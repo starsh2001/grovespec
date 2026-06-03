@@ -12,6 +12,8 @@ Changing an already-`done` node *later*. (Fixing mid-build happens inside grow/i
 > - Unchanged → just that spot. *Don't touch the other nodes that use it.*
 > - Changed → find the nodes that used that contract (grep + tree) and re-review them (propagation). This is the most expensive part.
 
+**Don't eyeball this — make it mechanical.** Diff the node's `Contract` section (before vs after). *Any* changed line — added, removed, reworded — counts as changed; when unsure, treat it as changed. The asymmetry is the point: a false "unchanged" silently breaks every consumer (the one drift GroveSpec exists to stop), while a false "changed" just costs one cheap extra review. **Bias to changed.**
+
 Don't make clones — one node = one Task. Old code lives in git; why it changed lives in the Change Log.
 
 ## Two kinds of change
