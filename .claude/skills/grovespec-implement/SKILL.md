@@ -5,7 +5,7 @@ description: Implements a GroveSpec node — turns a confirmed spec into real co
 
 # grovespec-implement
 
-Turning a confirmed spec into *code*. (Writing specs is `grovespec-grow`.)
+Turning a confirmed spec into *code*. (Writing specs is `grovespec-grow`.) Both roles get implemented: a **feature**'s leaf behavior, and a **skeleton**'s own structural code (container·interface·dispatch) — the skeleton's code is written against its children's Contracts (already defined by grow), so the children aren't needed yet.
 
 ## Session
 Thin — read only this node's Task and the *relevant code*. Don't pile up a long working context.

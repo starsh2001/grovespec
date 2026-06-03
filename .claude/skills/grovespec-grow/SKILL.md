@@ -26,6 +26,7 @@ Don't pile up a long working context. The truth is on disk; re-read when you nee
 Copy `.grovespec/templates/task.md` and fill it in. The format is fixed by `.grovespec/templates/FORMATS.md` — frontmatter (role·status·blocked_by·tdd) + Overview·Requirements·**Contract**·AC. Write the *content* in `config.language`.
 - **The contract matters most**: precise enough that *another node can rely on it alone, without seeing the internals* (what it takes·gives·empty cases).
 - Don't write *how* the code will look — that emerges in implement.
+- **`blocked_by`** = the shared/cross-tree nodes this one consumes (often `[]`); *not* the parent (that's in tree.md).
 
 ### 4. If it's a skeleton: define the children
 If this node is a skeleton, also define the *roles·contracts* of its direct children.
@@ -40,6 +41,6 @@ Call `grovespec-review` against *this spec* (scope by *node importance* — usua
 Show the spec to the human and get **"is this what you want?"** confirmed. The checkpoint *before* spending effort on implementation.
 
 ## When it's done
-The node's Task is filled in as concept, status `todo`. Next:
+The node's Task is filled in as concept, status `todo`. Next — **both roles get implemented**:
 - feature node → implement it with `grovespec-implement`.
-- skeleton → its children are now unblocked, so `grovespec-grow` each child.
+- skeleton → implement it too (its container/interface/dispatch code, written against the children's Contracts). When the skeleton is `done`, its children unblock — then `grovespec-grow` each child.

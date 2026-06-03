@@ -4,7 +4,7 @@
 > Reviewers write their findings in the project's language (`config.language`); the role lenses below are the fixed structure.
 
 ## Spawning
-- Spawn the reviewers as **parallel subagents**, one per role, as many as the level sets (`skip`=0, `light`=1–2, `standard`=3, `full`=5). Each subagent starts from an **empty context** — that independence is what makes them "cold". Send them in one batch so they run concurrently.
+- Spawn the reviewers as **parallel subagents** (Claude Code's Task tool), one per role, as many as the level sets (`skip`=0, `light`=1–2, `standard`=3, `full`=5). Each subagent starts from an **empty context** — that independence is what makes them "cold". Send them in one batch so they run concurrently. (This only works from the main session — see the review skill's invocation contract.)
 - For `skip`: spawn none; the caller self-checks against the criteria.
 - Each reviewer's prompt = **common preamble** + its **role lens** + the **findings format**. Never give them how the target was built, or the previous round's discussion.
 

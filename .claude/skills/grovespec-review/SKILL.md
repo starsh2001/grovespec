@@ -33,7 +33,7 @@ The level is set by three things — ① did the contract change ② how many co
 
 Reviewer-count·repeat defaults live in `config.yaml`'s `review.scale`. If the caller passes ①② (revise already computes them during propagation), use that to pick the level.
 
-> **Where it runs**: review runs *somewhere it can spawn subagents* (a main session the user invoked directly). *Deeply nested* inside another skill it can't spawn cold reviewers — so when grow/implement/revise call review, that skill must itself be running in the main session.
+> **Where it runs (the invocation contract).** GroveSpec skills run in your **main Claude Code session** — the main agent, which *can* spawn subagents. review spawns its cold reviewers as **subagents (Claude Code's Task tool)** from there. The one thing that breaks it: running a grovespec skill *as a subagent itself* — then it can't spawn the reviewers and review silently degrades to a non-cold self-check (defeating the whole point). So **invoke grovespec skills from the main session; never nest one inside a subagent.**
 
 ## One round
 

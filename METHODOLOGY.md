@@ -147,18 +147,18 @@ Each node in the tree becomes a **Task** file on disk (`docs/tasks/{node}.md`). 
 
 **There's only one kind of Task.** No tier names like epic·story. Every Task, wherever it sits, is the same kind, and by its tree position it takes **one of two roles**:
 
-- **Skeleton role** — builds the structure to hold what's below. When you make a skeleton, you also define the spec of the one level directly below it. That level may be features, or more skeletons.
-- **Feature role** — builds the actual behavior. If a feature is complex, split it into smaller features inside (Principle 1).
+- **Skeleton role** — holds what's below *and* builds its own structural code: the container, the interface, the dispatch/glue children slot into (a screen's layout, a CLI's command table, a module's public interface). When you make a skeleton you also define the spec of the one level directly below it (features, or more skeletons). A skeleton is *not* code-free — it's implemented like a feature, its code written against the children's Contracts.
+- **Feature role** — builds the actual leaf behavior. If a feature is complex, split it into smaller features inside (Principle 1).
 
 Individual components (buttons·dropdowns) are neither, so they're not Tasks — they're details decided when you build (Principle 2).
 
-Off-the-shelf SDD tools split work into multiple kinds, like epic·story. GroveSpec keeps a single kind and expresses hierarchy only through blocking (`Blocked By`), not through kinds.
+Off-the-shelf SDD tools split work into multiple kinds, like epic·story. GroveSpec keeps a single kind; hierarchy lives in tree.md (below), and `blocked_by` records only *cross-tree dependencies*.
 
-### Blocking: `Blocked By`
+### Blocking: `blocked_by`
 
-A parent has to build the structure (be Done) before a child can start, so a child Task is blocked by its parent. When a parent goes Done, its children can all start at once. The work order falls out naturally as "start from the Tasks that just got unblocked."
+Two things must be done before a node can start: its **parent** (which lays out the structure it slots into) and any **shared node it consumes** (e.g. auth, storage). The parent is already in tree.md, so `blocked_by` holds *only the second kind* — the cross-tree dependencies, **not the parent**. A node is unblocked when its parent (from tree.md) is done **and** every node in its `blocked_by` is done. The work order falls out as "start from the nodes that just got unblocked."
 
-> **How to record it**: it's almost always the parent. It could be a sibling or another Task, so the field is left open. Record it only when something actually blocks.
+> **How to record it**: `blocked_by` = the shared/cross-tree nodes this one depends on — usually `[]` for a leaf. Don't put the parent in (that's in tree.md). grow sets it when a node it defines consumes a shared node.
 
 ### Position is held by `docs/tree.md`
 
@@ -359,7 +359,7 @@ Success rides on two things.
 | How far the spec leads the code | 0 (not written) | just the next step | all up front |
 | Unit of work | none | one kind of Task, two roles (skeleton/feature) | epic ⊃ story (multiple kinds) |
 | How it's split | — | by entry point: skeleton + feature (components are out) | — |
-| How hierarchy is expressed | — | `Blocked By` (almost always the parent) | kind separation + separate docs |
+| How hierarchy is expressed | — | tree.md (parent-child) + `blocked_by` (cross-tree deps) | kind separation + separate docs |
 | Shared code | ignored | structural up front, accidental extracted on discovery | up-front architecture doc |
 | Source of tree structure | — | tree.md (point-in-time synced with code) | separate design doc |
 | Green/brownfield | — | same way | diverges |
