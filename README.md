@@ -4,6 +4,8 @@
 
 GroveSpec is a set of [Claude Code](https://claude.com/claude-code) skills + templates. You grow a project as a **tree of nodes**, where each node publishes a **Contract** — what it guarantees to the outside, so other nodes can rely on it without reading its internals. The spec stays *one node ahead* of the code, and every change is gated by a **cold, multi-reviewer** pass.
 
+> **Scope:** GroveSpec is for building *software*. Its core — interface Contracts, an entry-point tree, tests, code search, spec↔code drift — assumes code. It is not a general workflow for documentation or planning.
+
 ## The problem it targets
 
 At scale, spec-driven workflows tend to fail in two ways:
@@ -67,7 +69,7 @@ GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 
 ## Status
 
-Early, and validated by dogfooding — including a real cold-spawn, multi-reviewer run that caught planted flaws, emergent ones, *and* flaws introduced by its own fixes (no false convergence). Not yet a packaged tool; expect rough edges.
+Early. Validated by a controlled cold-spawn, multi-reviewer run on a planted-flaw sample — it caught the planted flaws, emergent ones, *and* flaws its own fixes introduced (no false convergence). Not yet used on a real project or packaged as a tool; expect rough edges.
 
 ---
 

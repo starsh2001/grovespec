@@ -4,6 +4,8 @@
 
 GroveSpec is a development methodology for handing coding work to an AI agent. An AI agent can only hold a limited amount of information at once (its context), so the work is cut into small pieces with defined steps to match.
 
+> **Scope — GroveSpec is for building software.** Its core assumes code: interface *Contracts*, a tree by entry point, tests-first, searching the codebase, spec↔code drift. It is *not* a general workflow for documentation, planning, or other prose work. (Some underlying principles — start rough, cold review, plain language — transfer; the workflow itself does not.)
+
 Off-the-shelf SDD (Spec-Driven Development) tools write the whole spec first, then build. GroveSpec is different. It doesn't write the spec out in full up front — it grows it a little at a time as it builds.
 
 The name comes from *grove* (a small wood), which shares a root with *grow*. In a single tree, the roots and branches are the skeleton, the leaves on them are the features, and the tree itself is the system. The word packs together a tree (a structure that forks top-down like branches) and growth.
