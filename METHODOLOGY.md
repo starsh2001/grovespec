@@ -237,7 +237,7 @@ Because structure (tree.md) and content (Task) are separated, there are two kind
 - **Behavior change** — reopen the node (done→in-progress) and fix it. *If the contract changed*, find the nodes that use that contract (grep+tree) and re-review them (propagation).
 - **Structure change** (split·merge·move) — edit tree.md.
 
-The procedure is in [SKILLS.md](SKILLS.md) under revise.
+The procedure is in [WORKFLOW.md](WORKFLOW.md) under revise.
 
 ---
 
@@ -272,7 +272,7 @@ Write code until the tests pass. Because you build knowing the risks and the exi
 "Does this Task break the contract it agreed with other Tasks." It works properly only when the things being compared are actually reviewed together. Verify against the modules the pre-check's code search pulled in.
 
 ### Review is done by several fresh eyes
-The per-node and integration reviews have several reviewers — who *didn't see how it was built* — find flaws in parallel with different roles, aggregate, and then check "is it over-strict." The strength (Critical / Should Fix / Nice to Have) and repeat (number of consecutive passes) are set in config, and each round runs as a new session. The detailed rules are in [SKILLS.md](SKILLS.md) §3.
+The per-node and integration reviews have several reviewers — who *didn't see how it was built* — find flaws in parallel with different roles, aggregate, and then check "is it over-strict." The strength (Critical / Should Fix / Nice to Have) and repeat (number of consecutive passes) are set in config, and each round runs as a new session. The detailed rules are in [WORKFLOW.md](WORKFLOW.md) §3.
 
 Because reviewers are *cold* (no memory of earlier rounds — or of a review months ago), a call made once would be re-made: the next cold review re-raises an issue the over-strictness check already ruled a nitpick, or re-flags an accepted gap. So when a review closes, the caller records the outcome and any *dropped-as-nitpick · accepted-gap* adjudications, with the reason, in the node's **Change Log**. (Accepted contract gaps are already unchecked AC; this just extends the same "don't re-decide it" protection across revisions — a Change-Log line, not a separate gate file.)
 
@@ -341,7 +341,7 @@ Success rides on two things.
 ## 9. Distribution form
 
 - **Target**: the Claude Code terminal (and compatible agents).
-- **Form**: per-step skills (`.claude/skills/`) + a light config (`.grovespec/`). The unit is not "whose role" but **"which step"** — divided by step, not by role. The five skills (init·grow·implement·review·revise) and how they're divided are in [SKILLS.md](SKILLS.md).
+- **Form**: per-step skills (`.claude/skills/`) + a light config (`.grovespec/`). The unit is not "whose role" but **"which step"** — divided by step, not by role. The five skills (init·grow·implement·review·revise) and how they're divided are in [WORKFLOW.md](WORKFLOW.md).
 - **The methodology is built into the skills.** Each step's skill carries its own guidance and reads only the files it needs, at the time, from the paths config points to.
 - **The unit of work is a markdown file on disk** (§5). It's not tied to a particular issue tracker or API; a board·IDE just reads these files and displays them.
 - **Install**: `npx grovespec`.

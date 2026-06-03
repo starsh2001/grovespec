@@ -65,7 +65,7 @@ GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 ## Design docs
 
 - [METHODOLOGY.md](METHODOLOGY.md) — the *what and why*: the principles and the reasoning behind them.
-- [SKILLS.md](SKILLS.md) — the *how*: the workflow, the steps, and how the skills are divided.
+- [WORKFLOW.md](WORKFLOW.md) — the *how*: the workflow, the steps, and how the skills are divided.
 
 ## Status
 
