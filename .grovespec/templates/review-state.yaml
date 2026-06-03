@@ -10,8 +10,20 @@ round: 1
 consecutive_passes: 0
 status: in-progress          # in-progress | passed | escalated
 
-# Confirmed issues for the caller to fix (this round's result)
+# Per-round outcome (append one entry per round)
+rounds:
+  - n: 1
+    outcome: fail            # pass | fail
+    found: { critical: 0, should_fix: 0, nice: 0 }   # counts after triage
+
+# Confirmed issues for the caller to fix (this round)
 open_issues:
   - severity: critical       # critical | should-fix | nice-to-have
     where: ""                # where (file · section · line)
     what: ""                 # what's wrong
+
+# Triage adjudications — do NOT re-raise these. A later cold review reads them to avoid re-litigating.
+adjudications:
+  - issue: ""                # short description
+    verdict: dropped         # dropped (nitpick) | accepted-gap
+    reason: ""               # why it's not a blocker

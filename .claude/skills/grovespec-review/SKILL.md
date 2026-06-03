@@ -36,6 +36,9 @@ Reviewer-count·repeat defaults live in `config.yaml`'s `review.scale`. If the c
 > **Where it runs**: review runs *somewhere it can spawn subagents* (a main session the user invoked directly). *Deeply nested* inside another skill it can't spawn cold reviewers — so when grow/implement/revise call review, that skill must itself be running in the main session.
 
 ## One round
+
+> The exact spawn mechanics, the reviewer prompt bodies, the findings format, and the triage prompt are in `references/reviewers.md` — load it to run a round, so every node's review comes out the same shape.
+
 1. **Spawn cold reviewers in parallel, *as many as the level sets*** (subagents, each with an empty context). If `skip`, spawn none and just self-check.
    - Each gets *only the target + criteria*. Not how it was built, not the prior round's discussion.
    - Send them in with *"Your job is to find flaws. Default to 'there is a problem'."*
@@ -55,5 +58,9 @@ Many identical reviewers all see the same weakness. Mix *different* eyes.
 - **Spec review (`spec`)**: consumer-impersonator (can I build mine from this contract alone?) · gap-finder (calmly walks the normal edge cases — empty·not-found·failure — and flags each one the contract leaves unanswered) · coherence (does it fill the parent's contract; for a skeleton, do the children's contracts sum to the parent's?) · non-expert (fails it on any jargon·fluff a layperson can't follow) · breaker (deliberately tries weird or broken inputs and unusual situations to make the contract fall apart). `full` uses all five; lighter levels take them from the front.
 - **Result review (`result`)**: correctness · security · the person who maintains this in 6 months · breaker (edge·failure) · non-expert.
 
+The prompt body for each role — plus the findings format and the triage prompt — is in `references/reviewers.md`.
+
 ## What it returns
 A **confirmed issue list** (by severity) written into `open_issues` and handed to the caller. **The caller fixes it, not review** — the caller already has the working context, and fixing needs no independence (review already guaranteed that, cold).
+
+Because reviewers are cold (no memory across rounds or revisions), the caller also records the outcome and any *dropped-as-nitpick · accepted-gap* adjudications — with the reason — in the node's Change Log, so a later cold review doesn't re-litigate what was already decided.

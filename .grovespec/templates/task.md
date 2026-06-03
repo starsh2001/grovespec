@@ -20,6 +20,7 @@ tdd_skip_reason: ""        # required when tdd: false
 {What it guarantees to the outside (the parent · other nodes): what it takes · what it gives · invariants (units · order · empty cases). Other nodes rely on this without seeing the internals.}
 
 ## AC
+<!-- Measurable non-functional targets (latency · throughput · error rate) go here as checkable items, e.g. "- [ ] p95 < 200ms @ 100 rps". -->
 - [ ] {acceptance criterion}
   - [ ] {detail}
 
@@ -27,4 +28,5 @@ tdd_skip_reason: ""        # required when tdd: false
 - [ ] {implementation step}
 
 ## Change Log
+<!-- Also record review outcomes + any dropped-as-nitpick / accepted-gap adjudications (with the reason) here, so a future cold review doesn't re-litigate them. -->
 - {YYYY-MM-DD} — {what changed and why, conceptually. Code diffs live in git.}

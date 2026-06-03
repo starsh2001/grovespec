@@ -216,6 +216,15 @@ tdd_skip_reason: ""        # required when tdd: false
 
 There's no `parent` in the frontmatter because you can see who the parent is from tree.md. The same information isn't kept in two places. (The exact fields·types·order are fixed by `.grovespec/templates/FORMATS.md` — the contract the tooling parses. Headers and field names are English; the *content* is written in `config.language`.)
 
+### Non-functional requirements (performance · security · reliability)
+
+GroveSpec keeps no separate NFR document — NFRs live where they bite:
+- *Global* rules (e.g. "every request is authenticated", "all amounts are whole-won") → `conventions.md`.
+- *Per-node behavioral* invariants (units · order · empty cases) → the node's **Contract**.
+- *Measurable targets* (latency · throughput · error rate) → the node's **AC, written as checkable items** ("- [ ] p95 < 200ms @ 100 rps"), so a test or the review can verify them rather than waving at vague prose.
+
+Security and reliability are also actively probed by the review's *breaker* and *security* personas. NFRs are first-class *content*, just not a first-class *file* — keep them measurable, and put them where the work touches them.
+
 ### It doesn't matter where it was made
 
 A Task is a markdown file on disk. Whether a human wrote it by hand or an external tool converted it, it works the same as long as the format matches. GroveSpec only defines the file format and the rules; it doesn't know external tools exist.
@@ -262,6 +271,8 @@ Write code until the tests pass. Because you build knowing the risks and the exi
 
 ### Review is done by several fresh eyes
 The per-node and integration reviews have several reviewers — who *didn't see how it was built* — find flaws in parallel with different roles, aggregate, and then check "is it over-strict." The strength (Critical / Should Fix / Nice to Have) and repeat (number of consecutive passes) are set in config, and each round runs as a new session. The detailed rules are in [SKILLS.md](SKILLS.md) §3.
+
+Because reviewers are *cold* (no memory of earlier rounds — or of a review months ago), a call made once would be re-made: the next cold review re-raises an issue the over-strictness check already ruled a nitpick, or re-flags an accepted gap. So when a review closes, the caller records the outcome and any *dropped-as-nitpick · accepted-gap* adjudications, with the reason, in the node's **Change Log**. (Accepted contract gaps are already unchecked AC; this just extends the same "don't re-decide it" protection across revisions — a Change-Log line, not a separate gate file.)
 
 ---
 
