@@ -1,0 +1,149 @@
+# GroveSpec workflow and skills
+
+> This document defines how GroveSpec actually runs — which steps, in what order, what comes out, and how the skills are divided.
+> The *why* lives in [METHODOLOGY.md](METHODOLOGY.md).
+
+---
+
+## 1. The big picture
+
+GroveSpec's goal is to **minimize the drift between spec and code**. To do that, whatever you change, you keep the *touched area small (a partial tree)*.
+
+```
+init (once)
+  → [ grow → implement → done ] repeat     (grow the tree one node at a time)
+  → revise (when changing an already-done node later)
+```
+
+- The spec stays **one node ahead** of the code. Top-down, one layer at a time.
+- grow and implement each contain a **review loop** (review → fix → review again).
+- The human looks and confirms at a glance, *before building (the spec)* and *after building (the result)*.
+
+---
+
+## 2. The five skills
+
+There are five units you invoke.
+
+### init — set up the project once
+- **When**: once, at the start.
+- **What it does**: figures out what you have (just an idea / rough spec / detailed spec / code / code+docs) → keeps reference docs as originals + a location map; if there's code, reads it to extract the tree → creates the brief·config·tree.md·root+first-level tasks.
+- **Output**: brief.md, tree.md (rough whole, ids only), tasks/ (root+first level), conventions.md (empty), config, ref/ (if present).
+- **Session**: once, thin.
+
+### grow — write the next node's spec
+- **When**: unfolding the tree by one node. Start from an unblocked node (its parent is done).
+- **What it does**: writes that node *as concept only* (→ §4). If it's a skeleton, also fixes the roles and contracts of its direct children and adds their ids to tree.md. → review (the spec) → fix → human check.
+- **Output**: tasks/TASK-N.md, (if a skeleton) an updated tree.md.
+- **Session**: thin (reads only the parent's contract).
+
+### implement — build that node
+- **When**: implementing a node whose spec is confirmed.
+- **What it does**: pre-check (risks·conventions·grep existing code) → tests first (skip for nodes hard to test up front, with the reason recorded) → code → review (the result) → fix → human check → done.
+- **Output**: src/, tests/, an updated Task (status done, Change Log).
+- **Session**: thin (the node's spec + relevant code only).
+
+### review — review
+- **When**: called internally by grow·implement·revise. Can also be called on its own.
+- **What it does**: takes the result (spec or code) + the criteria, has several *fresh-eyes* reviewers find flaws, triages, and returns a **confirmed issue list**.
+- **Session**: **this is the only one that splits off.** It spawns several reviewers that start from an empty context in new sessions and runs them in parallel (with different roles), aggregates → over-strictness check → runs as many rounds as strength·repeat call for. Each round is a new session, and state is handed over via a file on disk. (→ §3)
+
+### revise — change an already-done node
+- **When**: deliberately changing a done node later, or changing the tree structure.
+- **What it does**:
+  - *Behavior change*: reopen the node (done→in-progress) and change it → **if the contract changed**, find the nodes that use that contract (grep+tree) and re-review them (propagation) → fix → record why it changed.
+  - *Structure change (split·merge·move)*: change tree.md (the shape) + **the parent Task('s) child list** (drop from the old parent, add to the new). The moved node's own Task stays (it doesn't record its parent). Here too, **if the contract changes**, re-review the nodes that use it (propagation). Default to *keeping the outer contract* — that's what keeps the touched area small.
+- **Session**: thin.
+
+> **Fixing (apply) is not a separate skill.** When review returns the confirmed issue list, the *caller* fixes it right there. The caller already has the working context, and fixing needs no independence (review already guaranteed that, cold).
+
+---
+
+## 3. Review rules
+
+- **Fresh eyes**: a reviewer *doesn't see how it was built.* They look only at the result + the criteria, and go in with "my job is to find flaws; the default is 'there's a problem'."
+- **Different roles**: many identical reviewers see only the same weakness. Mix *different* eyes — like security / the future maintainer / a non-expert / a breaker.
+- **Non-expert reviewer**: one of them becomes "a non-expert" and fails it on any jargon or fluff they can't follow. (The lever that forces a spec to be *confirmable by a human at a glance*.)
+- **Strength (how far to block)**: issues split into Critical / Should Fix / Nice to Have.
+  - level 1: pass if no Critical
+  - level 2: pass if no Critical·Should Fix
+  - level 3: pass only if none of the three
+- **Repeat (how many passes before stopping)**: stop after one pass, or require N passes in a row. (Stops the "passed once, but found more on a re-read" problem.)
+- **Over-strictness check**: at the end, a separate look at whether the raised issues are *real blockers or nitpicks*. Nitpicks are dropped. (Stops it looping forever.)
+- **Stop safety**: set a max round count; if it can't finish within that, take the remaining issues to the human.
+- Strength·repeat are set in config, and can be set per node.
+- **Scale review effort to the size of the change** — a small change with an unchanged contract gets 0 reviewers (`skip`); a changed contract·many consumers·important node gets `full` (5 reviewers × repeat); in between is `light`/`standard`. (When the caller passes the blast radius, review picks the level.)
+
+**When reviewing a spec (= is the contract good?):**
+- **Consumer impersonation**: one reviewer pretends *"I'm a node that will use this"* and tries to build theirs from the contract alone. Wherever they have to *guess* is a hole in the contract. (This impersonation also sets the precision — only as much as a consumer needs.)
+- **Gap finding**: does the contract answer "when empty / when not found / when it fails"?
+- **Coherence**: does a child's contract fill *what the parent promised on its behalf*? For a skeleton, *do the children's contracts sum to the parent's* (nothing missing, nothing overlapping)?
+
+---
+
+## 4. Task file format (concept only)
+
+A Task holds *concept* only. **It does not record what the code looks like** — that's read from the code.
+
+```markdown
+---
+id: TASK-N
+name: "{node name}"
+role: feature              # skeleton | feature
+status: backlog            # backlog | todo | in-progress | review | done
+blocked_by: []             # [TASK-2, ...] / [] if none
+tdd: true                  # true | false
+tdd_skip_reason: ""        # required when tdd: false
+---
+
+## Overview
+{what, and why.}
+
+## Requirements
+{what it must do. From the user's point of view.}
+
+## Contract
+{what it guarantees to the outside (parent·other nodes). Other nodes rely on this without seeing the internals.}
+
+## AC
+- [ ] {acceptance criterion}
+
+## Subtasks
+- [ ] {implementation step}
+
+## Change Log
+- {YYYY-MM-DD} — {what changed and why — conceptually}
+```
+
+- Position (who the parent is) is held by tree.md. A Task doesn't record its Parent.
+- "Which code changed how" is held by git; "why it changed" by the Change Log.
+- The exact fields·types·order are fixed by `.grovespec/templates/FORMATS.md` (the contract the tooling parses). Headers and field names are English; the *content* is written in `config.language`.
+
+---
+
+## 5. Sessions and tokens
+
+- The *only* one that must split off into a new session is **review** (it needs independence).
+- Everything else runs **thin** — reading only what's needed at the time from disk, not piling up a long working context. The truth is on disk, so it's safe to stop, and not dragging dead context saves tokens too.
+
+---
+
+## 6. How the skills are divided
+
+1. **Group by the same grain** — so a user immediately knows "this kind of thing goes here."
+2. **Split the session when independence is needed** (review). Otherwise you may continue, or cut thin for tokens.
+3. **Keep the skill body thin**, with per-case notes in separate files loaded *only when needed*.
+
+> Reducing the number of skills isn't the goal. The split is by *core vs. fluff*.
+
+---
+
+## 7. Not yet settled
+
+Settled: contract verification (§3) · structure change (§2 revise) · brownfield code→tree (init `code-to-tree`) · review cost = change-size scaling (§3) · the real cold-spawn of a full-level review (validated in a main session; the 5th `spec` role added). Remaining:
+
+- **Terminal-convergence demo** — through to a clean pass + repeat=2 consecutive passes.
+- grow·implement **full cycle**, init on a large codebase.
+- When two far-apart nodes share a contract — their common parent is the top, so the partial tree grows large.
+- When several agents work *different branches at the same time* (spec conflicts).
+- Where to stop node size (the split criterion), and how to find the risk list.

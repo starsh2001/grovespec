@@ -1,0 +1,26 @@
+version: 1
+
+# Language for the CONTENT of generated artifacts (specs, brief, conventions, reviews).
+# Headers and field names stay fixed (English) — only the prose is written in this language.
+# Set once at init: match existing docs if any, otherwise the language the user works in. en | ko | ja | ...
+language: en
+
+# Only the paths (locations) are changeable. The structure is fixed.
+paths:
+  brief: docs/brief.md
+  tree: docs/tree.md
+  conventions: docs/conventions.md
+  tasks: docs/tasks/
+  ref: docs/ref/
+
+# Review defaults (overridable per node).
+review:
+  strength: 2        # how far to block: 1=Critical · 2=+Should Fix · 3=+Nice to Have
+  max_rounds: 5
+
+  # Scale review effort (reviewer count·repeat) to the change's blast radius. The review skill picks the level.
+  scale:
+    skip:     { reviewers: 0, repeat: 0 }   # contract unchanged + trivial (format·comment)
+    light:    { reviewers: 2, repeat: 1 }   # contract unchanged + small change
+    standard: { reviewers: 3, repeat: 1 }   # normal (new feature node)
+    full:     { reviewers: 5, repeat: 2 }   # contract changed / many consumers / important node

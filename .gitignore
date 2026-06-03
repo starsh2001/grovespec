@@ -1,0 +1,10 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Local editor / OS
+.DS_Store
+.claude/settings.local.json
+
+# GroveSpec scratch
+.grovespec/_tmp_*

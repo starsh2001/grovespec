@@ -1,0 +1,17 @@
+# State of one review cycle. Each round is a new session that reads only this file and continues.
+target: tasks/TASK-0.md      # what's under review (a spec file or code location)
+target_type: spec            # spec | result
+level: full                  # skip | light | standard | full  (reviewer count·repeat, scaled to blast radius)
+strength: 2                  # 1 | 2 | 3
+repeat: 2                    # must pass N rounds in a row to finish
+max_rounds: 5
+
+round: 1
+consecutive_passes: 0
+status: in-progress          # in-progress | passed | escalated
+
+# Confirmed issues for the caller to fix (this round's result)
+open_issues:
+  - severity: critical       # critical | should-fix | nice-to-have
+    where: ""                # where (file · section · line)
+    what: ""                 # what's wrong
