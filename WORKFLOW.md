@@ -7,7 +7,7 @@
 
 ## 1. The big picture
 
-GroveSpec's goal is to **minimize the drift between spec and code**. To do that, whatever you change, you keep the *touched area small (a partial tree)*.
+GroveSpec's goal is to **minimize the drift between spec and code**. To do that, whatever you change, you keep the *touched area small* — a **partial tree**: the node you change plus the few nodes its contract touches (its children and its consumers), never the whole tree.
 
 ```
 init (once)

@@ -44,9 +44,9 @@ Risks hold only "where it might break." Leave out "what to build."
 ### 5. Make the files
 - **tree.md** — the rough whole tree, *ids only*. A hypothesis.
   ```
-  TASK-1
-  ├─ TASK-2
-  └─ TASK-3
+  - TASK-1
+    - TASK-2
+    - TASK-3
   ```
 - **tasks/** — only the root (TASK-1) and *its direct children*. Concepts only. Follow `.grovespec/templates/task.md` and `.grovespec/templates/FORMATS.md`.
 - **conventions.md** — start empty (filled in as you build). For a *brownfield* project you may fill in facts the code guarantees (terms·global rules) → `references/code-to-tree.md`.

@@ -42,4 +42,4 @@ Sections (`##`, fixed): `Glossary` · `Common Rules`.
 Table. Fixed columns: `Topic | File | Location`.
 
 ## config.yaml
-`version`, `language`, `paths`, `review` (`strength` 1–3 · `repeat` · `max_rounds`).
+`version`, `language`, `paths`, `review` (`strength` 1–3 · `max_rounds` · `scale`).

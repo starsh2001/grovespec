@@ -13,7 +13,7 @@ At scale, spec-driven workflows tend to fail in two ways:
 - **Specs a human can't actually review** — vast documents full of terms a person can't follow, so review degrades into a rubber stamp.
 - **Drift** — the spec and the code slowly disagree, because one change ripples through a document nobody re-reads.
 
-GroveSpec fights both: keep each change inside a **small partial tree** (so it's cheap to review deeply), and keep specs **plain enough to confirm at a glance**.
+GroveSpec fights both: keep each change inside a **small partial tree** — the node you change plus the few nodes its contract touches (its children and its consumers), never the whole tree — so it's cheap to review deeply; and keep specs **plain enough to confirm at a glance**.
 
 ## How it works
 

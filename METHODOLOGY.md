@@ -165,12 +165,12 @@ A parent has to build the structure (be Done) before a child can start, so a chi
 Where each Task sits in the tree is written in `docs/tree.md`, not in the Task file. tree.md draws the tree shape with Task numbers only:
 
 ```
-TASK-1
-├─ TASK-2
-│   ├─ TASK-4
-│   └─ TASK-5
-└─ TASK-3
-    └─ TASK-6
+- TASK-1
+  - TASK-2
+    - TASK-4
+    - TASK-5
+  - TASK-3
+    - TASK-6
 ```
 
 Why numbers only — a node name can change (rename) but the number doesn't. Link by name and you'd have to fix tree.md on every rename; link by number and you don't touch it. Each number points to `docs/tasks/TASK-N.md`, and the node name lives inside that file.
@@ -344,11 +344,8 @@ Success rides on two things.
 - **Form**: per-step skills (`.claude/skills/`) + a light config (`.grovespec/`). The unit is not "whose role" but **"which step"** — divided by step, not by role. The five skills (init·grow·implement·review·revise) and how they're divided are in [WORKFLOW.md](WORKFLOW.md).
 - **The methodology is built into the skills.** Each step's skill carries its own guidance and reads only the files it needs, at the time, from the paths config points to.
 - **The unit of work is a markdown file on disk** (§5). It's not tied to a particular issue tracker or API; a board·IDE just reads these files and displays them.
-- **Install**: `npx grovespec`.
+- **Install**: copy `.claude/skills/grovespec-*` and `.grovespec/` into your project (an `npx grovespec` installer is on the roadmap).
 - **Design principle**: GroveSpec itself follows §2 — fix as little as possible. It enforces only the order of steps and the gates, and leaves what to build within each step blank. Off-the-shelf SDD tools get heavy because they make you fill in templates with no blanks left. GroveSpec sets only the steps and leaves the content blank. How finely to split, how detailed to write the spec — these aren't set by rule. The agent follows the default approach ("skeleton or feature, don't go down to the component") but adjusts to the situation.
-
-### What to build first
-Once this design document is refined enough, the actual skill files and README are built from here. Document first, skills second. Starting rough and moving to detail — applying this methodology to this document itself.
 
 ---
 
