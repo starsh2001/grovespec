@@ -62,7 +62,16 @@ GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 
 **See a complete worked project:** [examples/expense-cli](examples/expense-cli) — a **brownfield** mini-CLI: its existing code *documented* as filled brief · tree · Tasks (real Contracts, honest gaps). The best way to see what good specs look like before you start.
 
-> A one-command installer (`npx grovespec`) and a human-facing tree view are on the roadmap.
+**Optional deterministic checks** ship in `.grovespec/bin/grovespec` (no install — needs only `bash`, which the required `git` already provides on every OS):
+
+- `validate` — format + graph coherence (orphans, cycles, impossible states); exits non-zero with fixes.
+- `status` — each node's state + which are unblocked, and what's next.
+- `impact TASK-N` — the consumer set a contract change reaches (the blast radius).
+- `tree` — the id-only tree rendered with names + status.
+
+They're a bonus enforcement floor (CI-friendly); the core loop runs on the skills + cold review without them.
+
+> A one-command installer (`npx grovespec`) is on the roadmap.
 
 ## Design docs
 
