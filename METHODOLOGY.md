@@ -51,26 +51,20 @@ The PRD and architecture are finished before building starts. The only thing tha
 ### The GroveSpec order
 
 ```
-1. Write the Task file
-     - Overview·Requirements·spec      (think through what to build)
-     - AC                              (acceptance criteria)
+1. grow:      write ONE node's draft Task   (Overview·Requirements·Contract·AC)
    ↓
-2. Write tests first   (from the AC, before building)
+2. verify:    cold multi-persona check of the draft → fix → human approve   (draft → approved)
    ↓
-3. Build
+3. implement: tests first (from the AC) → code → confirm the node's decomposition   (→ implemented)
    ↓
-4. Review
-     - did the tests pass?
-     - if the implementation differs from the spec:
-         intentional difference → update the spec + record in the Change Log
-         a mistake              → fix the implementation
+4. review:    run the tests + cold-review the diff → fix loop → human confirm   (→ reviewed → done)
    ↓
-5. Write the next Task   (just the next one step)
+5. grow the next node   (a child of this now-done node)
    ↓
    back to step 1 (repeat)
 ```
 
-The order matters. You write the Task file first and write code from it. You don't write code first and reconcile the spec afterward. And you don't skip the review. If the code has diverged from the spec, you must reconcile it in review and record why it changed.
+The order matters. The spec is verified *before* any code (a contract flaw caught there is free), and the code is gated by *tests* plus a cold review of its *diff*. You don't write code first and reconcile the spec afterward. If the code diverges from the spec: a mistake → conform the code; an intentional change → that's a contract change, done via *revise* (+ Change Log), never a silent edit.
 
 The spec leads the code by only one step. You have to decide what to build next, so you need a plan one step ahead. But decide details much further out, well ahead, and you'll have to fix them when they don't fit as you build.
 
@@ -100,7 +94,7 @@ When a feature needs to be shared, you don't design it up front; you split it ou
 
 Stand up the top skeleton first, top-down, and dig one layer deeper at a time. Because a parent skeleton lays out the structure its children will slot into, and the children slot in there, **there's no later step where you merge things back together.**
 
-**The tree is a hypothesis, not a fixed design.** The first skeleton should hold a rough whole tree so there's a frame to divide the work by. When building reveals something wrong, you fix it.
+**The tree is a hypothesis, not a fixed design.** It isn't drawn whole up front — `tree.md` holds only the nodes that currently exist, and grows one node at a time as each parent is built and reveals what it needs. Nothing below a node is committed until that node is `done`; when building reveals a planned child was wrong, you simply don't grow it (or *revise*).
 
 **The tree structure is written separately in `docs/tree.md`.** It's a file that expresses the tree shape with Task numbers only (→ §5). The structure is recorded here so you don't have to re-derive the tree from the code every time.
 
@@ -145,7 +139,7 @@ Each node in the tree becomes a **Task** file on disk (`docs/tasks/{node}.md`). 
 
 **There's only one kind of Task.** No tier names like epic·story. Every Task, wherever it sits, is the same kind, and by its tree position it takes **one of two roles**:
 
-- **Skeleton role** — holds what's below *and* builds its own structural code: the container, the interface, the dispatch/glue children slot into (a screen's layout, a CLI's command table, a module's public interface). When you make a skeleton you also define the spec of the one level directly below it (features, or more skeletons). A skeleton is *not* code-free — it's implemented like a feature, its code written against the children's Contracts.
+- **Skeleton role** — holds what's below *and* builds its own structural code: the container, the interface, the dispatch/glue children slot into (a screen's layout, a CLI's command table, a module's public interface). A skeleton is *not* code-free — it's implemented like a feature. Whether a node *is* a skeleton, and what its children are, is **confirmed when it's implemented** (recorded as its decomposition in the Change Log); the children are then grown one at a time, after it's `done`.
 - **Feature role** — builds the actual leaf behavior. If a feature is complex, split it into smaller features inside (Principle 1).
 
 Individual components (buttons·dropdowns) are neither, so they're not Tasks — they're details decided when you build (Principle 2).
@@ -199,20 +193,22 @@ A Task is a markdown file on disk. Whether a human wrote it by hand or an extern
 ### Changing an already-done node
 
 Because structure (tree.md) and content (Task) are separated, there are two kinds of change.
-- **Behavior change** — reopen the node (done→in-progress) and fix it. *If the contract changed*, find the nodes that use that contract (grep+tree) and re-review them (propagation).
+- **Behavior change** — reopen the node (to `draft` if the spec/contract changes, else `approved`) and fix it. *If the contract changed*, find the nodes that use that contract (grep+tree) and re-verify·re-review them (propagation).
 - **Structure change** (split·merge·move) — edit tree.md.
 
 The procedure is in [WORKFLOW.md](WORKFLOW.md) under revise.
 
 ---
 
-## 6. The per-Task gate
+## 6. The per-node gate
 
-Every time you build a feature Task, it goes through the flow below. Start from a Task whose `blocked_by` is cleared.
+Every node goes through the same gate, starting once its parent is `done`.
 
 ```
-pre-check → write tests first → build → review
+grow (draft) → verify (→ approved) → [ pre-check → tests first → build ] (→ implemented) → review: tests + cold diff review ⇄ fix (→ done)
 ```
+
+The spec is checked *before* any code (`verify`); the code is gated by *tests* + a cold review of its *diff* (`review`). The middle three — pre-check, tests-first, build — are `implement`.
 
 ### Pre-check
 1. **Look up risks** — is there a risk in `docs/brief.md` this Task touches? If so, go in knowing it before building.
@@ -225,17 +221,16 @@ Write tests from the AC first. With no implementation yet, the tests fail. These
 That said, for cases hard to pin down with tests up front — exploratory prototypes·UI work·hardware-dependent checks — this step may be skipped. If skipped, record the reason in the Task frontmatter's `tdd_skip_reason`. The detailed judgment is handled by the skill.
 
 ### Build
-Write code until the tests pass. Because you build knowing the risks and the existing code, the risky parts come out right from the start and no duplication arises.
+Write code until the tests pass. Because you build knowing the risks and the existing code, the risky parts come out right from the start and no duplication arises. Building also **confirms the node's `role`**: a leaf, or a skeleton whose **decomposition** (its children + each child's contract clause) is recorded in the Change Log. The node is now `implemented`.
 
-### Review — one pass, two questions
-The review (a single `grovespec-review` call) asks two things:
-- *Did this Task do its own job?* — tests pass, AC met. If the implementation differs from the spec: an intentional difference → update the spec + record in the Change Log; a mistake → fix the implementation.
-- *Does it still fit with the others?* — does it break a contract it agreed with another Task? The **coherence** reviewer checks this against the modules the pre-check's code search pulled in.
+### Two review points: verify (spec) then review (code)
+The cold multi-persona scrutiny runs **twice, on different things**:
+- **verify** (before code) asks *is the contract good?* — consumer-impersonation, gap-finding, coherence (does a child fill the parent; do a skeleton's children sum to it), non-expert. Spending it here is the point: a contract flaw caught before code is free.
+- **review** (after code) asks *is this code good?* — it runs the **tests** (every AC item should have a passing test) and cold-reviews **only this node's diff** (correctness · security · maintainer · breaker · test-quality). It does **not** re-ask spec questions, and it never reads the wider codebase — that bound keeps cost flat as the project grows.
 
-### Review is done by several fresh eyes
-The review has several reviewers — who *didn't see how it was built* — find flaws in parallel with different roles, aggregate, and then (on `full`) check "is it over-strict." Strength (config `strength`: 1 = block on Critical · 2 = +Should Fix · 3 = +Nice to Have) and repeat (consecutive clean passes, set per scale level) come from config, and each round runs as a new session. The detailed rules are in [WORKFLOW.md](WORKFLOW.md) §3.
+Both run several reviewers — who *didn't see how it was built* — in parallel as subagents, aggregate, and (on `full`) check "is it over-strict." Strength·repeat·scale come from config (`verify:` / `review:`), each round a new cold session. Detailed rules: [WORKFLOW.md](WORKFLOW.md) §3.
 
-Because reviewers are *cold* (no memory of earlier rounds — or of a review months ago), a call made once would be re-made: the next cold review re-raises an issue the over-strictness check already ruled a nitpick, or re-flags an accepted gap. So when a review closes, the caller records the outcome and any *dropped-as-nitpick · accepted-gap* adjudications, with the reason, in the node's **Change Log**. (Accepted contract gaps are already unchecked AC; this just extends the same "don't re-decide it" protection across revisions — a Change-Log line, not a separate gate file.)
+Because reviewers are *cold* (no memory of earlier rounds — or of a review months ago), a decision once made would be re-made. So when verify/review closes, the *dropped-as-nitpick · accepted-gap* adjudications are recorded (with the reason) in the node's **Change Log**, so a later cold review — or a future revision's — doesn't re-litigate them. (A Change-Log line, not a separate gate file.)
 
 ---
 
@@ -302,7 +297,7 @@ Success rides on two things.
 ## 9. Distribution form
 
 - **Target**: the Claude Code terminal (and compatible agents).
-- **Form**: per-step skills (`.claude/skills/`) + a light config (`.grovespec/`). The unit is not "whose role" but **"which step"** — divided by step, not by role. The five skills (init·grow·implement·review·revise) and how they're divided are in [WORKFLOW.md](WORKFLOW.md).
+- **Form**: per-step skills (`.claude/skills/`) + a light config (`.grovespec/`). The unit is not "whose role" but **"which step"** — divided by step, not by role. The seven skills (init·grow·verify·implement·review·fix·revise) and how they're divided are in [WORKFLOW.md](WORKFLOW.md).
 - **The methodology is built into the skills.** Each step's skill carries its own guidance and reads only the files it needs, at the time, from the paths config points to.
 - **The unit of work is a markdown file on disk** (§5). It's not tied to a particular issue tracker or API; a board·IDE just reads these files and displays them.
 - **Install**: copy `.claude/skills/grovespec-*` and `.grovespec/` into your project (an `npx grovespec` installer is on the roadmap).
@@ -315,7 +310,7 @@ Success rides on two things.
 | Aspect | Vibe coding | GroveSpec | Off-the-shelf SDD tools |
 |---|---|---|---|
 | Spec exists | No | Yes | Yes |
-| When the spec is known | — | Task→test→build→review→next Task | all fixed before start |
+| When the spec is known | — | grow→verify→implement→review→next node | all fixed before start |
 | Where the spec lives | — | inside the cycle (keeps growing) | outside the cycle (fixed once) |
 | How far the spec leads the code | 0 (not written) | just the next step | all up front |
 | Unit of work | none | one kind of Task, two roles (skeleton/feature) | epic ⊃ story (multiple kinds) |
@@ -339,7 +334,7 @@ project root/
       {node}.md
     ref/                   #   reference docs (detailed·existing specs). Originals, unchanged. May be absent
   .claude/skills/          # ── platform (Claude) owns: the methodology skills ──
-    grovespec-init/  grovespec-grow/  grovespec-implement/  grovespec-review/  grovespec-revise/
+    grovespec-init/  grovespec-grow/  grovespec-verify/  grovespec-implement/  grovespec-review/  grovespec-fix/  grovespec-revise/
   .grovespec/              # ── the tool owns: config·templates only ──
     config.yaml            #   customize paths (default docs/...) + language. The model itself is fixed.
     templates/

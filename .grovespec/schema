@@ -4,9 +4,9 @@
 
 task.fm.required: id|name|role|status|blocked_by|tdd
 task.fm.enum.role: skeleton|feature
-task.fm.enum.status: backlog|todo|in-progress|done
+task.fm.enum.status: draft|approved|implemented|reviewed|fixed|done
 task.sections: Overview|Requirements|Contract|AC|Subtasks|Change Log
 brief.fm.required: name
 brief.sections: Direction|Scope|Risks
 conventions.sections: Glossary|Common Rules
-lifecycle: backlog|todo|in-progress|done
+lifecycle: draft|approved|implemented|reviewed|fixed|done

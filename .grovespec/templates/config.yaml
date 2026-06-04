@@ -14,16 +14,31 @@ paths:
   ref: docs/ref/
   src: src/                 # where implemented code goes
   tests: tests/             # where tests go
-  review: .grovespec/review/  # review-cycle state (one <node-id>.yaml per reviewed node)
+  review: .grovespec/review/  # cold-review state (<id>.verify.yaml + <id>.review.yaml per node)
 
-# Review defaults (overridable per node).
-review:
+# Cold-review defaults (overridable per node). TWO cold-review steps share one engine:
+#   verify = the SPEC (the draft) — code not written yet.
+#   review = the CODE (this node's DIFF only) + the test results.
+
+# verify — spec cold-review (multi-persona on the draft). Scales to how far the contract reaches.
+verify:
   strength: 2        # how far to block: 1=Critical · 2=+Should Fix · 3=+Nice to Have
   max_rounds: 5
-
-  # Scale review effort (reviewer count·repeat) to how far the change reaches (how many consumers). The review skill picks the level.
+  # reviewer count·repeat, scaled to the change's reach (consumers / skeleton). verify picks the level.
   scale:
-    skip:     { reviewers: 0, repeat: 0 }   # contract unchanged + trivial (format·comment)
-    light:    { reviewers: 2, repeat: 1 }   # contract unchanged + small change
-    standard: { reviewers: 3, repeat: 1 }   # normal (new feature node)
+    skip:     { reviewers: 0, repeat: 0 }   # trivial spec edit (format·comment)
+    light:    { reviewers: 2, repeat: 1 }   # small, contract unchanged
+    standard: { reviewers: 3, repeat: 1 }   # a normal new node
     full:     { reviewers: 5, repeat: 2 }   # contract changed / 3+ consumers / a skeleton
+
+# review — code cold-review on THIS NODE'S DIFF only (never the whole codebase) + tests.
+review:
+  test: ""           # command to run this project's tests (e.g. "pytest -q", "npm test"). Empty → review infers/asks.
+  strength: 2
+  max_rounds: 5
+  # reviewer count·repeat, scaled to the diff's size·risk (security-touching / big diff → higher). review picks the level.
+  scale:
+    skip:     { reviewers: 0, repeat: 0 }   # trivial diff (format·comment·≤2 lines)
+    light:    { reviewers: 2, repeat: 1 }   # small diff, no new behavior
+    standard: { reviewers: 3, repeat: 1 }   # a normal node's implementation
+    full:     { reviewers: 5, repeat: 2 }   # security-touching / large / contract-bearing diff

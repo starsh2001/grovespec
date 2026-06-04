@@ -24,4 +24,4 @@
 Compress the conversation into `brief.md` (template `.grovespec/templates/brief.md`): **Direction** (2-3 sentences) · **Scope** (Does / Doesn't — what's deliberately left out matters as much as what's in) · **Risks** (where it might break, *not* what to build). Short, plain, in `config.language`. If more than ~5 risks surface, keep only the *shape-changing* ones — the rest belong to grow.
 
 ## When done
-Return to `grovespec-init`'s flow — set the language, then build from the brief (tree.md + root + first level), with the human-check at the end ("is this the right direction?") gating it before any effort goes into growing the tree.
+Return to `grovespec-init`'s flow — set the language, then build from the brief (tree.md + the root Task only, `draft`), with the human-check at the end ("is this the right direction?") gating it before any effort goes into growing the tree.

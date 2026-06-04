@@ -5,15 +5,17 @@ description: Sets up GroveSpec in a project for the first time (just once). Look
 
 # grovespec-init
 
-The first-time setup of a GroveSpec project. Runs **once**. When it's done, `grovespec-grow` takes over.
+The first-time setup of a GroveSpec project. Runs **once**. When it's done, the per-node cycle (`grow → verify → implement → review ⇄ fix → done`) takes over.
 
 > **Language — establish it first, don't assume.** These skill files are English; your replies are not. Determine the working language in this order: **(1) the language of the user's messages; (2) the OS locale — `$LANG`/`LC_ALL`/`LC_MESSAGES`, or PowerShell `Get-Culture` on Windows; (3) if still unclear, ASK. Never silently default to English.** Write it to `config.language` (§3) and reply in it from your first response. (Every later skill just *reads* `config.language` — no re-detecting.)
 
-## One principle: top in detail, the rest rough
+## One principle: only the root, nothing below yet (greenfield)
 
-Even if you brought a detailed spec, don't unfold the whole tree. Write **only the root + one layer below** properly; leave everything under that as a rough shape (a hypothesis).
+Starting from an idea or a spec doc, don't unfold the tree. Write **only the root** — one Task, `status: draft`. Everything below is grown later, one node at a time, *after* the root is built and `done`.
 
-Because — if you bake unverified assumptions into the whole tree, then when an assumption turns out wrong while building the top, you have to redo the whole tree below it. The tree is *a hypothesis, not a fixed design.*
+Because — bake unverified assumptions into the tree and, when one turns out wrong while building the top, you redo everything below it. The tree is *a hypothesis, not a fixed design*; commit nothing below the root until the root is done.
+
+(*Brownfield* — existing code — is the exception: the code is already-built reality, so `references/code-to-tree.md` maps the whole existing structure at once, all `done`. "Root only" is about not pre-baking what *isn't built yet*.)
 
 ## Flow
 
@@ -25,7 +27,7 @@ Because — if you bake unverified assumptions into the whole tree, then when an
 | What you have | How to build the tree | Reference docs |
 |---|---|---|
 | Just an idea / rough spec | explore it out → a lean brief (`references/explore.md`) | none |
-| Detailed spec doc | in conversation (one layer at a time) | keep in ref/ |
+| Detailed spec doc | root only; `grow` unfolds the rest later | keep in ref/ |
 | Existing code (±docs) | read the code and extract it | in ref/ if present |
 
 ### 2. Per-case prep
@@ -44,26 +46,27 @@ Risks hold only "where it might break." Leave out "what to build."
 - Out: "the profile should have name and email"
 
 ### 5. Make the files
-- **tree.md** — the rough whole tree, *ids only*. A hypothesis.
+- **tree.md** — *greenfield*: just the root. *brownfield*: the whole existing structure (from `code-to-tree.md`). Ids only.
   ```
   - TASK-1
-    - TASK-2
-    - TASK-3
   ```
-- **tasks/** — only the root (TASK-1) and *its direct children*. Concepts only. Follow `.grovespec/templates/task.md` and `.grovespec/templates/FORMATS.md`. **Status** (per `FORMATS.md` lifecycle): root `TASK-1` → `todo`; its children → `backlog`.
+- **tasks/** — *greenfield*: only the root (`TASK-1`), concept only, `status: draft`. *brownfield*: one Task per existing node, `status: done` (see `code-to-tree.md`). Follow `.grovespec/templates/task.md` + `FORMATS.md`. **Don't create any child Task here** — greenfield children are grown one at a time later; brownfield children already exist.
 - **conventions.md** — start empty (filled in as you build). For a *brownfield* project, **do** fill in the facts the code guarantees (terms·global rules) — don't leave it empty (→ `references/code-to-tree.md` §7).
 - **config** — copy `.grovespec/templates/config.yaml` → `.grovespec/config.yaml`; set `language` + any custom paths (defaults under `docs/...`).
 
 ### 6. Human check → hand off
-Show the brief and the top of the tree to the human and get **"is this the right direction?"** confirmed. This is the checkpoint *before* spending more effort.
-If it's right, you're done — **next, implement the root skeleton** (`grovespec-implement` `TASK-1`: its container/dispatch code, written against the children's Contracts); when the root is `done`, its children unblock → `grovespec-grow` each. If not, loop back to the relevant step (re-`explore` the brief / re-read the code) — don't proceed on a wrong direction.
+Show the brief and the root (greenfield) or the extracted tree (brownfield) to the human and get **"is this right?"** confirmed — the checkpoint *before* more effort.
+- *Greenfield*: **next is `grovespec-verify TASK-1`** (cold-verify the root's draft → human approve → `approved`), then `implement` → `review` → `done`; once the root is `done`, `grovespec-grow` its first child.
+- *Brownfield*: the tree is now documented (`done`). Work proceeds via `grovespec-grow` / `grovespec-revise` on the parts you change next.
+
+If it's not right, loop back (re-`explore` the brief / re-read the code) — don't proceed on a wrong direction.
 
 ## What it looks like when done
 ```
 docs/
   brief.md           broad direction·scope·risks
-  tree.md            rough whole tree (ids only)
+  tree.md            greenfield: just the root · brownfield: the whole existing tree (ids only)
   conventions.md     (empty greenfield / filled brownfield)
-  tasks/             root + first level (concepts only)
+  tasks/             greenfield: root only (draft) · brownfield: one per existing node (done)
   ref/               reference originals + location map (only if present)
 ```

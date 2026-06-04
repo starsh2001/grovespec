@@ -1,11 +1,11 @@
 ---
 name: grovespec-revise
-description: Changes an already-done node in GroveSpec — either changing its behavior under a new requirement (reopen), or changing the tree structure (split·merge·move). The key question is "did the contract change" — if it did, find the nodes that used that contract and re-review them (propagation); if not, fix just that spot. Use when the user wants to "change·fix this (already-done) thing / the requirement changed / split·merge·move this node / grovespec revise". For specs·implementation of not-yet-built nodes, use grovespec-grow·implement.
+description: Changes an already-done node in GroveSpec — change its behavior under a new requirement (reopen), change the tree structure (split·merge·move), or promote a leaf to a skeleton (it grew to need children). The key question is "did the contract change" — if it did, find the nodes that used that contract and re-verify·re-review them (propagation); if not, fix just that spot. Use when the user wants to "change·fix this (already-done) thing / the requirement changed / scale this up / split·merge·move this node / grovespec revise". For not-yet-built nodes use grovespec-grow·verify·implement.
 ---
 
 # grovespec-revise
 
-Changing an already-`done` node *later*. (Fixing mid-build happens inside grow/implement.)
+Changing an already-`done` node *later*. (Fixing mid-build is `grovespec-verify` for the spec, and `grovespec-review` → `grovespec-fix` for the code.)
 
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language. These files are English; your output is not.
 
@@ -25,11 +25,10 @@ Don't make clones — one node = one Task. Old code lives in git; why it changed
 ## Two kinds of change
 
 ### A. Behavior change (reopen)
-1. Reopen the node: `status` `done` → `in-progress`.
-2. Change it (spec·code).
-3. **If the contract changed** → compute the consumer set (above) and re-review them with `grovespec-review` (propagation). If it didn't change, skip this.
-4. Review with `grovespec-review` → fix. **Pass the scope**: *did the contract change* (the top question) + *consumer count* (counted in step 3) → review picks the strength level (for a small change with an unchanged contract, `light`/`skip`). Re-invoke on the same node (reuses its `<id>.yaml`); on an `escalated` return, stop — don't re-close the node.
-5. Record *why it changed* in the Change Log. `status` → `done`.
+1. **Reopen** to the earliest status the change touches: `done` → `draft` if the spec/contract changes (needs re-`verify`), or `done` → `approved` if only the code changes (spec still valid → re-`implement` → re-`review`).
+2. Change it (spec and/or code), then run it forward through the normal gates from there: `draft` → `grovespec-verify` → `grovespec-implement` → `grovespec-review` → `done`; or `approved` → `grovespec-implement` → `grovespec-review` (→ `fix`) → `done`.
+3. **If the contract changed** → compute the consumer set (above) and **propagate**: reopen each consumer the same way (its spec touched → `draft` + re-`verify`; only its code touched → `approved` + re-`implement` → re-`review`) and run it forward. The expensive part — bias to doing it; a missed consumer is the silent drift this whole tool exists to stop. (`grovespec impact <id>` lists the blast radius.)
+4. Record *why it changed* in the Change Log of each touched node; each returns to `done` through its own gate. On an `escalated` verify/review, stop — don't re-close that node.
 
 ### B. Structure change (split·merge·move)
 Change the shape in **`tree.md` only** — it's the single source of truth for parent-child structure; Task files don't record parent or children (`FORMATS.md`). Here too, if the contract changes, propagate (consumer set as above).
@@ -39,6 +38,12 @@ Change the shape in **`tree.md` only** — it's the single source of truth for p
 - **Merge**: two ids into one in `tree.md`, merge the Task content into the surviving Task. Any node whose `blocked_by` listed either one now points at the merged node (update those).
 
 > Prefer *keeping the outer contract* — that's what keeps the partial tree small and contained.
+
+### C. Leaf grew to need children (feature → skeleton)
+A `done` `feature` turns out to need sub-nodes ("scale this up / more behavior attaches here"). Reopen it, set `role: skeleton`, and **record its decomposition in the Change Log** (the children + which Contract clause each owns — exactly as `implement` would). Then:
+- **Outer Contract unchanged** (it just gains internal structure) → consumers untouched; re-`implement` its own structural code if needed → `review` → `done`, then `grovespec-grow` each child one at a time.
+- **Outer Contract changed** → propagate to consumers as in A.3 first.
+The role promotion *is* the change; the children themselves are grown afterward, normally.
 
 ## Session
 Thin — read only the Task·relevant code of the node you're changing, and (if propagating) the nodes that use the contract.

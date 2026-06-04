@@ -134,9 +134,8 @@ cmd_validate() {
       for b in $(blocked_ids "$TASKS/$t.md"); do
         [ "$(status_of "$b")" != "done" ] && prob "$t is done but blocked_by $b is $(status_of "$b")"
       done
-      if [ "$(role_of "$t")" = "skeleton" ] && [ -z "$(children_of "$t")" ]; then
-        prob "$t is a done skeleton with no children in tree.md"
-      fi
+      # (removed) a done skeleton may legitimately have 0 children in tree.md yet —
+      # children are grown one at a time AFTER the skeleton is done (tree.md = current reality).
     fi
   done
 
@@ -194,12 +193,25 @@ unblocked() { # $1=tid -> "yes"/"no:reason"
   done
   echo "yes"
 }
+next_action() { # $1=tid -> the next skill to run on this (unblocked) node, from its status
+  case "$(status_of "$1")" in
+    draft)       echo "verify" ;;
+    approved)    echo "implement" ;;
+    implemented) echo "review" ;;
+    reviewed)    echo "fix (if issues) else confirm → done" ;;
+    fixed)       echo "review (re-run)" ;;
+    done)        [ "$(role_of "$1")" = "skeleton" ] && echo "grow (children)" || echo "—" ;;
+    *)           echo "?" ;;
+  esac
+}
 cmd_status() {
-  local t st ub nexts=""
+  local t st ub rl nexts=""
   for t in $(tree_ids); do
-    st=$(status_of "$t"); ub=$(unblocked "$t")
-    if [ "$st" = "done" ]; then printf '%-8s done\n' "$t"
-    elif [ "$ub" = "yes" ]; then printf '%-8s %-12s (unblocked)\n' "$t" "$st"; nexts="$nexts $t"
+    st=$(status_of "$t"); ub=$(unblocked "$t"); rl=$(role_of "$t")
+    if [ "$st" = "done" ]; then
+      if [ "$rl" = "skeleton" ]; then printf '%-8s done        → grow (children, if its spec calls for more)\n' "$t"
+      else printf '%-8s done\n' "$t"; fi
+    elif [ "$ub" = "yes" ]; then printf '%-8s %-12s → %s\n' "$t" "$st" "$(next_action "$t")"; nexts="$nexts $t"
     else printf '%-8s %-12s (%s)\n' "$t" "$st" "${ub#no:}"
     fi
   done
@@ -209,20 +221,24 @@ cmd_status() {
 # ===================== check (the top-down gate) =====================
 # check TASK-N -> is this node ready to work? (exit 0 yes / 1 no). check (no arg) -> list ready nodes.
 cmd_check() {
-  local n="${1:-}" t ub any=""
+  local n="${1:-}" t any="" doneskel="" ub
   if [ -z "$n" ]; then
     echo "ready to work now (top-down):"
     for t in $(tree_ids); do
-      [ "$(status_of "$t")" = "done" ] && continue
-      if [ "$(unblocked "$t")" = "yes" ]; then printf '  %-8s %s\n' "$t" "$(status_of "$t")"; any=1; fi
+      if [ "$(status_of "$t")" = "done" ]; then
+        [ "$(role_of "$t")" = "skeleton" ] && doneskel=1
+        continue
+      fi
+      if [ "$(unblocked "$t")" = "yes" ]; then printf '  %-8s %-12s → %s\n' "$t" "$(status_of "$t")" "$(next_action "$t")"; any=1; fi
     done
     [ -z "$any" ] && echo "  (none — every non-done node is blocked)"
+    [ -n "$doneskel" ] && echo "  + done skeletons may have children left to grow — see 'grovespec tree' / each skeleton's decomposition"
     return 0
   fi
   [ -f "$TASKS/$n.md" ] || { echo "✗ $n: no task file"; return 2; }
   ub=$(unblocked "$n")
   if [ "$ub" = "yes" ]; then
-    echo "✓ $n is ready ($(status_of "$n")) — parent done, blocked_by done."; return 0
+    echo "✓ $n is ready ($(status_of "$n")) — parent done, blocked_by done → next: $(next_action "$n")"; return 0
   fi
   echo "✗ $n is NOT ready — ${ub#no:}. Do NOT work it (that's bottom-up). Work a node 'grovespec check' lists as ready."
   return 1

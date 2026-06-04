@@ -1,68 +1,56 @@
 ---
 name: grovespec-review
-description: GroveSpec review — has several *fresh-eyes* reviewers independently inspect a result (a spec or code), then returns a triaged, confirmed issue list. To stop checklists from being rubber-stamped, it runs cold reviewers (who never saw how it was built) in parallel, each with a different role. Called internally by grovespec-grow·implement·revise, and invokable directly when the user asks to review or sanity-check a spec or code, or says "grovespec review" (in any language). Fixing is done by the *caller*, not by this skill.
+description: GroveSpec code review — the implemented→reviewed step. NOT a persona reading the whole codebase: it (1) runs the node's tests and analyses the results against the AC, and (2) has a few cold fresh-eyes reviewers inspect ONLY this node's diff with code roles (correctness·security·maintainer·breaker). Returns a confirmed issue list; grovespec-fix applies it; on a clean pass + human confirm the node goes to done. Use when the user wants to "review the code / run the tests / code review / grovespec review" after implement. For verifying a spec use grovespec-verify; to apply the fixes use grovespec-fix.
 ---
 
 # grovespec-review
 
-Review. **This skill runs on its own (cold)** — if the builders review their own work, they miss the same blind spots. Fresh eyes look instead.
+Code review — the step that turns `implemented` → `reviewed` (→ `done` on a clean pass + human confirm). (Verifying the *spec* is `grovespec-verify`.)
 
-> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language (the cold reviewers' findings follow it too). These files are English; your output is not.
+Two things, both bounded to **this one node**, so cost never scales with the codebase:
+1. **Run the tests + analyse the results** — the deterministic spine. Did every AC-derived test pass? Any AC item with no test? Any measurable NFR target (in the AC) unmet?
+2. **Cold code review of THIS NODE'S DIFF only** — a few fresh-eyes reviewers inspect just the diff, with code roles. **Not the whole codebase, not other nodes' code.** This catches what tests can't see (security, hidden coupling, a hollow test).
 
-## Why go this far
-A checklist just gets checked off (it claims "passed" once, then the same problems resurface on a re-read). So we stack five things: ① reviewers who did *not* see how it was built, ② with *different* roles, ③ *several* in parallel, ④ filtering out nitpicks too, ⑤ repeating until a full clean round.
+> review never re-asks *spec* questions ("is the contract complete?") — `grovespec-verify` settled those cold, before any code. Here the spec (AC·Contract) is the *yardstick*, not the subject.
+
+> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language (the reviewers' findings too). These files are English; your output is not.
 
 ## What it takes in
-- `target`: the thing to review (a spec file or code).
-- `target_type`: `spec` | `result`.
-- criteria: what to judge it against (parent contract / requirements / AC).
-- `strength`·`max_rounds`: from `.grovespec/config.yaml` (overridable per node).
-- `scope` (optional): *did the contract change · how many consumers*. If the caller passes it, that picks the level; if not, review computes it (did the Contract section change? consumer count from the caller's propagation or the `blocked_by` reverse-lookup). **When the computed level is ambiguous, round *up* one level** — a too-light review silently lets drift through; a too-heavy one just costs a little.
+- the node's **diff** (its `src/`·`tests/` changes) + its **AC·Contract** as criteria + the **test results**.
+- `test` command + `strength`·`max_rounds`·`scale` from `.grovespec/config.yaml` `review:` (overridable per node).
 
-State lives at `config.paths.review` (default `.grovespec/review/`) as `<id>.yaml` — **`<id>` = the node id under review** (e.g. `TASK-3`). Re-invoking review for the same node **reuses this file so rounds accumulate** (propagation reviews each consumer in its own `<id>.yaml`). Format/template: `.grovespec/templates/review-state.yaml`; **round 1 creates it** from that template (`round: 1`, `consecutive_passes: 0`, with the chosen `level·strength·repeat·max_rounds`), later rounds update it in place. **review writes *only* this state file** — it never edits the target or any node doc (that's the caller's job; editing the target would destroy the next round's coldness). **Each round is a new session** that reads only this file and continues — it must not carry over the prior round's discussion, or "fresh eyes" is lost.
+> **Where it runs (the invocation contract).** Run grovespec-review in your **main Claude Code session** — it spawns the cold reviewers as **subagents**. **Never run a grovespec skill *as* a subagent** — then it can't spawn reviewers and silently degrades to a non-cold self-check.
 
-## Review depth scales with the change's reach (cost)
-If `strength` is *how far you block*, this is a separate dial: it **scales the reviewer count·repeat to how far the change reaches** (how many nodes its contract touches). A full review (5 reviewers × repeat 2) on an 8-line change is overkill.
+## State
+`.grovespec/review/<id>.review.yaml` (template `review-state.yaml`, `target_type: result`). Separate from verify's `<id>.verify.yaml` — they never collide.
 
-The level is set by checkable inputs — ① did the contract change (diff the Contract section) ② consumer count ③ is it a skeleton (defines children):
+## 1. Run the tests (the spine)
+Run `config.review.test` (if empty, infer it from the project — `pytest`, `npm test`, … — or ask). Collect pass/fail per test and **map them to the AC**: every AC item should have a passing test. Measurable NFR targets in the AC (e.g. `p95 < 200ms`) are checked here too.
+- A **failed test** is a `critical` issue (the implementation doesn't meet its AC) → straight to the verdict (fix), no cold round needed yet.
+- **`tdd: false`** node (no tests): note it; this review leans entirely on the cold diff review below — the *only* gate available — and the unmet AC items stay unchecked.
+
+Tests green → go to the cold review.
+
+## 2. Cold code review — the diff only
+Scale the reviewer count·repeat by the diff's size·risk (`config.yaml` `review.scale` — the SSoT; never restate a number here). When ambiguous, round **up**.
 
 | level | when | review |
 |---|---|---|
-| `skip` | contract unchanged + trivial (format·comment·≤2 lines) | self-check only, no reviewers |
-| `light` | contract unchanged + small change (≤ ~20 lines, no new behavior) | cold reviewers, repeat 1, no over-strictness check |
-| `standard` | a normal new feature node | cold reviewers, repeat 1 |
-| `full` | *contract changed*, or 3+ consumers, or a skeleton (defines children) | cold reviewers, repeat 2, + over-strictness check |
+| `skip` | trivial diff (format·comment·≤2 lines) | tests only, no reviewers |
+| `light` | small diff, no new behavior | cold reviewers, repeat 1 |
+| `standard` | a normal node's implementation | cold reviewers, repeat 1 |
+| `full` | security-touching / large / contract-bearing diff | cold reviewers, repeat 2, + over-strictness check |
 
-Exact reviewer **counts** per level live in `config.yaml` `review.scale` (the SSoT — never restate a number here; that's how a doc and its config drift apart). If the caller passes ①②③ (grow/revise compute them), use that to pick the level; otherwise compute as above.
+> Spawn mechanics, the reviewer prompt bodies, findings format, and triage are in `references/reviewers.md`. Use the **code lens set** in its fixed order: correctness · security · the-6-month-maintainer · breaker · test-quality (take the first *N*). Each reviewer reads **only this node's diff + the AC·Contract + the test results** — never the wider codebase or other nodes.
 
-> **Where it runs (the invocation contract).** GroveSpec skills run in your **main Claude Code session** — the main agent, which *can* spawn subagents. review spawns its cold reviewers as **subagents (Claude Code's Task tool)** from there. The one thing that breaks it: running a grovespec skill *as a subagent itself* — then it can't spawn the reviewers and review silently degrades to a non-cold self-check (defeating the whole point). So **invoke grovespec skills from the main session; never nest one inside a subagent.**
+Run cold rounds — each: spawn the reviewers in parallel (subagents, empty context, *"find flaws; default to 'there is a problem'"*) → aggregate (dedupe; higher severity wins) → over-strictness triage (`full`; optional `standard`) → judge by `strength` (1: no `critical` · 2: +`should-fix` · 3: +`nice-to-have`).
+- A round **finds blocking issues** → stop: write them to `open_issues`, `status: reviewed`, `consecutive_passes`→0, hand to `grovespec-fix`.
+- A round is **clean** → `consecutive_passes`+1; run another fresh cold round until clean `repeat` times in a row.
+- `round` exceeds `max_rounds` → `status: escalated`, issues to the human, **not** done.
 
-## One round
+## 3. Verdict
+- **Issues remain** → `status: reviewed` with `open_issues`; next is **`grovespec-fix`** (it applies them → `fixed` → re-run `grovespec-review`). review does **not** fix — the diff stays the cold reviewers' subject, and fixing needs no independence (cold already gave that).
+- **Clean terminal pass** (tests green + cold review passed `repeat` times running) → show the human the result + test summary; on **confirm** set `status: done` and copy the surviving `adjudications` into the node's **Change Log** (so a future revision's cold review won't re-litigate them).
 
-> The exact spawn mechanics, the reviewer prompt bodies, the findings format, and the triage prompt are in `references/reviewers.md` — load it to run a round, so every node's review comes out the same shape.
-
-1. **Spawn cold reviewers in parallel, *as many as the level sets*** (subagents, each with an empty context). If `skip`, spawn none and just self-check.
-   - Each gets *only the target + criteria*. Not how it was built, not the prior round's discussion.
-   - Send them in with *"Your job is to find flaws. Default to 'there is a problem'."*
-   - Give them *different* roles (below).
-   - Have them return findings with a *severity*: `critical` | `should-fix` | `nice-to-have`.
-2. **Aggregate** — merge and dedupe. When severities disagree, take the *higher* one.
-3. **Over-strictness check** (`full`; optional on `standard`; not on `light`/`skip`) — a separate reviewer judges *"are these real blockers, or nitpicks?"* and drops the nitpicks. (Stops infinite loops.)
-4. **Pass judgment** (by `strength`):
-   - `1`: pass if no `critical`
-   - `2`: pass if no `critical`·`should-fix`
-   - `3`: pass only if none of the three
-5. **Repeat**: on a pass, `consecutive_passes` +1; **a fail resets it to 0**. Stop when it passes `repeat` times *in a row* (`skip`/`repeat: 0` → no reviewer round; done immediately). Otherwise hand the remaining issues back to the caller (who fixes them); the caller then **re-invokes review on the *same* `<id>.yaml`** and the next round runs as a *new session* continuing that file.
-6. **Stop safety**: if `round` exceeds `max_rounds`, set `status: escalated` and take the remaining issues *to the human* — on an escalated return the caller does **not** mark the node `done`.
-
-## Reviewer roles (the diversity is what works)
-Many identical reviewers all see the same weakness. Mix *different* eyes.
-- **Spec review (`spec`)**: consumer-impersonator (can I build mine from this contract alone?) · gap-finder (calmly walks the normal edge cases — empty·not-found·failure — and flags each one the contract leaves unanswered) · coherence (does it fill the parent's contract; for a skeleton, do the children's contracts sum to the parent's?) · non-expert (fails it on any jargon·fluff a layperson can't follow) · breaker (deliberately tries weird or broken inputs and unusual situations to make the contract fall apart). `full` uses all five; lighter levels take them from the front.
-- **Result review (`result`)**: correctness · security · the person who maintains this in 6 months · breaker (edge·failure) · non-expert.
-
-The prompt body for each role — plus the findings format and the triage prompt — is in `references/reviewers.md`.
-
-## What it returns
-A **confirmed issue list** (by severity) written into `open_issues` and handed to the caller. **The caller fixes it, not review** — the caller already has the working context, and fixing needs no independence (review already guaranteed that, cold).
-
-Because reviewers are cold (no memory across rounds or revisions), adjudications get written down twice, on purpose: **review** appends the *dropped-as-nitpick · accepted-gap* items (with reasons) to the state file's `adjudications` — that stops the *next round* re-litigating them; then the **caller**, on done, copies the surviving ones into the node's **Change Log** — that stops a *future revision*'s cold review re-litigating them.
+## When it's done
+On `done`: the node's tests pass, its diff is cold-reviewed clean, the human confirmed. A `done` skeleton's children can now be grown (`grovespec-grow`); a `done` leaf ends its branch.

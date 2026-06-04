@@ -19,24 +19,28 @@ GroveSpec fights both: keep each change inside a **small partial tree** — the 
 
 ```
 init (once)
-  → [ grow → implement → done ]   grow the tree one node at a time
-  → revise                        change an already-done node later
+  → per node:  grow → verify → implement → review ⇄ fix → done
+  → revise                     change an already-done node later
 ```
 
 - **Tree of contracts.** A project is a tree. Each node is a `Task` with a **Contract** (what it takes, gives, and guarantees). Consumers depend on the Contract, never the internals — so a change reaches only as far as the contracts it touches.
 - **One node ahead.** The spec leads the code by exactly one layer. The tree is a *hypothesis*, refined as you build — not a big design locked in up front.
-- **Cold review gate.** Both grow (spec) and implement (code) end in a review loop: several *fresh-eyes* reviewers — who never saw how it was built — inspect in parallel with different roles (consumer-impersonator, gap-finder, coherence, non-expert, breaker), the findings are triaged, and the caller fixes. Review effort scales to the size of the change.
+- **Two cold gates.** The spec is cold-**verified** before any code (fresh-eyes reviewers in parallel — consumer-impersonator, gap-finder, coherence, non-expert, breaker). The code is gated by **tests + a cold review of just that node's diff** (correctness, security, maintainer, breaker, test-quality) — never the whole codebase, so review cost stays flat as the project grows. Effort scales to the change.
 - **Propagation on change.** Changing a done node asks one question: *did the contract change?* If not, fix just that spot. If so, find the nodes that used it and re-review them. Nothing more.
 
-## The five skills
+## The seven skills
+
+One per step of a node's life: `draft → approved → implemented → reviewed ⇄ fixed → done`.
 
 | Skill | What it does |
 |---|---|
-| `grovespec-init` | First-time setup (once). From whatever you have — idea, spec, or existing code — produces the brief, tree, and top-level Tasks. |
-| `grovespec-grow` | Write the next node's *concept spec* (no code). For a skeleton, also defines its children's contracts. |
-| `grovespec-implement` | Turn a confirmed spec into code: pre-check → tests first → code → review → done. |
-| `grovespec-review` | Cold, multi-role, parallel review that returns a triaged issue list. The anti-rubber-stamp gate. |
-| `grovespec-revise` | Change an already-done node — behavior (reopen + propagate) or structure (split·merge·move). |
+| `grovespec-init` | First-time setup (once). From whatever you have — idea, spec, or existing code — produces the brief, tree, and the root Task (greenfield) or the whole existing tree (brownfield). |
+| `grovespec-grow` | Write **one** new node's *draft spec* (no code). Its own children are decided later, at *its* implement. |
+| `grovespec-verify` | Cold, multi-role, parallel review of the **draft spec** → human approve (`draft → approved`). The anti-rubber-stamp gate, spent where a flaw is cheapest. |
+| `grovespec-implement` | Turn an approved spec into code: pre-check → tests first → code → confirm the node's decomposition (`approved → implemented`). |
+| `grovespec-review` | Run the **tests** + cold-review **only this node's diff** (not the codebase) → confirmed issue list (`implemented → reviewed`). |
+| `grovespec-fix` | Apply the review's issues to this node's code → re-review (`reviewed ⇄ fixed`), until clean → `done`. |
+| `grovespec-revise` | Change an already-done node — behavior (reopen + propagate), structure (split·merge·move), or promote a leaf to a skeleton. |
 
 ## Artifacts
 
@@ -58,7 +62,7 @@ GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 
 1. Copy `.claude/skills/grovespec-*` and `.grovespec/` into your repo.
 2. Ask Claude: **"grovespec init"** — it creates `docs/` (brief, tree, first Tasks) and `.grovespec/config.yaml`.
-3. From there: **"grow the next node"**, then **"implement it"**, looping down the tree.
+3. From there, per node: **"grow the next node"** → **"verify it"** → **"implement it"** → **"review it"** (→ **"fix"** if issues), looping down the tree.
 
 **See a complete worked project:** [examples/expense-cli](examples/expense-cli) — a **brownfield** mini-CLI: its existing code *documented* as filled brief · tree · Tasks (real Contracts, honest gaps). The best way to see what good specs look like before you start.
 
@@ -66,7 +70,7 @@ GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 
 - `validate` — format + graph coherence (orphans, cycles, impossible states); exits non-zero with fixes.
 - `status` — each node's state + which are unblocked, and what's next.
-- `check [TASK-N]` — is a node ready to work (parent done + blocked_by done)? The top-down gate `grow`/`implement` run before building, so the build can't drift bottom-up.
+- `check [TASK-N]` — is a node ready to work (parent done + blocked_by done), and what's the next step (verify/implement/review/fix/grow)? The top-down gate `grow`/`verify`/`implement` run, so the build can't drift bottom-up.
 - `impact TASK-N` — the consumer set a contract change reaches (the blast radius).
 - `tree` — the id-only tree rendered with names + status.
 
