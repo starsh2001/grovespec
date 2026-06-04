@@ -14,24 +14,24 @@ A checklist just gets checked off (it claims "passed" once, then the same proble
 - `target`: the thing to review (a spec file or code).
 - `target_type`: `spec` | `result`.
 - criteria: what to judge it against (parent contract / requirements / AC).
-- `strength`·`max_rounds`: from `config.yaml` (overridable per node).
-- `scope` (optional): *did the contract change · how many consumers · node importance*. If the caller passes it, that picks the scale level; if not, review works it out itself (did the Contract section change? grep for the consumer count?).
+- `strength`·`max_rounds`: from `.grovespec/config.yaml` (overridable per node).
+- `scope` (optional): *did the contract change · how many consumers*. If the caller passes it, that picks the level; if not, review computes it (did the Contract section change? consumer count from the caller's propagation or the `blocked_by` reverse-lookup). **When the computed level is ambiguous, round *up* one level** — a too-light review silently lets drift through; a too-heavy one just costs a little.
 
-State lives in `.grovespec/review/<id>.yaml` (template: `.grovespec/templates/review-state.yaml`). **Each round is a new session** that reads only this file and continues — it must not carry over the prior round's discussion, or "fresh eyes" is lost.
+State lives at `config.paths.review` (default `.grovespec/review/`) as `<id>.yaml` — **`<id>` = the node id under review** (e.g. `TASK-3`). Re-invoking review for the same node **reuses this file so rounds accumulate** (propagation reviews each consumer in its own `<id>.yaml`). Format/template: `.grovespec/templates/review-state.yaml`; **round 1 creates it** from that template (`round: 1`, `consecutive_passes: 0`, with the chosen `level·strength·repeat·max_rounds`), later rounds update it in place. **review writes *only* this state file** — it never edits the target or any node doc (that's the caller's job; editing the target would destroy the next round's coldness). **Each round is a new session** that reads only this file and continues — it must not carry over the prior round's discussion, or "fresh eyes" is lost.
 
 ## Review depth scales with the change's reach (cost)
 If `strength` is *how far you block*, this is a separate dial: it **scales the reviewer count·repeat to how far the change reaches** (how many nodes its contract touches). A full review (5 reviewers × repeat 2) on an 8-line change is overkill.
 
-The level is set by three things — ① did the contract change ② how many consumers ③ node importance (config):
+The level is set by checkable inputs — ① did the contract change (diff the Contract section) ② consumer count ③ is it a skeleton (defines children):
 
 | level | when | review |
 |---|---|---|
-| `skip` | contract unchanged + trivial (format·comment·1–2 lines) | 0 reviewers, self-check only |
-| `light` | contract unchanged + small change | 1–2 reviewers, repeat 1, no over-strictness check |
-| `standard` | normal (e.g. a new feature node) | 3 reviewers, repeat 1 |
-| `full` | *contract changed* or many consumers or important node | 5 reviewers, repeat 2, includes over-strictness check |
+| `skip` | contract unchanged + trivial (format·comment·≤2 lines) | self-check only, no reviewers |
+| `light` | contract unchanged + small change (≤ ~20 lines, no new behavior) | cold reviewers, repeat 1, no over-strictness check |
+| `standard` | a normal new feature node | cold reviewers, repeat 1 |
+| `full` | *contract changed*, or 3+ consumers, or a skeleton (defines children) | cold reviewers, repeat 2, + over-strictness check |
 
-Reviewer-count·repeat defaults live in `config.yaml`'s `review.scale`. If the caller passes ①② (revise already computes them during propagation), use that to pick the level.
+Exact reviewer **counts** per level live in `config.yaml` `review.scale` (the SSoT — never restate a number here; that's how a doc and its config drift apart). If the caller passes ①②③ (grow/revise compute them), use that to pick the level; otherwise compute as above.
 
 > **Where it runs (the invocation contract).** GroveSpec skills run in your **main Claude Code session** — the main agent, which *can* spawn subagents. review spawns its cold reviewers as **subagents (Claude Code's Task tool)** from there. The one thing that breaks it: running a grovespec skill *as a subagent itself* — then it can't spawn the reviewers and review silently degrades to a non-cold self-check (defeating the whole point). So **invoke grovespec skills from the main session; never nest one inside a subagent.**
 
@@ -45,13 +45,13 @@ Reviewer-count·repeat defaults live in `config.yaml`'s `review.scale`. If the c
    - Give them *different* roles (below).
    - Have them return findings with a *severity*: `critical` | `should-fix` | `nice-to-have`.
 2. **Aggregate** — merge and dedupe. When severities disagree, take the *higher* one.
-3. **Over-strictness check** — a separate reviewer judges *"are these real blockers, or nitpicks?"* and drops the nitpicks. (Stops infinite loops.)
+3. **Over-strictness check** (`full`; optional on `standard`; not on `light`/`skip`) — a separate reviewer judges *"are these real blockers, or nitpicks?"* and drops the nitpicks. (Stops infinite loops.)
 4. **Pass judgment** (by `strength`):
    - `1`: pass if no `critical`
    - `2`: pass if no `critical`·`should-fix`
    - `3`: pass only if none of the three
-5. **Repeat**: on a pass, `consecutive_passes` +1. Stop when it passes `repeat` times *in a row*. Otherwise hand the remaining issues back to the caller (who fixes them), and run the next round as a *new session*.
-6. **Stop safety**: if `round` exceeds `max_rounds`, take the remaining issues *to the human*.
+5. **Repeat**: on a pass, `consecutive_passes` +1; **a fail resets it to 0**. Stop when it passes `repeat` times *in a row* (`skip`/`repeat: 0` → no reviewer round; done immediately). Otherwise hand the remaining issues back to the caller (who fixes them); the caller then **re-invokes review on the *same* `<id>.yaml`** and the next round runs as a *new session* continuing that file.
+6. **Stop safety**: if `round` exceeds `max_rounds`, set `status: escalated` and take the remaining issues *to the human* — on an escalated return the caller does **not** mark the node `done`.
 
 ## Reviewer roles (the diversity is what works)
 Many identical reviewers all see the same weakness. Mix *different* eyes.
@@ -63,4 +63,4 @@ The prompt body for each role — plus the findings format and the triage prompt
 ## What it returns
 A **confirmed issue list** (by severity) written into `open_issues` and handed to the caller. **The caller fixes it, not review** — the caller already has the working context, and fixing needs no independence (review already guaranteed that, cold).
 
-Because reviewers are cold (no memory across rounds or revisions), the caller also records the outcome and any *dropped-as-nitpick · accepted-gap* adjudications — with the reason — in the node's Change Log, so a later cold review doesn't re-litigate what was already decided.
+Because reviewers are cold (no memory across rounds or revisions), adjudications get written down twice, on purpose: **review** appends the *dropped-as-nitpick · accepted-gap* items (with reasons) to the state file's `adjudications` — that stops the *next round* re-litigating them; then the **caller**, on done, copies the surviving ones into the node's **Change Log** — that stops a *future revision*'s cold review re-litigating them.

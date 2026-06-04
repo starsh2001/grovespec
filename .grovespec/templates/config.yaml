@@ -12,6 +12,9 @@ paths:
   conventions: docs/conventions.md
   tasks: docs/tasks/
   ref: docs/ref/
+  src: src/                 # where implemented code goes
+  tests: tests/             # where tests go
+  review: .grovespec/review/  # review-cycle state (one <node-id>.yaml per reviewed node)
 
 # Review defaults (overridable per node).
 review:
@@ -23,4 +26,4 @@ review:
     skip:     { reviewers: 0, repeat: 0 }   # contract unchanged + trivial (format·comment)
     light:    { reviewers: 2, repeat: 1 }   # contract unchanged + small change
     standard: { reviewers: 3, repeat: 1 }   # normal (new feature node)
-    full:     { reviewers: 5, repeat: 2 }   # contract changed / many consumers / important node
+    full:     { reviewers: 5, repeat: 2 }   # contract changed / 3+ consumers / a skeleton

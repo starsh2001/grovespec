@@ -22,11 +22,10 @@ Where to find them: entry files (main, etc.), routers·dispatchers, public expor
 Root = the whole app (skeleton), with the entry points under it.
 
 ### 2. Features under each entry point
-Make a feature node for what each entry point *actually does*. If complex, features within a feature (Principle 1). Individual components (a button·a one-line helper) aren't nodes — only down to a *self-contained unit*.
+Make a feature node for what each entry point *actually does*. **Stop-splitting rule:** a thing is a node only if it has a *single nameable responsibility* **and** its own *contract* (inputs/outputs other nodes call). No contract of its own (a button, a one-line helper, an inline step) → implementation detail, not a node. Keep splitting (a feature inside a feature) only while each part still has its own contract.
 
 ### 3. Find shared modules
-A module imported/called from 2+ places → a shared node (confirm the import·call relations with grep).
-The test: "without this, can the other nodes not be built *around* it?" → if so, a shared node. If it's a use-once util, keep it inside that feature.
+**Trigger: imported/called from 2+ places (grep-confirmed) → a shared node.** (Borderline two-caller utils: the tiebreaker is "without this, can the others not be built *around* it?" — if they can, keep it inline in that feature.)
 
 ### 4. Extract each node's contract from the code (most important)
 So that another node can use this one *without seeing the internals*:

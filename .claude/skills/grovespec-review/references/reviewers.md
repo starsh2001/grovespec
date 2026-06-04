@@ -4,7 +4,7 @@
 > Reviewers write their findings in the project's language (`config.language`); the role lenses below are the fixed structure.
 
 ## Spawning
-- Spawn the reviewers as **parallel subagents** (Claude Code's Task tool), one per role, as many as the level sets (`skip`=0, `light`=1–2, `standard`=3, `full`=5). Each subagent starts from an **empty context** — that independence is what makes them "cold". Send them in one batch so they run concurrently. (This only works from the main session — see the review skill's invocation contract.)
+- Spawn the reviewers as **parallel subagents** (Claude Code's Task tool), one per role — the **count comes from `config.yaml` `review.scale[level].reviewers`** (the SSoT; don't hardcode a number or a range here). Each subagent starts from an **empty context** — that independence is what makes them "cold". Send them in one batch so they run concurrently. (This only works from the main session — see the review skill's invocation contract.)
 - For `skip`: spawn none; the caller self-checks against the criteria.
 - Each reviewer's prompt = **common preamble** + its **role lens** + the **findings format**. Never give them how the target was built, or the previous round's discussion.
 
@@ -19,6 +19,11 @@ Severity:
 - `nice-to-have` — better if fixed, but not blocking.
 
 If a lens finds nothing, it says `none` with a one-line note on what it checked. The reviewer's final message **is** the result — no greeting, just the findings.
+
+Examples (the exact shape):
+- ✅ `- [should-fix] §Contract "Returns" — return shape unspecified: a consumer can't tell a list from a single record.`
+- ✅ `- [critical] §AC — empty-input case missing: add(0 items) behavior is undefined.`
+- ❌ `the contract seems a little unclear in places` (no severity, no location, not actionable).
 
 ## Common preamble (prepend to every role)
 ```
@@ -36,7 +41,7 @@ Write your findings in {config.language}.
 ```
 
 ## Role lenses — spec review
-consumer-impersonator · gap-finder · coherence · non-expert · breaker. `full` uses all five; lighter levels take them from the front.
+This is the **fixed order** (so a level always uses the same lenses — never an ad-hoc pick): consumer-impersonator · gap-finder · coherence · non-expert · breaker. A level takes the first *N* of this list, where *N* = `config.scale[level].reviewers` (`full` = all five). Counts live in config — don't restate a number here.
 
 - **consumer-impersonator** — You are *a node that will use this contract*. Try to actually write your code against this contract alone. Wherever you'd have to *guess* — a return shape, who outputs what, where a value comes from — that's a hole. List every spot you could not build.
 - **gap-finder** — Calmly walk the standard edge cases and flag each one the contract doesn't answer: empty input · not-found · failure · none-set · file missing/corrupt · the basis of "current X" (time zone? source?) · re-setting an existing value. If the contract doesn't say, it's a gap.
@@ -45,7 +50,7 @@ consumer-impersonator · gap-finder · coherence · non-expert · breaker. `full
 - **breaker** — You came to break it. Find inputs/flows that make the contract fall apart: weird or broken values (empty · text where a number goes · negative · zero · huge · wrong unit); weird identifiers (blank · whitespace · case-only difference); abnormal flows (call order · concurrent writes · a corrupted data file · a failure mid-operation). State each as "this input → the contract does X (or leaves it undefined)".
 
 ## Role lenses — result review
-correctness · security · the-6-month-maintainer · breaker · non-expert.
+Same rule — fixed order, take the first *N* = `config.scale[level].reviewers`: correctness · security · the-6-month-maintainer · breaker · non-expert.
 
 - **correctness** — does it actually meet the AC and the Contract; any logic error?
 - **security** — injection, auth, secrets, unsafe defaults, the data it trusts blindly.
@@ -58,11 +63,11 @@ Merge all findings; dedupe by (where + what). On a severity disagreement, take t
 
 ## Over-strictness check (triage) — `full` (and optionally `standard`)
 Spawn one more cold reviewer, given the aggregated list + the target. It plays *defender*: for each finding, rule **KEEP (severity) / DOWNGRADE (to what) / DROP (nitpick)** with a one-line reason. Guidance to it:
-- This is a *concept* spec — don't demand implementation detail; but a real interface hole (unbuildable, self-contradiction, wrong grounding) is a real flaw even here.
+- *(`spec` target)* This is a *concept* spec — don't demand implementation detail; but a real interface hole (unbuildable, self-contradiction, wrong grounding) is a real flaw even here. *(`result` target)* judge against the AC + Contract, not future-proofing or style — a missing test for an AC item is real; a stylistic nit is not.
 - A project-accepted gap (an already-known limitation) doesn't need a full fix — "note the same gap" is enough; demanding a full fix is over-reach.
 - Merge findings that share a root; a reviewer can misread — re-check before keeping.
 
 It returns the **confirmed list** + a **do-not-re-raise** list (dropped / accepted, each with a reason).
 
 ## Round hand-off
-Write to `.grovespec/review/<id>.yaml` (template: `review-state.yaml`): the round's outcome, the confirmed `open_issues`, and append the triage's do-not-re-raise items to `adjudications`. The next round is a **new session** that reads only this file — so the adjudications are how a later cold review avoids re-litigating what was already decided.
+Write to `.grovespec/review/<id>.yaml` (template: `review-state.yaml`): the round's outcome, the confirmed `open_issues`, and append the triage's do-not-re-raise items to `adjudications`. The next round is a **new session** that reads only this file — so the adjudications are how a later cold review avoids re-litigating what was already decided. (On done, the *caller* copies the surviving adjudications into the node's Change Log — see the review skill — so future *revisions* don't re-litigate them either.)

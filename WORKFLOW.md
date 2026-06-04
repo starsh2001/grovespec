@@ -7,7 +7,7 @@
 
 ## 1. The big picture
 
-GroveSpec's goal is to **minimize the drift between spec and code**. To do that, whatever you change, you keep the *touched area small* — a **partial tree**: the node you change plus the few nodes its contract touches (its children and its consumers), never the whole tree.
+GroveSpec's goal is to **minimize the drift between spec and code**. To do that, whatever you change, you keep the changed area to a **partial tree**: the node you change plus the few nodes its contract touches (its children and its consumers), never the whole tree.
 
 ```
 init (once)
@@ -27,8 +27,8 @@ There are five units you invoke.
 
 ### init — set up the project once
 - **When**: once, at the start.
-- **What it does**: figures out what you have (just an idea / rough spec / detailed spec / code / code+docs) → keeps reference docs as originals + a location map; if there's code, reads it to extract the tree → creates the brief·config·tree.md·root+first-level tasks.
-- **Output**: brief.md, tree.md (rough whole, ids only), tasks/ (root+first level), conventions.md (empty), config, ref/ (if present).
+- **What it does**: figures out what you have (just an idea / rough spec / detailed spec / code / code+docs) → for a bare idea/rough spec, **explores it into a lean brief** (a thinking-partner stance, no code — `references/explore.md`); keeps reference docs as originals + a location map; if there's code, reads it to extract the tree → creates the brief·config·tree.md·root+first-level tasks.
+- **Output**: brief.md, tree.md (rough whole, ids only), tasks/ (root+first level), conventions.md (empty for greenfield; filled for brownfield), `.grovespec/config.yaml`, ref/ (if present).
 - **Session**: once, thin.
 
 ### grow — write the next node's spec
@@ -52,7 +52,7 @@ There are five units you invoke.
 - **When**: deliberately changing a done node later, or changing the tree structure.
 - **What it does**:
   - *Behavior change*: reopen the node (done→in-progress) and change it → **if the contract changed**, find the nodes that use that contract (grep+tree) and re-review them (propagation) → fix → record why it changed.
-  - *Structure change (split·merge·move)*: change tree.md (the shape) + **the parent Task('s) child list** (drop from the old parent, add to the new). The moved node's own Task stays (it doesn't record its parent). Here too, **if the contract changes**, re-review the nodes that use it (propagation). Default to *keeping the outer contract* — that's what keeps the touched area small.
+  - *Structure change (split·merge·move)*: change **tree.md only** — the sole source of parent-child structure (a Task records no parent or children). Here too, **if the contract changes**, re-review the nodes that use it (propagation). Default to *keeping the outer contract* — that's what keeps the partial tree small.
 - **Session**: thin.
 
 > **Fixing (apply) is not a separate skill.** When review returns the confirmed issue list, the *caller* fixes it right there. The caller already has the working context, and fixing needs no independence (review already guaranteed that, cold).
@@ -64,8 +64,8 @@ There are five units you invoke.
 - **Fresh eyes**: a reviewer *doesn't see how it was built.* They look only at the result + the criteria, and go in with "my job is to find flaws; the default is 'there's a problem'."
 - **Different roles**: many identical reviewers see only the same weakness. Mix *different* eyes — like security / the future maintainer / a non-expert / a breaker.
 - **Non-expert reviewer**: one of them becomes "a non-expert" and fails it on any jargon or fluff they can't follow. (The lever that forces a spec to be *confirmable by a human at a glance*.)
-- **Strength (how far to block)**: Critical / Should Fix / Nice to Have — how severe a finding must be to block a pass. **Repeat**: how many consecutive clean passes before stopping (stops "passed once, then found more on a re-read"). **Scale**: reviewer count·rounds scale to how far the change reaches — `skip` (unchanged contract, trivial) · `light` · `standard` · `full` (contract changed / many consumers / important node). *The exact pass-conditions and counts live in the `grovespec-review` skill + `config.yaml` — not restated here, so they can't drift.*
-- **Over-strictness check**: at the end, a separate look at whether the raised issues are *real blockers or nitpicks*. Nitpicks are dropped. (Stops it looping forever.)
+- **Strength (how far to block)**: Critical / Should Fix / Nice to Have — how severe a finding must be to block a pass. **Repeat**: how many consecutive clean passes before stopping (stops "passed once, then found more on a re-read"). **Scale**: reviewer count·rounds scale to how far the change reaches — `skip` (unchanged contract, trivial) · `light` · `standard` · `full` (contract changed / 3+ consumers / a skeleton). *The exact pass-conditions and counts live in the `grovespec-review` skill + `config.yaml` — not restated here, so they can't drift.*
+- **Over-strictness check** (on `full`; optional on `standard`): at the end, a separate look at whether the raised issues are *real blockers or nitpicks*. Nitpicks are dropped. (Stops it looping forever.)
 - **Stop safety**: a max round count; if it can't finish within that, the remaining issues go to the human.
 
 **When reviewing a spec (= is the contract good?):**
@@ -94,7 +94,7 @@ A Task holds *concept* only — **it does not record what the code looks like** 
 
 ## 6. How the skills are divided
 
-1. **Group by the same grain** — so a user immediately knows "this kind of thing goes here."
+1. **Group by the same kind of step** — so a user immediately knows "this kind of thing goes here."
 2. **Split the session when independence is needed** (review). Otherwise you may continue, or cut thin for tokens.
 3. **Keep the skill body thin**, with per-case notes in separate files loaded *only when needed*.
 

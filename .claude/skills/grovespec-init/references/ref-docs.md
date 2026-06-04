@@ -8,7 +8,7 @@
 - **If code is present too, code comes first.** Docs can drift from code (stale·not-followed). Build the tree from code (code-to-tree); reference the docs only for *intent·risks*.
 
 ## Steps
-1. **Keep the originals in ref/ as-is.** Put the incoming docs in the config's ref path (default `docs/ref/`) *untouched*. (If it's a live operational doc already sitting somewhere, you may point at that spot instead of copying — so two copies don't drift.)
+1. **Keep the originals in ref/ as-is.** **Default: copy** the incoming docs into the config's ref path (default `docs/ref/`) *untouched*. Point at a doc in place instead *only* if it's actively maintained elsewhere (so two copies don't drift). When unsure, copy.
 2. **Make a location map (ref-index).** A map of "what's where." Kept so you don't re-read the whole thing each time. Format is the `ref-index.md` template (Topic | File | Location). ref doesn't change, so this table doesn't go stale.
 3. **Reflect into the tree/contract per Task.** init doesn't unfold the docs. Later, as grow/implement build a node, they reference the relevant part of ref to *stay true to the intended implementation*.
 

@@ -24,15 +24,16 @@ Thin — read only this node's Task and the *relevant code*. Don't pile up a lon
 
 ### 2. Tests first
 From the AC, write *failing* tests. These tests are the target of the implementation.
-- If the Task has `tdd: false`, skip (the reason is already in the meta). Exploratory prototypes·UI·hardware-dependent checks, etc.
+- TDD is decided by the Task's `tdd` field (set at grow, with `tdd_skip_reason`) — here you only **obey** it: `tdd: true` → write failing tests first; `tdd: false` → skip, no judgment call. If the field looks wrong for this node, that's a spec fix — go back to grow/revise; don't override it silently here.
 
 ### 3. Implement
-Write code until the tests pass. Because you write *knowing* the risks and the existing code, the risky spots come out right from the start and no duplication creeps in.
-- If you extract a shared node or split this one (Principle 3), add it to `tree.md` (and the parent's child list) — tree.md stays in sync with the code.
+Write code until the tests pass.
+- **Write-scope (blast radius):** write only *this node's* code (`src/`), its tests (`tests/`), and *this node's* Task — plus `tree.md` if you extract/split (next bullet). **Don't edit another existing node's code or Task** to make yours pass; if a *shared* node you depend on needs changing, stop and use `grovespec-revise` on it.
+- If you find a chunk that 2+ nodes will use, extract it as a shared node (or split this one): add its id to `tree.md` so the structure stays in sync with the code.
 
 ### 4. Review (the result)
-Call `grovespec-review` with `target_type: result` (scope by *node importance* — usually `standard`, `full` for an important node). Fix the confirmed issues right there (apply), and repeat until it passes.
-- If the implementation differs from the spec: if **intentional**, fix the spec (concept) and note it in the Change Log. If a **mistake**, fix the code.
+Call `grovespec-review` with `target_type: result`. Don't eyeball "importance" — let review pick the level (an ordinary node → `standard`; a contract many nodes consume → `full`). Fix the confirmed issues right there (apply), then re-invoke review **on the same node** (reuses its `<id>.yaml`; rounds accumulate) until it passes; on an `escalated` return, stop — **do not set `done`** (open issues go to the human).
+- If the implementation differs from the spec: **default to "mistake" — conform the code to the spec.** Call it *intentional* (fix the spec + note why in the Change Log) only if you can state the new contract clause that replaces the old one. (Matching the spec is the cheap, reversible direction; rewriting the contract is the expensive one — don't do it by accident.)
 
 ### 5. Human check → done
 Show the result to the human and get it confirmed. If it's right, set the Task `status: done`.

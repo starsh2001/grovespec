@@ -4,8 +4,8 @@ name: "add command"
 role: feature
 status: done
 blocked_by: [TASK-2]
-tdd: true
-tdd_skip_reason: ""
+tdd: false
+tdd_skip_reason: "existing code, documented after the fact (brownfield); tests to follow"
 ---
 
 ## Overview

@@ -13,7 +13,7 @@ Define only this node + (if it's a skeleton) its direct children. Don't go deepe
 ## Flow
 
 ### 1. Pick a node
-From `tree.md`, one of the *unblocked* nodes (its parent is done). Or the node the user pointed at.
+From `tree.md`, one of the *unblocked* nodes — its parent is `done` **and** every `blocked_by` dep is `done`. Or the node the user pointed at.
 
 ### 2. Read only what you need (thin)
 - The parent Task's **contract** — what this node has to fill.
@@ -23,7 +23,7 @@ From `tree.md`, one of the *unblocked* nodes (its parent is done). Or the node t
 Don't pile up a long working context. The truth is on disk; re-read when you need it.
 
 ### 3. Write the spec (concept only)
-Copy `.grovespec/templates/task.md` and fill it in. The format is fixed by `.grovespec/templates/FORMATS.md` — frontmatter (role·status·blocked_by·tdd) + Overview·Requirements·**Contract**·AC. Write the *content* in `config.language`.
+Copy `.grovespec/templates/task.md` and fill it in. The format is fixed by `.grovespec/templates/FORMATS.md` — frontmatter (role·status·blocked_by·tdd) + Overview·Requirements·**Contract**·AC. Set `id` to match the filename (`TASK-N`, not the template's `TASK-0`). **`tdd`**: default `true` (tests come first at implement); set `false` only for nodes that resist up-front tests (exploratory prototype · UI · hardware-dependent), and then `tdd_skip_reason` is required. Write the *content* in `config.language`.
 - **The contract matters most**: precise enough that *another node can rely on it alone, without seeing the internals* (what it takes·gives·empty cases).
 - Don't write *how* the code will look — that emerges in implement.
 - **`blocked_by`** = the shared/cross-tree nodes this one consumes (often `[]`); *not* the parent (that's in tree.md).
@@ -33,13 +33,16 @@ Copy `.grovespec/templates/task.md` and fill it in. The format is fixed by `.gro
 If this node is a skeleton, also define the *roles·contracts* of its direct children.
 - Add the children's ids to `tree.md` (indented under this node).
 - Create each child's Task and write its role·contract.
-- **The children's contracts must sum to this node's contract** — nothing missing, nothing overlapping.
+- **The children's contracts must sum to this node's contract** — nothing missing, nothing overlapping. *Self-test (do it, don't eyeball):* list every clause of this node's Contract (takes · gives · each invariant · each empty-case); assign each to **exactly one** child — 0 unassigned (a gap), 0 claimed by two (an overlap). Record that clause→child map in this node's Change Log.
+  - ✅ `storage` owns the record shape; `add` owns validation — each clause has one owner.
+  - ❌ both `storage` and `add` validate the amount (overlap), or neither owns the empty-file case (gap).
+- New children are created at `status: backlog` (they unblock when this skeleton is `done` — see `FORMATS.md` status lifecycle).
 
 ### 5. Review (the spec)
-Call `grovespec-review` against *this spec* (scope by *node importance* — usually `standard`, `full` for an important node). Fix the confirmed issue list it returns, right there, and repeat until clean. (review has cold reviewers verify the contract via *consumer-impersonator / gap-finder / coherence*.)
+Call `grovespec-review` with `target_type: spec`. Don't eyeball "importance" — let review pick the level from checkable inputs (a skeleton, or a *shared* node others will depend on → `full`; an ordinary leaf → `standard`). Fix the confirmed issue list it returns, right there, then re-invoke review **on the same node** — it reuses that `<id>.yaml`, so rounds accumulate — until clean; on an `escalated` return, stop (don't confirm the spec). (review has cold reviewers verify the contract via *consumer-impersonator / gap-finder / coherence*.)
 
 ### 6. Human check
-Show the spec to the human and get **"is this what you want?"** confirmed. The checkpoint *before* spending effort on implementation.
+Show the spec to the human and get **"is this what you want?"** confirmed. The checkpoint *before* spending effort on implementation. (A node that was `backlog` flips to `todo` here, once confirmed.)
 
 ## When it's done
 The node's Task is filled in as concept, status `todo`. Next — **both roles get implemented**:

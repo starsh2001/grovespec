@@ -139,7 +139,7 @@ Written down this way, just before you make a Task related to that risk you can 
 
 ## 5. Task — the tree's unit of work
 
-Each node in the tree becomes a **Task** file on disk (`docs/tasks/{node}.md`). A Task holds a node's *concept* in one file — Overview·Requirements·Contract·AC·Subtasks·status·Change Log. What the code looks like is in the code, not the Task.
+Each node in the tree becomes a **Task** file on disk (`docs/tasks/{node}.md`). A Task holds a node's *concept* in one file — Overview·Requirements·Contract·AC·Subtasks·Change Log (status·blocked_by etc. are frontmatter, not body sections). What the code looks like is in the code, not the Task.
 
 ### One kind, two roles
 
@@ -208,10 +208,10 @@ The procedure is in [WORKFLOW.md](WORKFLOW.md) under revise.
 
 ## 6. The per-Task gate
 
-Every time you build a feature Task, it goes through the flow below. Start from a Task whose `Blocked By` is cleared.
+Every time you build a feature Task, it goes through the flow below. Start from a Task whose `blocked_by` is cleared.
 
 ```
-pre-check → write tests first → build → per-node review → integration review
+pre-check → write tests first → build → review
 ```
 
 ### Pre-check
@@ -233,7 +233,7 @@ The review (a single `grovespec-review` call) asks two things:
 - *Does it still fit with the others?* — does it break a contract it agreed with another Task? The **coherence** reviewer checks this against the modules the pre-check's code search pulled in.
 
 ### Review is done by several fresh eyes
-The review has several reviewers — who *didn't see how it was built* — find flaws in parallel with different roles, aggregate, and then check "is it over-strict." The strength (Critical / Should Fix / Nice to Have) and repeat (number of consecutive passes) are set in config, and each round runs as a new session. The detailed rules are in [WORKFLOW.md](WORKFLOW.md) §3.
+The review has several reviewers — who *didn't see how it was built* — find flaws in parallel with different roles, aggregate, and then (on `full`) check "is it over-strict." Strength (config `strength`: 1 = block on Critical · 2 = +Should Fix · 3 = +Nice to Have) and repeat (consecutive clean passes, set per scale level) come from config, and each round runs as a new session. The detailed rules are in [WORKFLOW.md](WORKFLOW.md) §3.
 
 Because reviewers are *cold* (no memory of earlier rounds — or of a review months ago), a call made once would be re-made: the next cold review re-raises an issue the over-strictness check already ruled a nitpick, or re-flags an accepted gap. So when a review closes, the caller records the outcome and any *dropped-as-nitpick · accepted-gap* adjudications, with the reason, in the node's **Change Log**. (Accepted contract gaps are already unchecked AC; this just extends the same "don't re-decide it" protection across revisions — a Change-Log line, not a separate gate file.)
 
@@ -275,7 +275,7 @@ This is why off-the-shelf SDD tools are weak on existing projects. With no desig
 
 ### Paths are changeable
 
-An existing project already has its own doc structure. Change the default paths (`docs/...`) in `.grovespec/config.yaml` to wherever you want and GroveSpec works there. But only the location (path) is changeable; the structure isn't. The brief is one overview, tasks is one file per node, each Task has a `Blocked By` — this structure is fixed.
+An existing project already has its own doc structure. Change the default paths (`docs/...`) in `.grovespec/config.yaml` to wherever you want and GroveSpec works there. But only the location (path) is changeable; the structure isn't. The brief is one overview, tasks is one file per node, each Task has a `blocked_by` — this structure is fixed.
 
 > Detecting the case above and the prep for each is handled by the entry skill (`grovespec-init`). This document only settles "why it's divided this way"; the concrete procedure lives in the skill.
 

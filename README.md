@@ -60,7 +60,7 @@ GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 2. Ask Claude: **"grovespec init"** — it creates `docs/` (brief, tree, first Tasks) and `.grovespec/config.yaml`.
 3. From there: **"grow the next node"**, then **"implement it"**, looping down the tree.
 
-**See a complete worked project:** [examples/expense-cli](examples/expense-cli) — a finished mini-CLI with filled brief · tree · Tasks (real Contracts, honest gaps) + the code they produced. The best way to see what a good spec looks like before you start.
+**See a complete worked project:** [examples/expense-cli](examples/expense-cli) — a **brownfield** mini-CLI: its existing code *documented* as filled brief · tree · Tasks (real Contracts, honest gaps). The best way to see what good specs look like before you start.
 
 > A one-command installer (`npx grovespec`) and a human-facing tree view are on the roadmap.
 
@@ -68,6 +68,10 @@ GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 
 - [METHODOLOGY.md](METHODOLOGY.md) — the *what and why*: the principles and the reasoning behind them.
 - [WORKFLOW.md](WORKFLOW.md) — the *how*: the workflow, the steps, and how the skills are divided.
+
+## Influences
+
+GroveSpec stands on earlier spec-driven work, with thanks. Its *explore* stance is influenced by [OpenSpec](https://github.com/Fission-AI/OpenSpec)'s explore mode. The cold, multi-reviewer gate and the one-node-ahead tree are GroveSpec's own response to the rubber-stamp reviews and spec↔code drift that every spec workflow meets at scale — territory charted by [BMAD-METHOD](https://github.com/bmadcode/bmad-method) and [Spec-Kit](https://github.com/github/spec-kit). Different bets, shared lineage.
 
 ## Status
 

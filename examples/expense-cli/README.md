@@ -1,6 +1,6 @@
 # expense-cli — a worked GroveSpec example
 
-A finished small project built with GroveSpec, so you can see what *filled-in* artifacts look like. (The templates ship empty `{placeholders}`; this is the calibration target — "what a good Contract/Task/tree looks like.")
+An existing small CLI **documented as GroveSpec specs** (a *brownfield* example), so you can see what *filled-in* artifacts look like. (The templates ship empty `{placeholders}`; this is the calibration target — "what a good Contract/Task/tree looks like.") Being brownfield — code captured after the fact — every node is `tdd: false` with a tests-to-follow reason; a *greenfield* tests-first example is on the roadmap.
 
 It's a tiny CLI expense tracker: `python src/cli.py <add|list|report>`.
 
