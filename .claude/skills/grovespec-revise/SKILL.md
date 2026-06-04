@@ -7,7 +7,9 @@ description: Changes an already-done node in GroveSpec — either changing its b
 
 Changing an already-`done` node *later*. (Fixing mid-build happens inside grow/implement.)
 
-> Reply in `config.language` (set at init) — these files are English, your replies aren't.
+> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language. These files are English; your output is not.
+
+> **Decisions: recommend + leave a way out.** When you ask the user to decide (split·merge·move, how to change…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (the AskUserQuestion tool's *Other*, or an explicit free-form choice in an inline list). Don't force a closed pick.
 
 ## The question that decides everything
 > **Did the contract change?**

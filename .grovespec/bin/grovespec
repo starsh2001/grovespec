@@ -228,6 +228,14 @@ cmd_check() {
   return 1
 }
 
+# ===================== lang (reply/artifact language) =====================
+cmd_lang() {
+  local v
+  v=$(grep -E '^[[:space:]]*language:' "$CONFIG" 2>/dev/null | head -1 \
+      | sed -E 's/^[[:space:]]*language:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]*$//')
+  if [ -n "$v" ]; then echo "$v"; else echo "(no config.language yet — run grovespec-init)"; fi
+}
+
 # ===================== impact =====================
 cmd_impact() {
   local n="${1:-}"
@@ -262,7 +270,8 @@ case "${1:-}" in
   validate) cmd_validate ;;
   status)   cmd_status ;;
   check)    shift; cmd_check "${1:-}" ;;
+  lang)     cmd_lang ;;
   impact)   shift; cmd_impact "${1:-}" ;;
   tree)     cmd_tree ;;
-  *) echo "grovespec — validate | status | check [TASK-N] | impact TASK-N | tree"; exit 2 ;;
+  *) echo "grovespec — validate | status | check [TASK-N] | lang | impact TASK-N | tree"; exit 2 ;;
 esac

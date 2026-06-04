@@ -7,7 +7,9 @@ description: Grows the GroveSpec tree by one node — writes only the *concept s
 
 Growing the tree *one node at a time*. No code — **concept spec only**. (Implementation is `grovespec-implement`.)
 
-> Reply in `config.language` (set at init) — these files are English, your replies aren't.
+> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language. These files are English; your output is not.
+
+> **Decisions: recommend + leave a way out.** When you ask the user to decide (an approach, a contract choice…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (the AskUserQuestion tool's *Other*, or an explicit free-form choice in an inline list). Don't force a closed pick.
 
 ## One principle: one layer only
 Define only this node + (if it's a skeleton) its direct children. Don't go deeper. The tree is a hypothesis — bake it deep before the top is settled and you'll redo it all later.
