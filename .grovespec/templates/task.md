@@ -2,7 +2,7 @@
 id: TASK-0
 name: "{node name}"
 role: feature              # skeleton | feature
-status: backlog            # backlog | todo | in-progress | review | done
+status: backlog            # backlog | todo | in-progress | done
 blocked_by: []             # [TASK-2, ...] / [] if none
 tdd: true                  # true | false
 tdd_skip_reason: ""        # required when tdd: false

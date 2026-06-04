@@ -27,6 +27,7 @@ Copy `.grovespec/templates/task.md` and fill it in. The format is fixed by `.gro
 - **The contract matters most**: precise enough that *another node can rely on it alone, without seeing the internals* (what it takes·gives·empty cases).
 - Don't write *how* the code will look — that emerges in implement.
 - **`blocked_by`** = the shared/cross-tree nodes this one consumes (often `[]`); *not* the parent (that's in tree.md).
+- **Measurable NFR targets** (latency·throughput·error-rate, where they apply) go in the AC as checkable items — don't leave them implicit.
 
 ### 4. If it's a skeleton: define the children
 If this node is a skeleton, also define the *roles·contracts* of its direct children.

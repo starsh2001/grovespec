@@ -64,7 +64,7 @@ There are five units you invoke.
 - **Fresh eyes**: a reviewer *doesn't see how it was built.* They look only at the result + the criteria, and go in with "my job is to find flaws; the default is 'there's a problem'."
 - **Different roles**: many identical reviewers see only the same weakness. Mix *different* eyes — like security / the future maintainer / a non-expert / a breaker.
 - **Non-expert reviewer**: one of them becomes "a non-expert" and fails it on any jargon or fluff they can't follow. (The lever that forces a spec to be *confirmable by a human at a glance*.)
-- **Strength (how far to block)**: Critical / Should Fix / Nice to Have — how severe a finding must be to block a pass. **Repeat**: how many consecutive clean passes before stopping (stops "passed once, then found more on a re-read"). **Scale**: reviewer count·rounds scale to the change's blast radius — `skip` (unchanged contract, trivial) · `light` · `standard` · `full` (contract changed / many consumers / important node). *The exact pass-conditions and counts live in the `grovespec-review` skill + `config.yaml` — not restated here, so they can't drift.*
+- **Strength (how far to block)**: Critical / Should Fix / Nice to Have — how severe a finding must be to block a pass. **Repeat**: how many consecutive clean passes before stopping (stops "passed once, then found more on a re-read"). **Scale**: reviewer count·rounds scale to how far the change reaches — `skip` (unchanged contract, trivial) · `light` · `standard` · `full` (contract changed / many consumers / important node). *The exact pass-conditions and counts live in the `grovespec-review` skill + `config.yaml` — not restated here, so they can't drift.*
 - **Over-strictness check**: at the end, a separate look at whether the raised issues are *real blockers or nitpicks*. Nitpicks are dropped. (Stops it looping forever.)
 - **Stop safety**: a max round count; if it can't finish within that, the remaining issues go to the human.
 
@@ -110,4 +110,3 @@ Settled: contract verification (§3) · structure change (§2 revise) · brownfi
 - grow·implement **full cycle**, init on a large codebase.
 - When two far-apart nodes share a contract — their common parent is the top, so the partial tree grows large.
 - When several agents work *different branches at the same time* (spec conflicts).
-- Where to stop node size (the split criterion), and how to find the risk list.

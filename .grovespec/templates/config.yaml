@@ -18,7 +18,7 @@ review:
   strength: 2        # how far to block: 1=Critical · 2=+Should Fix · 3=+Nice to Have
   max_rounds: 5
 
-  # Scale review effort (reviewer count·repeat) to the change's blast radius. The review skill picks the level.
+  # Scale review effort (reviewer count·repeat) to how far the change reaches (how many consumers). The review skill picks the level.
   scale:
     skip:     { reviewers: 0, repeat: 0 }   # contract unchanged + trivial (format·comment)
     light:    { reviewers: 2, repeat: 1 }   # contract unchanged + small change

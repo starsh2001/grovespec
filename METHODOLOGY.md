@@ -227,17 +227,13 @@ That said, for cases hard to pin down with tests up front — exploratory protot
 ### Build
 Write code until the tests pass. Because you build knowing the risks and the existing code, the risky parts come out right from the start and no duplication arises.
 
-### Per-node review
-"Did this Task do its own job properly" — a check within the Task.
-- Did all the tests pass?
-- Are the AC met?
-- If the implementation differs from the spec: an intentional difference → update the spec + record in the Change Log; a mistake → fix the implementation.
-
-### Integration review
-"Does this Task break the contract it agreed with other Tasks." It works properly only when the things being compared are actually reviewed together. Verify against the modules the pre-check's code search pulled in.
+### Review — one pass, two questions
+The review (a single `grovespec-review` call) asks two things:
+- *Did this Task do its own job?* — tests pass, AC met. If the implementation differs from the spec: an intentional difference → update the spec + record in the Change Log; a mistake → fix the implementation.
+- *Does it still fit with the others?* — does it break a contract it agreed with another Task? The **coherence** reviewer checks this against the modules the pre-check's code search pulled in.
 
 ### Review is done by several fresh eyes
-The per-node and integration reviews have several reviewers — who *didn't see how it was built* — find flaws in parallel with different roles, aggregate, and then check "is it over-strict." The strength (Critical / Should Fix / Nice to Have) and repeat (number of consecutive passes) are set in config, and each round runs as a new session. The detailed rules are in [WORKFLOW.md](WORKFLOW.md) §3.
+The review has several reviewers — who *didn't see how it was built* — find flaws in parallel with different roles, aggregate, and then check "is it over-strict." The strength (Critical / Should Fix / Nice to Have) and repeat (number of consecutive passes) are set in config, and each round runs as a new session. The detailed rules are in [WORKFLOW.md](WORKFLOW.md) §3.
 
 Because reviewers are *cold* (no memory of earlier rounds — or of a review months ago), a call made once would be re-made: the next cold review re-raises an issue the over-strictness check already ruled a nitpick, or re-flags an accepted gap. So when a review closes, the caller records the outcome and any *dropped-as-nitpick · accepted-gap* adjudications, with the reason, in the node's **Change Log**. (Accepted contract gaps are already unchecked AC; this just extends the same "don't re-decide it" protection across revisions — a Change-Log line, not a separate gate file.)
 

@@ -14,7 +14,7 @@ YAML frontmatter + fixed sections.
 | `id` | string | `TASK-N` — immutable, same as the filename |
 | `name` | string | node name — may change (rename) |
 | `role` | enum | `skeleton` \| `feature` |
-| `status` | enum | `backlog` \| `todo` \| `in-progress` \| `review` \| `done` |
+| `status` | enum | `backlog` \| `todo` \| `in-progress` \| `done` |
 | `blocked_by` | list | `[TASK-2, ...]`, `[]` if none |
 | `tdd` | bool | `true` \| `false` |
 | `tdd_skip_reason` | string | required when `tdd: false` |

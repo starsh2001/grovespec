@@ -28,6 +28,7 @@ From the AC, write *failing* tests. These tests are the target of the implementa
 
 ### 3. Implement
 Write code until the tests pass. Because you write *knowing* the risks and the existing code, the risky spots come out right from the start and no duplication creeps in.
+- If you extract a shared node or split this one (Principle 3), add it to `tree.md` (and the parent's child list) — tree.md stays in sync with the code.
 
 ### 4. Review (the result)
 Call `grovespec-review` with `target_type: result` (scope by *node importance* — usually `standard`, `full` for an important node). Fix the confirmed issues right there (apply), and repeat until it passes.

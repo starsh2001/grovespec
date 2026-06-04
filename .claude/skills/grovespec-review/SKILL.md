@@ -19,8 +19,8 @@ A checklist just gets checked off (it claims "passed" once, then the same proble
 
 State lives in `.grovespec/review/<id>.yaml` (template: `.grovespec/templates/review-state.yaml`). **Each round is a new session** that reads only this file and continues — it must not carry over the prior round's discussion, or "fresh eyes" is lost.
 
-## Review depth scales with blast radius (cost)
-If `strength` is *how far you block*, this is a separate dial: it **scales the reviewer count·repeat to the change's blast radius.** A full review (5 reviewers × repeat 2) on an 8-line change is overkill.
+## Review depth scales with the change's reach (cost)
+If `strength` is *how far you block*, this is a separate dial: it **scales the reviewer count·repeat to how far the change reaches** (how many nodes its contract touches). A full review (5 reviewers × repeat 2) on an 8-line change is overkill.
 
 The level is set by three things — ① did the contract change ② how many consumers ③ node importance (config):
 

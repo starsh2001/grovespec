@@ -23,7 +23,7 @@ init (once)
   → revise                        change an already-done node later
 ```
 
-- **Tree of contracts.** A project is a tree. Each node is a `Task` with a **Contract** (what it takes, gives, and guarantees). Consumers depend on the Contract, never the internals — so the blast radius of a change is bounded by the contracts it touches.
+- **Tree of contracts.** A project is a tree. Each node is a `Task` with a **Contract** (what it takes, gives, and guarantees). Consumers depend on the Contract, never the internals — so a change reaches only as far as the contracts it touches.
 - **One node ahead.** The spec leads the code by exactly one layer. The tree is a *hypothesis*, refined as you build — not a big design locked in up front.
 - **Cold review gate.** Both grow (spec) and implement (code) end in a review loop: several *fresh-eyes* reviewers — who never saw how it was built — inspect in parallel with different roles (consumer-impersonator, gap-finder, coherence, non-expert, breaker), the findings are triaged, and the caller fixes. Review effort scales to the size of the change.
 - **Propagation on change.** Changing a done node asks one question: *did the contract change?* If not, fix just that spot. If so, find the nodes that used it and re-review them. Nothing more.
@@ -47,7 +47,7 @@ docs/
   conventions.md     glossary · common rules
   tasks/TASK-N.md    one node each: Overview · Requirements · Contract · AC · Subtasks · Change Log
   ref/               original reference docs, kept as-is + a location map
-config.yaml          paths · review settings · language
+.grovespec/config.yaml  paths · review settings · language
 ```
 
 **Headers and field names are fixed (English) — the parser contract. The content is written in your project's language** (`config.language`, set once at init). A Korean team writes Korean specs under English headers; an English team writes English. Plain language — in whatever language you work in.
@@ -57,7 +57,7 @@ config.yaml          paths · review settings · language
 GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 
 1. Copy `.claude/skills/grovespec-*` and `.grovespec/` into your repo.
-2. Ask Claude: **"grovespec init"** — it sets up the brief, tree, and first Tasks.
+2. Ask Claude: **"grovespec init"** — it creates `docs/` (brief, tree, first Tasks) and `.grovespec/config.yaml`.
 3. From there: **"grow the next node"**, then **"implement it"**, looping down the tree.
 
 **See a complete worked project:** [examples/expense-cli](examples/expense-cli) — a finished mini-CLI with filled brief · tree · Tasks (real Contracts, honest gaps) + the code they produced. The best way to see what a good spec looks like before you start.
