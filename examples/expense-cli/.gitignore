@@ -1,0 +1,4 @@
+# runtime data the example writes when you run it
+src/expenses.json
+__pycache__/
+*.pyc

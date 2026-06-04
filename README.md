@@ -60,6 +60,8 @@ GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 2. Ask Claude: **"grovespec init"** — it sets up the brief, tree, and first Tasks.
 3. From there: **"grow the next node"**, then **"implement it"**, looping down the tree.
 
+**See a complete worked project:** [examples/expense-cli](examples/expense-cli) — a finished mini-CLI with filled brief · tree · Tasks (real Contracts, honest gaps) + the code they produced. The best way to see what a good spec looks like before you start.
+
 > A one-command installer (`npx grovespec`) and a human-facing tree view are on the roadmap.
 
 ## Design docs

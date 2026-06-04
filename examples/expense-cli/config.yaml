@@ -1,0 +1,18 @@
+version: 1
+language: en
+
+paths:
+  brief: docs/brief.md
+  tree: docs/tree.md
+  conventions: docs/conventions.md
+  tasks: docs/tasks/
+  ref: docs/ref/
+
+review:
+  strength: 2
+  max_rounds: 5
+  scale:
+    skip:     { reviewers: 0, repeat: 0 }
+    light:    { reviewers: 2, repeat: 1 }
+    standard: { reviewers: 3, repeat: 1 }
+    full:     { reviewers: 5, repeat: 2 }
