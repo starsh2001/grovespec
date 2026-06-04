@@ -66,6 +66,7 @@ GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 
 - `validate` — format + graph coherence (orphans, cycles, impossible states); exits non-zero with fixes.
 - `status` — each node's state + which are unblocked, and what's next.
+- `check [TASK-N]` — is a node ready to work (parent done + blocked_by done)? The top-down gate `grow`/`implement` run before building, so the build can't drift bottom-up.
 - `impact TASK-N` — the consumer set a contract change reaches (the blast radius).
 - `tree` — the id-only tree rendered with names + status.
 

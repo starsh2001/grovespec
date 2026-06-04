@@ -13,7 +13,7 @@ Define only this node + (if it's a skeleton) its direct children. Don't go deepe
 ## Flow
 
 ### 1. Pick a node
-From `tree.md`, one of the *unblocked* nodes — its parent is `done` **and** every `blocked_by` dep is `done`. Or the node the user pointed at.
+From `tree.md`, pick an *unblocked* node. **Confirm it mechanically — `grovespec check <node>` (or `grovespec check` to list what's ready); only a ✓ node is eligible, don't eyeball it.** (Unblocked = parent `done` **and** every `blocked_by` `done`.) Or the node the user pointed at — but still run `check`; if it's ✗, it's blocked, so say so and grow the ready node instead. **Never grow/implement a node whose parent isn't done — that's bottom-up drift.**
 
 ### 2. Read only what you need (thin)
 - The parent Task's **contract** — what this node has to fill.

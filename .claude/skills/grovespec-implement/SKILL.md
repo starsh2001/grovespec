@@ -12,6 +12,9 @@ Thin — read only this node's Task and the *relevant code*. Don't pile up a lon
 
 ## Flow
 
+### 0. Confirm it's this node's turn (the top-down gate)
+Run `grovespec check <node>`. If it exits **✗** (blocked / no spec), **STOP — do not implement this node**; implement the node `grovespec check` reports ready instead. This gate keeps the build top-down: *never* implement a node whose parent isn't `done` (building a leaf before its skeleton is bottom-up drift — exactly the failure this prevents).
+
 ### 1. Pre-check (before implementing)
 - **Look up risks**: any risk in `brief.md` that this node touches? If so, go in knowing it.
 - **Check conventions**: the relevant terms·rules in `conventions.md`.

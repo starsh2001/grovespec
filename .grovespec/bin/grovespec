@@ -206,6 +206,28 @@ cmd_status() {
   [ -n "$nexts" ] && echo "next:$nexts"
 }
 
+# ===================== check (the top-down gate) =====================
+# check TASK-N -> is this node ready to work? (exit 0 yes / 1 no). check (no arg) -> list ready nodes.
+cmd_check() {
+  local n="${1:-}" t ub any=""
+  if [ -z "$n" ]; then
+    echo "ready to work now (top-down):"
+    for t in $(tree_ids); do
+      [ "$(status_of "$t")" = "done" ] && continue
+      if [ "$(unblocked "$t")" = "yes" ]; then printf '  %-8s %s\n' "$t" "$(status_of "$t")"; any=1; fi
+    done
+    [ -z "$any" ] && echo "  (none — every non-done node is blocked)"
+    return 0
+  fi
+  [ -f "$TASKS/$n.md" ] || { echo "✗ $n: no task file"; return 2; }
+  ub=$(unblocked "$n")
+  if [ "$ub" = "yes" ]; then
+    echo "✓ $n is ready ($(status_of "$n")) — parent done, blocked_by done."; return 0
+  fi
+  echo "✗ $n is NOT ready — ${ub#no:}. Do NOT work it (that's bottom-up). Work a node 'grovespec check' lists as ready."
+  return 1
+}
+
 # ===================== impact =====================
 cmd_impact() {
   local n="${1:-}"
@@ -239,7 +261,8 @@ cmd_tree() {
 case "${1:-}" in
   validate) cmd_validate ;;
   status)   cmd_status ;;
+  check)    shift; cmd_check "${1:-}" ;;
   impact)   shift; cmd_impact "${1:-}" ;;
   tree)     cmd_tree ;;
-  *) echo "grovespec — validate | status | impact TASK-N | tree"; exit 2 ;;
+  *) echo "grovespec — validate | status | check [TASK-N] | impact TASK-N | tree"; exit 2 ;;
 esac
