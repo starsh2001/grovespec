@@ -8,8 +8,6 @@ GroveSpec is a development methodology for handing coding work to an AI agent. A
 
 Off-the-shelf SDD (Spec-Driven Development) tools write the whole spec first, then build. GroveSpec is different. It doesn't write the spec out in full up front — it grows it a little at a time as it builds.
 
-The name comes from *grove* (a small wood), which shares a root with *grow*. In a single tree, the roots and branches are the skeleton, the leaves on them are the features, and the tree itself is the system. The word packs together a tree (a structure that forks top-down like branches) and growth.
-
 ---
 
 ## 1. What's different from existing methods
@@ -181,42 +179,9 @@ When a human needs to see the tree at a glance, just ask the agent to lay out th
 
 ### Task file format
 
-`docs/tasks/TASK-N.md`:
+A Task (`docs/tasks/TASK-N.md`) is YAML frontmatter + fixed sections — `Overview · Requirements · Contract · AC · Subtasks · Change Log`. The exact fields·types·order are the parser contract, fixed in `.grovespec/templates/FORMATS.md`, with a fill-in template at `.grovespec/templates/task.md` — not reprinted here, to keep one source of truth. Headers and field names are English; the *content* is written in `config.language`.
 
-```markdown
----
-id: TASK-N
-name: "{node name}"
-role: feature              # skeleton | feature
-status: backlog            # backlog | todo | in-progress | review | done
-blocked_by: []             # [TASK-2, ...] / [] if none
-tdd: true                  # true | false
-tdd_skip_reason: ""        # required when tdd: false
----
-
-## Overview
-{What this node covers, in 2-3 sentences. Why it's needed.}
-
-## Requirements
-{What it must do. From the user's point of view.}
-
-## Contract
-{What it guarantees to the outside (parent·other nodes). What it takes·gives·invariants. Other nodes rely on this without seeing the internals.}
-
-## AC
-- [ ] {acceptance criterion 1}
-  - [ ] {detail}
-- [ ] {acceptance criterion 2}
-
-## Subtasks
-- [ ] {implementation step 1}
-- [ ] {implementation step 2}
-
-## Change Log
-- {YYYY-MM-DD} — {what changed and why — conceptually. How the code changed is held by git.}
-```
-
-There's no `parent` in the frontmatter because you can see who the parent is from tree.md. The same information isn't kept in two places. (The exact fields·types·order are fixed by `.grovespec/templates/FORMATS.md` — the contract the tooling parses. Headers and field names are English; the *content* is written in `config.language`.)
+There's no `parent` in the frontmatter — you read the parent from tree.md, so the same information isn't kept in two places.
 
 ### Non-functional requirements (performance · security · reliability)
 

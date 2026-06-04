@@ -64,15 +64,9 @@ There are five units you invoke.
 - **Fresh eyes**: a reviewer *doesn't see how it was built.* They look only at the result + the criteria, and go in with "my job is to find flaws; the default is 'there's a problem'."
 - **Different roles**: many identical reviewers see only the same weakness. Mix *different* eyes — like security / the future maintainer / a non-expert / a breaker.
 - **Non-expert reviewer**: one of them becomes "a non-expert" and fails it on any jargon or fluff they can't follow. (The lever that forces a spec to be *confirmable by a human at a glance*.)
-- **Strength (how far to block)**: issues split into Critical / Should Fix / Nice to Have.
-  - level 1: pass if no Critical
-  - level 2: pass if no Critical·Should Fix
-  - level 3: pass only if none of the three
-- **Repeat (how many passes before stopping)**: stop after one pass, or require N passes in a row. (Stops the "passed once, but found more on a re-read" problem.)
+- **Strength (how far to block)**: Critical / Should Fix / Nice to Have — how severe a finding must be to block a pass. **Repeat**: how many consecutive clean passes before stopping (stops "passed once, then found more on a re-read"). **Scale**: reviewer count·rounds scale to the change's blast radius — `skip` (unchanged contract, trivial) · `light` · `standard` · `full` (contract changed / many consumers / important node). *The exact pass-conditions and counts live in the `grovespec-review` skill + `config.yaml` — not restated here, so they can't drift.*
 - **Over-strictness check**: at the end, a separate look at whether the raised issues are *real blockers or nitpicks*. Nitpicks are dropped. (Stops it looping forever.)
-- **Stop safety**: set a max round count; if it can't finish within that, take the remaining issues to the human.
-- Strength·repeat are set in config, and can be set per node.
-- **Scale review effort to the size of the change** — a small change with an unchanged contract gets 0 reviewers (`skip`); a changed contract·many consumers·important node gets `full` (5 reviewers × repeat); in between is `light`/`standard`. (When the caller passes the blast radius, review picks the level.)
+- **Stop safety**: a max round count; if it can't finish within that, the remaining issues go to the human.
 
 **When reviewing a spec (= is the contract good?):**
 - **Consumer impersonation**: one reviewer pretends *"I'm a node that will use this"* and tries to build theirs from the contract alone. Wherever they have to *guess* is a hole in the contract. (This impersonation also sets the precision — only as much as a consumer needs.)
@@ -83,41 +77,11 @@ There are five units you invoke.
 
 ## 4. Task file format (concept only)
 
-A Task holds *concept* only. **It does not record what the code looks like** — that's read from the code.
+A Task holds *concept* only — **it does not record what the code looks like** (that's read from the code). It's YAML frontmatter + fixed sections (`Overview · Requirements · Contract · AC · Subtasks · Change Log`); the exact format is fixed in `.grovespec/templates/FORMATS.md` (the parser contract), with a fill-in template at `.grovespec/templates/task.md` — not reprinted here.
 
-```markdown
----
-id: TASK-N
-name: "{node name}"
-role: feature              # skeleton | feature
-status: backlog            # backlog | todo | in-progress | review | done
-blocked_by: []             # [TASK-2, ...] / [] if none
-tdd: true                  # true | false
-tdd_skip_reason: ""        # required when tdd: false
----
-
-## Overview
-{what, and why.}
-
-## Requirements
-{what it must do. From the user's point of view.}
-
-## Contract
-{what it guarantees to the outside (parent·other nodes). Other nodes rely on this without seeing the internals.}
-
-## AC
-- [ ] {acceptance criterion}
-
-## Subtasks
-- [ ] {implementation step}
-
-## Change Log
-- {YYYY-MM-DD} — {what changed and why — conceptually}
-```
-
-- Position (who the parent is) is held by tree.md. A Task doesn't record its Parent.
+- Position (who the parent is) is held by tree.md — a Task doesn't record its parent.
 - "Which code changed how" is held by git; "why it changed" by the Change Log.
-- The exact fields·types·order are fixed by `.grovespec/templates/FORMATS.md` (the contract the tooling parses). Headers and field names are English; the *content* is written in `config.language`.
+- Headers and field names are English; the *content* is written in `config.language`.
 
 ---
 
