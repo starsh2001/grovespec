@@ -7,6 +7,8 @@ description: Changes an already-done node in GroveSpec — either changing its b
 
 Changing an already-`done` node *later*. (Fixing mid-build happens inside grow/implement.)
 
+> Reply in `config.language` (set at init) — these files are English, your replies aren't.
+
 ## The question that decides everything
 > **Did the contract change?**
 > - Unchanged → just that spot. *Don't touch the other nodes that use it.*

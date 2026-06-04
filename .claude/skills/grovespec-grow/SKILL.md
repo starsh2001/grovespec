@@ -7,6 +7,8 @@ description: Grows the GroveSpec tree by one node — writes only the *concept s
 
 Growing the tree *one node at a time*. No code — **concept spec only**. (Implementation is `grovespec-implement`.)
 
+> Reply in `config.language` (set at init) — these files are English, your replies aren't.
+
 ## One principle: one layer only
 Define only this node + (if it's a skeleton) its direct children. Don't go deeper. The tree is a hypothesis — bake it deep before the top is settled and you'll redo it all later.
 

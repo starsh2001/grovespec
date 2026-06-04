@@ -7,6 +7,8 @@ description: GroveSpec review — has several *fresh-eyes* reviewers independent
 
 Review. **This skill runs on its own (cold)** — if the builders review their own work, they miss the same blind spots. Fresh eyes look instead.
 
+> Reply in `config.language` — these files are English, your replies aren't (reviewers' findings follow `config.language` too).
+
 ## Why go this far
 A checklist just gets checked off (it claims "passed" once, then the same problems resurface on a re-read). So we stack five things: ① reviewers who did *not* see how it was built, ② with *different* roles, ③ *several* in parallel, ④ filtering out nitpicks too, ⑤ repeating until a full clean round.
 

@@ -7,6 +7,8 @@ description: Sets up GroveSpec in a project for the first time (just once). Look
 
 The first-time setup of a GroveSpec project. Runs **once**. When it's done, `grovespec-grow` takes over.
 
+> **Language — establish it first, don't assume.** These skill files are English; your replies are not. Determine the working language in this order: **(1) the language of the user's messages; (2) the OS locale — `$LANG`/`LC_ALL`/`LC_MESSAGES`, or PowerShell `Get-Culture` on Windows; (3) if still unclear, ASK. Never silently default to English.** Write it to `config.language` (§3) and reply in it from your first response. (Every later skill just *reads* `config.language` — no re-detecting.)
+
 ## One principle: top in detail, the rest rough
 
 Even if you brought a detailed spec, don't unfold the whole tree. Write **only the root + one layer below** properly; leave everything under that as a rough shape (a hypothesis).
