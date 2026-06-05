@@ -61,7 +61,7 @@ Sections (`##`, fixed): `Glossary` · `Common Rules`.
 Table. Fixed columns: `Topic | File | Location`.
 
 ## config.yaml
-Location: `.grovespec/config.yaml`. Keys: `version`, `language`, `paths` (`brief·tree·conventions·tasks·ref·src·tests·review` — only the locations are changeable; the structure is fixed), `verify` (`strength` 1–3 · `max_rounds` · `scale` — the spec cold-review) and `review` (`strength` · `max_rounds` · `scale` · `test` command — the code diff-review).
+Location: `.grovespec/config.yaml`. Keys: `version`, `language`, `paths` (`brief·tree·conventions·tasks·ref·src·tests·review` — only the locations are changeable; the structure is fixed), `verify` (`strength` 1–3 · `max_rounds` · `scale` · optional `models` — the spec cold-review) and `review` (`strength` · `max_rounds` · `scale` · `test` command · optional `models` — the code diff-review). `models` (optional, either block) maps a lens name — or `default` / `triage` — to a model; **omit it and every reviewer inherits the session model** (no forced cost).
 
 ## review-cycle state (verify & review)
 *verify* (spec) and *review* (code) each run the cold-reviewer cycle and keep state at `paths.review` (default `.grovespec/review/`). Because both act on the **same** node id at different stages, they write **separate** files so they never collide:

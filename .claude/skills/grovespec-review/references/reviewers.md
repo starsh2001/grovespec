@@ -9,6 +9,7 @@
 
 ## Spawning
 - Spawn the reviewers as **parallel subagents** (Claude Code's Task tool), one per lens — the **count comes from `config.yaml`** (`verify.scale[level].reviewers` or `review.scale[level].reviewers`; the SSoT — don't hardcode a number or range here). Each subagent starts from an **empty context** — that independence is what makes them "cold". Send them in one batch so they run concurrently. (Works only from the main session — see each skill's invocation contract.)
+- **Model (optional)**: each reviewer's model = `config[verify|review].models[<lens>]` if set, else `models.default` if set, else **inherit the session model** — the default, *no forced cost*. The triage reviewer uses `models.triage` (same fallback). This lets a team run the deep lenses (correctness·security·coherence) and triage on a stronger model while the finder breadth stays cheap — only if they opt in; omit `models` and nothing changes.
 - For `skip`: spawn none; the caller self-checks against the criteria.
 - Each reviewer's prompt = **common preamble** + its **role lens** + the **findings format**. Never give them how the target was built, or the previous round's discussion.
 
