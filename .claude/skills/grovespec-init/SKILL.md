@@ -7,7 +7,7 @@ description: Sets up GroveSpec in a project for the first time (just once). Look
 
 The first-time setup of a GroveSpec project. Runs **once**. When it's done, the per-node cycle (`grow → verify → implement → review ⇄ fix → done`) takes over.
 
-> **Language — establish it first, don't assume.** These skill files are English; your replies are not. Determine the working language in this order: **(1) the language of the user's messages; (2) the OS locale — `$LANG`/`LC_ALL`/`LC_MESSAGES`, or PowerShell `Get-Culture` on Windows; (3) if still unclear, ASK. Never silently default to English.** Write it to `config.language` (§3) and reply in it from your first response. (Every later skill just *reads* `config.language` — no re-detecting.)
+> **Language — your FIRST word is already in the user's language. Never start in English.** These skill files are English — **that is irrelevant to your output; do NOT mirror their language.** The user has been writing to you in some language → **that is the language**, for *every* reply including init/explore's opening question: ask in the user's language (e.g. Korean *"무엇을 만들까요?"*), **never** English *"What would you like to build?"*. Only with **genuinely zero** user text to judge (a bare auto-invocation, no conversation) do you fall back — a real OS locale (`$LANG`/`Get-Culture`) if it actually names a language, else **ASK which language**. **Never silently default to English** (an empty/`C` locale is *not* a vote for English — ASK instead). Write the result to `config.language` (§3); every later skill just *reads* it.
 
 ## One principle: only the root, nothing below yet (greenfield)
 
