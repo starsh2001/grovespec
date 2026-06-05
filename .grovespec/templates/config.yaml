@@ -24,12 +24,13 @@ paths:
 verify:
   strength: 2        # how far to block: 1=Critical · 2=+Should Fix · 3=+Nice to Have
   max_rounds: 5
-  # Reviewer model (optional). OMIT → every reviewer inherits the session model — the default, no extra cost.
-  # To put the hard lenses on a stronger model, set per-lens (an unset lens falls back to `default`, then to inherit):
+  # Reviewer model — OPTIONAL. Omit → every reviewer inherits the session model (the default: no extra cost, no forced Opus).
+  # RECOMMENDED split if you customize: keep the broad finders on a cheap model (they drive recall), and lift only
+  # the deepest-reasoning lens + the triage to a stronger one (they set the ceiling + precision). Uncomment to follow:
   # models:
-  #   default: sonnet
-  #   coherence: opus       # the spec lens that needs the most reasoning
-  #   triage: opus          # the over-strictness / precision step
+  #   default: sonnet         # finder breadth — consumer-impersonator · gap-finder · non-expert · breaker
+  #   coherence: opus         # the spec lens needing the most reasoning (decomposition · cross-contract fit)
+  #   triage: opus            # the over-strictness pass — precision, so fewer real findings get dropped
   # reviewer count·repeat, scaled to the change's reach (consumers / skeleton). verify picks the level.
   scale:
     skip:     { reviewers: 0, repeat: 0 }   # trivial spec edit (format·comment)
@@ -42,13 +43,14 @@ review:
   test: ""           # command to run this project's tests (e.g. "pytest -q", "npm test"). Empty → review infers/asks.
   strength: 2
   max_rounds: 5
-  # Reviewer model (optional). OMIT → every reviewer inherits the session model — the default, no extra cost.
-  # To put the hard lenses on a stronger model, set per-lens (an unset lens falls back to `default`, then to inherit):
+  # Reviewer model — OPTIONAL. Omit → every reviewer inherits the session model (the default: no extra cost, no forced Opus).
+  # RECOMMENDED split if you customize: cheap model for the broad finders (recall), a stronger one only on the
+  # lenses that need deep reasoning + the triage (ceiling + precision). Uncomment to follow:
   # models:
-  #   default: sonnet
-  #   correctness: opus
-  #   security: opus
-  #   triage: opus
+  #   default: sonnet         # finder breadth — the-6-month-maintainer · breaker · test-quality
+  #   correctness: opus       # subtle logic / contract-violation reasoning
+  #   security: opus          # exploit paths the tests rarely cover
+  #   triage: opus            # the over-strictness pass — precision
   # reviewer count·repeat, scaled to the diff's size·risk (security-touching / big diff → higher). review picks the level.
   scale:
     skip:     { reviewers: 0, repeat: 0 }   # trivial diff (format·comment·≤2 lines)
