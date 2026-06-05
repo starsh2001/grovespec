@@ -225,7 +225,7 @@ Write code until the tests pass. Because you build knowing the risks and the exi
 
 ### Two review points: verify (spec) then review (code)
 The cold multi-persona scrutiny runs **twice, on different things**:
-- **verify** (before code) asks *is the contract good?* — consumer-impersonation, gap-finding, coherence (does a child fill the parent; do a skeleton's children sum to it), non-expert. Spending it here is the point: a contract flaw caught before code is free.
+- **verify** (before code) asks *is the contract good?* — consumer-impersonation, gap-finding, coherence (does this node fill the parent; and for a skeleton, does its contract decompose cleanly into covering children — a top-down check made from the spec, before the children exist), non-expert. Spending it here is the point: a contract flaw caught before code is free.
 - **review** (after code) asks *is this code good?* — it runs the **tests** (every AC item should have a passing test) and cold-reviews **only this node's diff** (correctness · security · maintainer · breaker · test-quality). It does **not** re-ask spec questions, and it never reads the wider codebase — that bound keeps cost flat as the project grows.
 
 Both run several reviewers — who *didn't see how it was built* — in parallel as subagents, aggregate, and (on `full`) check "is it over-strict." Strength·repeat·scale come from config (`verify:` / `review:`), each round a new cold session. Detailed rules: [WORKFLOW.md](WORKFLOW.md) §3.

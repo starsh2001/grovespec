@@ -18,6 +18,7 @@ init (once)
 - The spec stays **one node ahead** of the code. Top-down, **one node at a time**.
 - Each node is a draft (`grow`) that's cold-**verified** into `approved`, then **implemented**, then **reviewed** (its tests + a cold code review of its *diff*) with a **fix** loop — ending `done`. **Only a `done` node's children get grown.**
 - The human confirms at a glance twice: **approve the spec** (after verify) and **confirm the result** (after review).
+- **No id bookkeeping**: run any step skill *without a target* and it picks the node `grovespec check` reports ready for that step (status → next: `draft`→verify · `approved`→implement · `implemented`→review · `reviewed`→fix · done skeleton→grow). You advance by "do the next thing" — the two human gates still pause you.
 
 ---
 
@@ -75,7 +76,7 @@ Shared rules:
 **verify — is the *spec* good?** (cold spec lenses: consumer-impersonator · gap-finder · coherence · non-expert · breaker)
 - **Consumer impersonation**: "I'm a node that will use this" — anywhere you'd have to guess is a contract hole.
 - **Gap finding**: does it answer empty / not-found / fails?
-- **Coherence**: does a child fill what the parent promised; do a skeleton's children sum to the parent?
+- **Coherence**: does this node fill what its parent promised; and — the top-down check — if it's a skeleton, does its contract decompose cleanly into children that *cover it* (no gaps/overlaps)? You check that from the spec **even though the children don't exist yet** — that's the top-down discipline; implement later records the confirmed map.
 - **Non-expert**: fails it on any jargon/fluff a layperson can't confirm (the lever that keeps a spec human-confirmable).
 
 **review — is the *code* good?** (run the tests first, then cold code lenses: correctness · security · the-6-month-maintainer · breaker · test-quality)

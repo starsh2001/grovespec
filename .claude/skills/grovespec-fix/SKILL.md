@@ -11,8 +11,8 @@ Clearing the issues `grovespec-review` found — the `reviewed` → `fixed` → 
 
 ## Flow
 
-### 1. Read the issues
-Read `.grovespec/review/<id>.review.yaml` `open_issues` — the confirmed list review handed over. If it's empty there's nothing to fix; go back to `grovespec-review` (it's what gates `done`). Read this node's Task (AC·Contract) as the yardstick.
+### 1. Pick the node + read the issues
+*If no node is named*, take the `reviewed` node whose `<id>.review.yaml` carries `open_issues` — the one `grovespec-review` just handed back. Read that `open_issues` (the confirmed list). If it's empty there's nothing to fix; go back to `grovespec-review` (it's what gates `done`). Read the node's Task (AC·Contract) as the yardstick.
 
 ### 2. Fix — this node's code only
 Apply each open issue.

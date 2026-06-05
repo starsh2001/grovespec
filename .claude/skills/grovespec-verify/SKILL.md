@@ -15,7 +15,7 @@ The leverage: spend the multi-persona scrutiny *here*, on the spec, before any c
 A checklist gets rubber-stamped. So we stack: ① reviewers who did *not* see how the draft was written, ② with *different* roles, ③ *several* in parallel, ④ a triage that drops nitpicks, ⑤ repeat until a clean round — then a human approves.
 
 ## What it takes in
-- the node (its draft Task) — `target_type: spec`.
+- **the node** — its draft Task (`target_type: spec`). *If none is named*, run `grovespec check` and take an unblocked `draft` node (its next step is verify); if several are ready, ask which (or take the lowest id).
 - criteria: the parent's **Contract** + the decomposition clause this node must fill + `conventions.md`.
 - `strength`·`max_rounds`·`scale` from `.grovespec/config.yaml` `verify:` (overridable per node).
 

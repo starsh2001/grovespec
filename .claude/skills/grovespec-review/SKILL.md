@@ -16,7 +16,7 @@ Two things, both bounded to **this one node**, so cost never scales with the cod
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language (the reviewers' findings too). These files are English; your output is not.
 
 ## What it takes in
-- the node's **diff** (its `src/`·`tests/` changes) + its **AC·Contract** as criteria + the **test results**.
+- **the node** — *if none is named*, take an `implemented` or `fixed` node `grovespec check` reports ready (next step = review). What you review: its **diff** (`src/`·`tests/` changes) + its **AC·Contract** (criteria) + the **test results**.
 - `test` command + `strength`·`max_rounds`·`scale` from `.grovespec/config.yaml` `review:` (overridable per node).
 
 > **Where it runs (the invocation contract).** Run grovespec-review in your **main Claude Code session** — it spawns the cold reviewers as **subagents**. **Never run a grovespec skill *as* a subagent** — then it can't spawn reviewers and silently degrades to a non-cold self-check.
