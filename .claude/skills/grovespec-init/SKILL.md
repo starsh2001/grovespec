@@ -52,7 +52,9 @@ Risks hold only "where it might break." Leave out "what to build."
   ```
 - **tasks/** — *greenfield*: only the root (`TASK-1`), concept only, `status: draft`. *brownfield*: one Task per existing node, `status: done` (see `code-to-tree.md`). Follow `.grovespec/templates/task.md` + `FORMATS.md`. **Don't create any child Task here** — greenfield children are grown one at a time later; brownfield children already exist.
 - **conventions.md** — start empty (filled in as you build). For a *brownfield* project, **do** fill in the facts the code guarantees (terms·global rules) — don't leave it empty (→ `references/code-to-tree.md` §7).
-- **config** — copy `.grovespec/templates/config.yaml` → `.grovespec/config.yaml`; set `language` + any custom paths (defaults under `docs/...`).
+- **config** — copy `.grovespec/templates/config.yaml` → `.grovespec/config.yaml`; set `language` + any custom paths (defaults under `docs/...`). Then **ask once: mix reviewer models, or one for all?** (AskUserQuestion; recommend the default, always allow a free-form *Other*):
+  - **(추천) One model** — leave `models` unset → every reviewer uses the session model. No Opus needed, no extra cost; for all-strong, just run the session on a strong model. *Default if unsure.*
+  - **Split** — uncomment the recommended `models` in `verify`/`review` (cheap finders + `correctness·security·coherence·triage` on a stronger model; needs access to it).
 
 ### 6. Human check → hand off
 Show the brief and the root (greenfield) or the extracted tree (brownfield) to the human and get **"is this right?"** confirmed — the checkpoint *before* more effort.
