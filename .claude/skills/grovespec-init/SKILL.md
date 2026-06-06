@@ -1,13 +1,13 @@
 ---
 name: grovespec-init
-description: Sets up GroveSpec in a project for the first time (just once). Looks at what you have (just an idea / rough spec / detailed spec doc / existing code / code+docs) and creates the initial brief, tree.md, top-level Tasks, and config. Use when the user wants to "start a new project with GroveSpec", "adopt GroveSpec in this codebase", "grovespec init", or "set up the spec/tree for the first time" and there's no tree.md yet. If a tree already exists and you're adding the next node, use grovespec-grow; to change an already-done node, use grovespec-revise.
+description: Sets up GroveSpec in a project — opens with a fixed setup interview (language · review strength · reviewer models · test command), then creates the brief, tree.md, the root Task, and config. Use when the user wants to "start a new project with GroveSpec", "adopt GroveSpec in this codebase", "grovespec init", "set up the spec/tree", or "reconfigure / change the review settings or language". Re-invoking init on an existing project re-runs the setup interview and updates config (it does not recreate the project). To add the next node use grovespec-grow; to change a done node use grovespec-revise.
 ---
 
 # grovespec-init
 
-The first-time setup of a GroveSpec project. Runs **once**. When it's done, the per-node cycle (`grow → verify → implement → review ⇄ fix → done`) takes over.
+Setup of a GroveSpec project — it **opens with a fixed setup interview** (`references/setup.md`: language · review strength · reviewer models · test command), then builds the brief + root. When that's done, the per-node cycle (`grow → verify → implement → review ⇄ fix → done`) takes over. **Re-invoke init anytime to *reconfigure*** — it re-asks the interview and updates `.grovespec/config.yaml`, without recreating the project.
 
-> **Language — set `config.language` from the OS locale, then reply in it.** Run `bash .grovespec/bin/grovespec locale`: it returns a code (`ko`/`en`/`ja`/…) read robustly from the OS — Unix `$LANG`/`LC_*`, and on **Windows/MSYS the registry** (because bash `$LANG` is empty there; the skill used to read that and wrongly fall through). **A returned code *is* `config.language`** — use it, English or otherwise. Only if it returns **nothing** (locale truly undetectable) do you **ASK** which language. **Never silently default to English** — an empty locale isn't a vote for English, it's a reason to ask. (These files are English; irrelevant to your output. Every later skill just *reads* `config.language` — §3.)
+> **Language — detect, then CONFIRM (don't assume).** Run `bash .grovespec/bin/grovespec locale` → a code (`ko`/`en`/`ja`/…) read from the OS (Unix `$LANG`/`LC_*`; on **Windows/MSYS the registry**, since bash `$LANG` is empty there). **Then confirm it with the user** — that's the setup interview's Q1 (*"locale=ko — 이 언어로 진행할까요?"*, default = the detected one). Reply in the chosen language from word one. If detection returns **nothing**, **ASK** outright; **never silently default to English** (an empty locale isn't a vote for English). The choice is written to `config.language`; later skills just read it. (These files are English — irrelevant to your output.)
 
 ## One principle: only the root, nothing below yet (greenfield)
 
@@ -20,7 +20,7 @@ Because — bake unverified assumptions into the tree and, when one turns out wr
 ## Flow
 
 ### 1. Figure out what you have
-**Check the directory first** (glob for source files + any docs); ask the user only if it's ambiguous. You need two things:
+**Check the directory first** (glob for source files + any docs); ask the user only if it's ambiguous. **Already a GroveSpec project (a `tree.md` exists)?** → this is a *reconfigure*: run only **§2 (the setup interview)**, update config, and **stop** — don't recreate brief/tree/tasks. (Add a node → grovespec-grow; change a done node → grovespec-revise.) Otherwise, first-time setup — you need two things:
 - **Is there code?** (source files exist → brownfield)
 - **Are there docs to reference?** (a spec doc, etc.) — and if so, *detailed or rough?* **Detailed = per-feature, AC-level behavior; anything less is a rough idea** → explore. When unsure, treat it as rough and `explore` (the cheap, reversible path).
 
@@ -30,13 +30,13 @@ Because — bake unverified assumptions into the tree and, when one turns out wr
 | Detailed spec doc | root only; `grow` unfolds the rest later | keep in ref/ |
 | Existing code (±docs) | read the code and extract it | in ref/ if present |
 
-### 2. Per-case prep
+### 2. Setup interview (the fixed questionnaire — ask before starting)
+Run the **fixed** interview in `references/setup.md` — **language** (confirm the detected locale) · **review strength** · **reviewer models** · **test command** — and write the answers to `.grovespec/config.yaml`. Ask **exactly** those questions, in order (don't improvise or skip any) — a fixed interview is what keeps every project configured the same and nothing decided silently. Do this **before** per-case prep, so the rest of init runs in the chosen language. (Re-invoked on an existing project, this is the *only* step — update config and stop.)
+
+### 3. Per-case prep
 - **If there are reference docs** → read and follow `references/ref-docs.md` (keep the originals as-is + make a location map. Don't convert them into a tree).
 - **If there's code** → read and follow `references/code-to-tree.md` (read the code first to extract the tree. Even with docs present, code comes first — docs can drift from code). **Brownfield: set `paths` in `.grovespec/config.yaml` to the existing layout** (e.g. `src`, `tasks`) so later searches hit the real dirs — METHODOLOGY §7 calls this a hard requirement.
 - **If it's just an idea / rough spec** (no code, no detailed doc) → read and follow `references/explore.md` (explore the idea as a thinking-partner; it lands on a lean brief — no tree or code yet).
-
-### 3. Set the language (once)
-Decide `config.language` — the language the *content* of the artifacts is written in. Match existing docs/README if there are any; otherwise default to the language the user works in. Write it to `.grovespec/config.yaml`. Headers and field names stay English; only the prose follows this. (Every later skill reads it from config — no re-detecting.)
 
 ### 4. Write brief.md
 Only the **broad direction · scope · visible risks**. Short, plain words — *a person should be able to read it at a glance and say "yes, that's right."*
@@ -52,9 +52,7 @@ Risks hold only "where it might break." Leave out "what to build."
   ```
 - **tasks/** — *greenfield*: only the root (`TASK-1`), concept only, `status: draft`. *brownfield*: one Task per existing node, `status: done` (see `code-to-tree.md`). Follow `.grovespec/templates/task.md` + `FORMATS.md`. **Don't create any child Task here** — greenfield children are grown one at a time later; brownfield children already exist.
 - **conventions.md** — start empty (filled in as you build). For a *brownfield* project, **do** fill in the facts the code guarantees (terms·global rules) — don't leave it empty (→ `references/code-to-tree.md` §7).
-- **config** — copy `.grovespec/templates/config.yaml` → `.grovespec/config.yaml`; set `language` + any custom paths (defaults under `docs/...`). Then **ask once: mix reviewer models, or one for all?** (AskUserQuestion; recommend the default, always allow a free-form *Other*):
-  - **(추천) One model** — leave `models` unset → every reviewer uses the session model. No Opus needed, no extra cost; for all-strong, just run the session on a strong model. *Default if unsure.*
-  - **Split** — uncomment the recommended `models` in `verify`/`review` (cheap finders + `correctness·security·coherence·triage` on a stronger model; needs access to it).
+- **config** — `.grovespec/config.yaml` was created from the template and filled by the **§2 setup interview** (`language` · `verify/review.strength` · `models` · `review.test`). Here, only set any custom **paths** — *brownfield*: point them at the existing layout (e.g. `src`, `tasks`); *greenfield*: keep the defaults under `docs/...`.
 
 ### 6. Human check → hand off
 Show the brief and the root (greenfield) or the extracted tree (brownfield) to the human and get **"is this right?"** confirmed — the checkpoint *before* more effort.

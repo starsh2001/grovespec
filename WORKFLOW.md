@@ -26,9 +26,9 @@ init (once)
 
 Seven units, one per step of a node's life.
 
-### init — set up the project once
-- **When**: once, at the start.
-- **What**: figure out what you have (idea / rough spec / detailed spec / code / code+docs); for a bare idea, explore it into a lean brief (`references/explore.md`); if there's code, read it to extract the existing tree. Create brief·config, and the tasks: **greenfield → just the root Task (`draft`)**; **brownfield → the whole existing tree (all `done`)**.
+### init — set up the project (and reconfigure)
+- **When**: at the start; **re-invoke anytime to *reconfigure*** (re-asks the setup interview, updates config, doesn't recreate the project).
+- **What**: first a **fixed setup interview** (`references/setup.md`: language · review strength · reviewer models · test command → config). Then figure out what you have (idea / rough spec / detailed spec / code / code+docs); for a bare idea, explore it into a lean brief (`references/explore.md`); if there's code, read it to extract the existing tree. Create brief·config, and the tasks: **greenfield → just the root Task (`draft`)**; **brownfield → the whole existing tree (all `done`)**.
 - **Output**: brief.md, tree.md, tasks/ (greenfield: root only · brownfield: every node), conventions.md, `.grovespec/config.yaml`, ref/ (if present).
 
 ### grow — write the next node's draft
