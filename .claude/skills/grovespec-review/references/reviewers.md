@@ -1,86 +1,98 @@
 # reviewers — the cold-review engine (shared by verify + review)
 
-> `grovespec-verify` (spec) and `grovespec-review` (code) both load this when they run a round. The SKILLs hold the *rules* (levels, when to pass, what to fix); this holds the *exact mechanics* — how to spawn, the prompts, the findings format, the triage, the round hand-off — so every node's review comes out the same shape. The two callers differ only in the **lens set** and the **read-scope** (below).
-> Reviewers write their findings in the project's language (`config.language`); the role lenses here are the fixed structure.
+> `grovespec-verify` (spec) and `grovespec-review` (code) both load this to run a round. The SKILLs hold the *rules* (levels, pass conditions); this holds the *mechanics + the bar + the lenses*, so every node's review comes out the same shape. The two callers differ in lens set, read-scope, and (verify) the checklist.
+> Reviewers write findings in the project's language (`config.language`).
 
-## Which lens set · which scale · which read-scope
-- **verify** (`target_type: spec`) — the **spec lenses**; count from `config.yaml` `verify.scale`. Reviewers may read the spec context: the draft Task, the parent/sibling Tasks, `tree.md`, `brief.md`, `conventions.md`.
-- **review** (`target_type: result`) — the **code lenses**; count from `config.yaml` `review.scale`. Reviewers read **ONLY the files this node changed (its `src/`·`tests/` diff) + its AC·Contract + the test results** — *never* other nodes' code or the wider codebase. **This bound is what keeps review's cost flat as the project grows.**
+## THE BAR — read first. *Sufficient*, not exhaustive.
+You review for a **competent implementer/consumer** who will research, make reasonable decisions, follow the project's conventions, and ask only when *truly* stuck. So:
+
+- A finding is a real flaw **only if that implementer would be blocked or build the wrong thing.** "I can imagine an unhandled edge / an unspecified detail" is **not** a flaw if a competent implementer would reasonably handle or decide it.
+- Yes, go in adversarially ("try to break it") — **but a kept finding must name *who is blocked, and on what decision*.** *What is merely unstated* is not enough.
+- You are checking for **sufficient** context, not exhaustive detail. Perfect specs don't exist; "enough to build the right thing without a mess" is the target. (This is the single rule that stops a review from churning for rounds.)
+
+## SCOPE — what a spec may and may not contain
+- A spec states the **contract** — what it *takes · gives · guarantees* (the behavior other nodes rely on). It does **not** state the **mechanism** — atomicity, transactions, concurrency handling, entity schemas, API/response shapes, algorithms. Those belong to the node's own *implementation* or to a *child*.
+- A **skeleton**'s spec states only: its child pieces (by role), the boundaries between them, and the **cross-cutting invariants** all children must respect — and **defers the rest to named children**.
+- **An unspecified mechanism, an edge a child owns, or an explicitly deferred detail is NOT a gap — do not raise it.** A spec line like `[→ child/deferred: …]` is *correct delegation*, not a hole. Demanding such detail is over-reach; the triage will drop it, so don't raise it in the first place.
+
+## Which lens set · scale · read-scope · do-not-raise
+- **verify** (`target_type: spec`) — the **spec lenses** + the **verify checklist** (below); count from `config.yaml` `verify.scale`. Read: the draft Task + the parent's Contract + the relevant `conventions.md`. (Not every sibling — only what the contract references.)
+- **review** (`target_type: result`) — the **code lenses**; count from `config.yaml` `review.scale`. Read **ONLY this node's changed files (its diff) + its AC·Contract + the test results** — never the wider codebase. (This bound keeps review's cost flat as the project grows.)
+- **do-not-raise**: the caller passes the *settled categories* condensed from the state file's `adjudications` (out-of-scope boundaries + accepted gaps — e.g. "concurrency mechanism · entity schemas · auth rules · timezone/month · API error shapes = child/impl scope"). **Do not re-raise anything in those categories** — already decided.
+- **Model (optional)**: each reviewer's model = `config[verify|review].models[<lens>]` if set, else `models.default`, else **inherit the session model** (the default — no forced cost). Triage uses `models.triage` (same fallback).
 
 ## Spawning
-- Spawn the reviewers as **parallel subagents** (Claude Code's Task tool), one per lens — the **count comes from `config.yaml`** (`verify.scale[level].reviewers` or `review.scale[level].reviewers`; the SSoT — don't hardcode a number or range here). Each subagent starts from an **empty context** — that independence is what makes them "cold". Send them in one batch so they run concurrently. (Works only from the main session — see each skill's invocation contract.)
-- **Model (optional)**: each reviewer's model = `config[verify|review].models[<lens>]` if set, else `models.default` if set, else **inherit the session model** — the default, *no forced cost*. The triage reviewer uses `models.triage` (same fallback). This lets a team run the deep lenses (correctness·security·coherence) and triage on a stronger model while the finder breadth stays cheap — only if they opt in; omit `models` and nothing changes.
-- For `skip`: spawn none; the caller self-checks against the criteria.
-- Each reviewer's prompt = **common preamble** + its **role lens** + the **findings format**. Never give them how the target was built, or the previous round's discussion.
+- Spawn the reviewers as **parallel subagents** (Claude Code's Task tool), one per lens — **count from `config.yaml`** (`verify.scale[level].reviewers` / `review.scale[level].reviewers`; the SSoT — don't hardcode here). Each starts from an **empty context** (that's what makes them cold). One batch, concurrent. (Main session only — see each skill's invocation contract.)
+- For `skip`: spawn none; the caller self-checks against the checklist.
+- Each reviewer's prompt = **common preamble** (incl. THE BAR + SCOPE + the do-not-raise list) + its **role lens** + the **findings format**. Never give them how the target was built, or a prior round's discussion.
 
-## Findings format (every reviewer returns exactly this)
-One finding per line, nothing else:
+## Findings format + severity (name the victim)
+One finding per line:
 ```
-- [critical|should-fix|nice-to-have] <where: §section / file:line> — <what is wrong, and why>
+- [critical|should-fix|nice-to-have] <C# / where: §section · file:line> — <who is blocked + the exact decision they can't make>
 ```
-Severity:
-- `critical` — (spec) unbuildable / breaks another node / wrong behavior; (code) a failing or missing AC, a security hole, or wrong behavior.
-- `should-fix` — buildable/works, but a consumer must guess, or a gap (or a hollow test) will bite later.
-- `nice-to-have` — better if fixed, not blocking.
+- `critical` — a **named** consumer/child **cannot build its part** (the contract is missing or self-contradictory on something *this node owns*). **If you can't name the consumer AND the blocked decision, it is not critical.**
+- `should-fix` — buildable, but a *normal, in-scope* point is ambiguous enough that **two consumers would integrate it differently**. (Whether should-fix forces another round is the caller's `strength` — default `2` = yes. Severity here is honest; blocking is the skill's call.)
+- `nice-to-have` — wording/clarity only.
 
-If a lens finds nothing, it says `none` with a one-line note on what it checked. The reviewer's final message **is** the result — no greeting, just the findings.
+A finding with no named victim + decision ("this seems unclear", "what about X edge?") is a **non-finding** — drop it before triage. If a lens finds nothing, it returns `none` with a one-line note on what it checked. The reviewer's final message **is** the result — no greeting.
 
-Examples (the exact shape):
-- ✅ `- [should-fix] §Contract "Returns" — return shape unspecified: a consumer can't tell a list from a single record.`
-- ✅ `- [critical] src/add.py:42 — amount not validated; a negative amount passes straight to storage.`
-- ❌ `the contract seems a little unclear in places` (no severity, no location, not actionable).
+Examples:
+- ✅ `- [critical] C2 §Contract — the *stats* child can't tell from this contract whether month totals are per-calendar-month or rolling-30d; it owns that and would guess.` *(named victim + decision)*
+- ✅ `- [critical] C1 — "invite" and "group" children both appear to own invite-code validity → overlap; neither can own it cleanly.`
+- ❌ `- [should-fix] concurrency: what if two users disband at once?` *(mechanism / child-owned → out of scope, do not raise)*
+- ❌ `the contract is a bit long` *(no victim/decision)*
 
 ## Common preamble (prepend to every role)
 ```
 You are a *cold* reviewer in a GroveSpec project. You did NOT see how this was built —
-you see only the target and the criteria, and your job is to find flaws.
-**Default to "there is a problem":** to conclude there's no flaw, you must have actively
-tried to disprove it first.
+only the target + criteria. Review for a COMPETENT implementer (researches, decides, follows
+conventions, asks only when truly stuck): a flaw is real only if such a person would be
+BLOCKED or build the WRONG thing — name who, and on what decision. An unspecified mechanism,
+a child-owned edge, or an explicitly deferred detail is NOT a flaw.
 
 Target: {target}  (spec = the draft Task | result = this node's code diff)
-Criteria: {spec → the parent's Contract + the clause this node must fill ·
-           code → this node's AC + Contract + the test results}
-You may read:
-  - (verify / spec)  the draft Task, parent/sibling Tasks, tree.md, brief.md, conventions.md.
-  - (review / code)  ONLY the files this node changed + its AC·Contract + the test results.
-                     NOT other nodes' code, NOT the wider codebase.
-Write your findings in {config.language}.
+Criteria: {spec → parent Contract + the clause this node fills ; code → this node's AC + Contract + test results}
+You may read: {spec → the draft + parent Task + relevant conventions ; code → only this node's changed files + AC·Contract + test results}
+Do NOT raise (already settled / out of scope): {the do-not-raise categories}
+Write findings in {config.language}.
 
 <then the findings format, then the role lens below>
 ```
 
-## Role lenses — verify (spec)
-Fixed order (a level always uses the same lenses — never an ad-hoc pick): consumer-impersonator · gap-finder · coherence · non-expert · breaker. A level takes the first *N* = `verify.scale[level].reviewers` (`full` = all five).
+## verify — the checklist the lenses fill (don't hunt open-endedly)
+A spec passes when this finite list is satisfied — NOT when "no reviewer can imagine an edge." Each lens fills its checks and marks **PASS / PARTIAL / FAIL**; the round's verdict is the table.
 
-- **consumer-impersonator** — You are *a node that will use this contract*. Try to write your code against this contract alone. Wherever you'd have to *guess* — a return shape, who outputs what, where a value comes from — that's a hole. List every spot you could not build.
-- **gap-finder** — Calmly walk the standard edge cases and flag each one the contract doesn't answer: empty input · not-found · failure · none-set · file missing/corrupt · the basis of "current X" (time zone? source?) · re-setting an existing value. If the contract is silent, it's a gap.
-- **coherence** — Check this contract against the *global rules and the parent/sibling contracts* (read `conventions.md` + the related Tasks: units, data-access path, naming), in **both directions**:
-  - **up** — does this node's contract fill the clause its parent's decomposition assigned it? Does it clash with a sibling?
-  - **down (the top-down decomposition check)** — if it's a skeleton, does its contract break cleanly into children that **cover it** — every clause owned, no gaps, no overlaps? **Do this from the contract itself; the child Tasks don't exist yet, and that's fine** — verifying a skeleton is soundly decomposable top-down is exactly the discipline (the children are created later by grow; the confirmed map is recorded at implement). A contract that *can't* be cleanly divided is a flaw to catch now.
-  If this changes another done node's behavior, is that node's contract updated too? Cite both sides of any mismatch.
-- **non-expert** — You don't know the jargon. The spec must be confirmable at a glance. Fail it on undefined terms, fluff, anything you can't restate in plain language, the same concept under different names. Quote the offending line.
-- **breaker** — You came to break the *contract*. Find inputs/flows that make it fall apart on paper: weird/broken values (empty · text where a number goes · negative · zero · huge · wrong unit); weird identifiers (blank · whitespace · case-only difference); abnormal flows (call order · concurrent writes · a corrupted data file · a failure mid-operation). State each as "this input → the contract does X (or leaves it undefined)".
+**For a `skeleton`:**
+- **C1 Decomposition coverage** — do the named children's roles *sum to* the brief/parent scope: no gap, no overlap? *(coherence)*
+- **C2 Buildability** — could each named child/consumer build its part from this contract alone? *(consumer-impersonator)*
+- **C3 Boundaries & invariants** — are the child boundaries + the cross-cutting invariants all children must respect stated? A *deferred* edge is fine. *(gap-finder, at THE BAR)*
+- **C4 Scope discipline** — is mechanism/child-detail deferred (markers), not pinned? **An over-stuffed contract FAILs here** (too detailed for a skeleton → delegate). *(breaker — hunt unbuildable holes AND over-reach)*
+- **C5 AC testable** — is each AC measurable/verifiable (NFR as a checkable item)?
+- **C6 Confirmable at a glance** — readable in one pass; if a skeleton's Contract is a dense wall, it's over-specified → FAIL. *(non-expert)*
 
-## Role lenses — review (code)
-Fixed order, take the first *N* = `review.scale[level].reviewers` (`full` = all five). Each reviewer reads **only this node's changed files + the AC·Contract + the test results**.
+**For a `feature` (leaf):** C1 becomes **"does the contract + AC cover this node's own behavior?"** and edges matter *more* (a leaf is where behavior is pinned, not deferred) — still at THE BAR. C4 inverts to "is anything here actually a child's job?" (rare for a leaf).
 
-- **correctness** — does the diff actually meet the AC and the Contract? Logic errors, off-by-one, wrong branch, mishandled return, a contract invariant broken.
-- **security** — injection, auth/authz gaps, secrets in code or logs, unsafe defaults, data trusted blindly, unsafe deserialization/path handling — *in this diff*.
-- **the-6-month-maintainer** — could someone who didn't write this change it safely? Hidden coupling, surprising side effects, and **duplication of code that already exists** (Principle 3 — did this reimplement something the pre-check should have reused?).
-- **breaker** — you came to break the *running code*: edge·failure inputs the diff mishandles (empty · huge · negative · wrong type · concurrent writes · a failure mid-operation). State each as "this input → the code does X".
-- **test-quality** — are the tests *real*? Does each test actually exercise the code path, or is it hollow / tautological / over-mocked so it would pass even if the code were wrong? Is every AC item backed by a passing test? A green suite that proves nothing is a `should-fix` (or `critical` if it masks a failing AC). *(This is the lens that stops "tests pass" from being a rubber stamp.)*
+## Role lenses — verify (spec) — fixed order, first *N* = `verify.scale[level].reviewers`
+- **consumer-impersonator** (C2) — *you are a node that will use this contract.* Try to write your code against it alone. A hole = a spot where you'd be *blocked* (can't pick a return shape / don't know who outputs what), not a spot you'd reasonably decide.
+- **gap-finder** (C3) — walk the standard edges (empty · not-found · failure · none-set). Flag one **only if** the contract leaves a competent implementer unable to proceed on an *in-scope* case. A child-owned or deferred edge is not a gap.
+- **coherence** (C1) — check against global rules + parent/sibling contracts. **(up)** does this node fill the clause its parent assigned it? **(down)** if a skeleton, do its children's roles cover it cleanly (no gap/overlap)? — judged from the contract; the children needn't exist yet.
+- **non-expert** (C6) — you don't know the jargon; the spec must be confirmable at a glance. Fail undefined terms, fluff, a dense wall, the same concept under two names. Quote the line.
+- **breaker** (C4) — you came to break the contract *and* to catch over-specification. A break counts only if a named consumer is blocked; flag any mechanism/child-detail that's been pinned into the contract (it should be deferred).
+
+## Role lenses — review (code) — fixed order, first *N* = `review.scale[level].reviewers`
+Each reads **only this node's diff + AC·Contract + test results**.
+- **correctness** — does the diff meet the AC·Contract? Logic errors, off-by-one, wrong branch, broken invariant.
+- **security** — injection, auth/authz gaps, secrets, unsafe defaults/deserialization/path handling — in this diff.
+- **the-6-month-maintainer** — hidden coupling, surprises, and **duplication of code that already exists** (Principle 3 — did this reimplement something?).
+- **breaker** — edge·failure inputs the running code mishandles. Same BAR: name the input → wrong behavior.
+- **test-quality** — are the tests *real* (exercise the path) or hollow/tautological? Every AC item backed by a passing test? A green-but-empty suite is a `should-fix` (or `critical` if it masks a failing AC).
 
 ## Aggregate
-Merge all findings; dedupe by (where + what). On a severity disagreement, take the **higher**.
+Merge findings; dedupe by (where + what). On a severity clash, take the higher.
 
-## Over-strictness check (triage) — `full` (and optionally `standard`)
-Spawn one more cold reviewer, given the aggregated list + the target. It plays *defender*: for each finding, rule **KEEP (severity) / DOWNGRADE (to what) / DROP (nitpick)** with a one-line reason. Guidance:
-- *(spec target)* This is a *concept* spec — don't demand implementation detail; but a real interface hole (unbuildable, self-contradiction, wrong grounding) is real even here.
-- *(code target)* Judge against the AC + Contract, not future-proofing or style — a missing test for an AC item, a hollow test, or a real security hole is real; a stylistic nit is not.
-- A project-accepted gap (an already-known limitation) doesn't need a full fix — "note the same gap" is enough; demanding a full fix is over-reach.
-- Merge findings that share a root; a reviewer can misread — re-check before keeping.
-
-It returns the **confirmed list** + a **do-not-re-raise** list (dropped / accepted, each with a reason).
+## Over-strictness triage — `full` (and optionally `standard`)
+One more cold reviewer (the *defender*) rules each finding KEEP / DOWNGRADE / DROP. **Drop, before scoring:** anything asking for mechanism or child-owned detail (out of scope by the SCOPE rule); anything failing the *name-the-victim* test; anything a competent implementer would reasonably decide; anything in the do-not-raise categories; duplicates. **Keep** only: a named consumer blocked (critical) or a real in-scope ambiguity two consumers would split on (should-fix). Returns the confirmed list + the do-not-raise additions.
 
 ## Round hand-off
-Write to `.grovespec/review/<id>.verify.yaml` (verify) or `.grovespec/review/<id>.review.yaml` (review) — template `review-state.yaml`: the round's outcome, the confirmed `open_issues`, and append the triage's do-not-re-raise items to `adjudications`. The next round is a **new session** that reads only this file — so the adjudications are how a later cold review avoids re-litigating what was already decided. (On approve/done, the *caller* copies the surviving adjudications into the node's Change Log — so future *revisions* don't re-litigate them either.)
+Write `.grovespec/review/<id>.verify.yaml` (verify) or `<id>.review.yaml` (review) — template `review-state.yaml`: the round's verdict (the C# table for verify) + confirmed `open_issues` + append the triage's drops to `adjudications` (and **condense them into the do-not-raise categories** passed to the next round). The next round is a new cold session reading only this file. On approve/done the caller copies surviving adjudications into the node's Change Log.

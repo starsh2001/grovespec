@@ -9,10 +9,12 @@ Cold verification of a node's **draft spec** — the step that turns `draft` →
 
 The leverage: spend the multi-persona scrutiny *here*, on the spec, before any code exists. A contract or decomposition error caught now costs nothing; caught after building, it costs the build. **This is the one place the cold persona review lives for a spec** — code review (`grovespec-review`) does *not* re-ask spec questions.
 
+> **THE BAR — *sufficient*, not exhaustive** (modeled on BMAD's PO *validate-story*). Verify for a **competent implementer/child** who researches, decides, follows conventions, and asks only when *truly* stuck. A flaw is real only if such a node would be **blocked or build the wrong thing** — *name who, and on what decision* — not merely that an edge is unspecified. A skeleton states its children's *roles · boundaries · invariants* and **defers** mechanism (atomicity, schemas, concurrency, API shapes…) and child-owned edges to children; **demanding that detail is over-reach.** This bar is what stops verify from churning for rounds — its absence is why a real run took 14.
+
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language (the cold reviewers' findings too). These files are English; your output is not.
 
 ## Why cold · several · different
-A checklist gets rubber-stamped. So we stack: ① reviewers who did *not* see how the draft was written, ② with *different* roles, ③ *several* in parallel, ④ a triage that drops nitpicks, ⑤ repeat until a clean round — then a human approves.
+An open-ended "just review it" gets rubber-stamped, and exhaustive flaw-hunting never converges. So we stack: ① cold reviewers (didn't see how it was written), ② *different* roles, ③ *several* in parallel, ④ each **filling a bounded checklist at THE BAR** (not open hunting), ⑤ a triage that drops over-reach, ⑥ repeat until a clean round — then a human approves.
 
 ## What it takes in
 - **the node** — its draft Task (`target_type: spec`). *If none is named*, run `grovespec check` and take an unblocked `draft` node (its next step is verify); if several are ready, ask which (or take the lowest id).
@@ -35,15 +37,15 @@ verify picks the level from checkable inputs — ① did the contract change ②
 | `full` | contract changed / 3+ consumers / a skeleton | cold reviewers, repeat 2, + over-strictness check |
 
 ## One round
-> The exact spawn mechanics, reviewer prompt bodies, findings format, and triage prompt are in `.claude/skills/grovespec-review/references/reviewers.md` (shared by verify + review) — load it and use the **spec lens set**, so every node's verify comes out the same shape.
+> Spawn mechanics, the reviewer prompts, **THE BAR + the SCOPE rule**, the findings format, the **verify checklist (C1–C6)**, and the triage all live in `.claude/skills/grovespec-review/references/reviewers.md` — load it and use the **spec lens set**.
 
-1. **Spawn cold reviewers in parallel** (subagents, empty context), as many as the level sets, using the **spec lenses** in their fixed order: consumer-impersonator · gap-finder · coherence · non-expert · breaker (take the first *N*). Each gets *only the draft + criteria* — not how it was written, not a prior round's discussion — and is told *"find flaws; default to 'there is a problem'."*
-2. **Aggregate** — merge·dedupe; on a severity clash take the higher.
-3. **Over-strictness check** (`full`; optional on `standard`) — a separate cold reviewer drops nitpicks.
-4. **Fix the draft** — apply the confirmed issues to the draft Task right here. (The reviewers were cold subagents; fixing in this main session is fine — each next round re-spawns *fresh* reviewers, so coldness holds.)
-5. **Pass judgment** by `strength` (1: no `critical` · 2: +`should-fix` · 3: +`nice-to-have`). A pass: `consecutive_passes`+1; a fail resets it to 0. Re-spawn a new cold round until it passes `repeat` times in a row.
-6. **Stop safety**: if `round` exceeds `max_rounds`, set `status: escalated`, take the open issues to the human, and do **not** approve.
-7. Append the triage's dropped-as-nitpick · accepted-gap items to the state file's `adjudications` (so a later cold round won't re-litigate them).
+1. **Spawn cold reviewers in parallel** (subagents, empty context), as many as the level sets — spec lenses in fixed order (consumer-impersonator · gap-finder · coherence · non-expert · breaker, first *N*). Give each: the draft + criteria, **THE BAR** (sufficient for a competent implementer; name who's blocked + the decision; deferred/child/mechanism detail is *not* a flaw), the **checklist to fill (C1–C6)**, and the **do-not-raise list** (settled categories condensed from this node's `adjudications`). Not how it was built, not a prior round's discussion.
+2. **Aggregate** into the C# verdict table (PASS / PARTIAL / FAIL per check); on a severity clash take the higher.
+3. **Over-strictness triage** (`full`; optional `standard`) — drop anything that's mechanism/child-detail (out of scope), fails the *name-the-victim* test, a competent implementer would decide, or is in the do-not-raise categories.
+4. **Resolve — prefer DEFER/CUT over ADD.** For an unspecified detail, add a **deferral marker `[→ child/deferred: …]` or cut** — not a new clause. Add a clause *only* for a genuine in-scope structural gap (C1–C3). **A skeleton Contract that grew this round is a smell**: the root should get *leaner*, not more detailed (over-specification is itself a C4/C6 FAIL). Fixing in this main session is fine — next round re-spawns fresh cold reviewers.
+5. **Pass judgment** by `strength` (1: no `critical` · 2: +`should-fix` · 3: +`nice-to-have`; default 2 — should-fix *does* block, keep it). **Non-blocking floor:** a round whose only surviving findings are deferred / out-of-scope / nice (nothing blocking at the set `strength`) is a **PASS**. Pass → `consecutive_passes`+1; fail → 0. Re-spawn a fresh cold round until it passes `repeat` times running.
+6. **Stop safety**: if `round` exceeds `max_rounds`, set `status: escalated`, take the open issues to the human, do **not** approve.
+7. Append the triage's drops to `adjudications`, and **condense them into the do-not-raise categories** handed to the next round (so fresh reviewers don't re-find them).
 
 ## Human approval → approved
 On a clean terminal pass, show the draft to the human and get **"is this what you want?"** confirmed.

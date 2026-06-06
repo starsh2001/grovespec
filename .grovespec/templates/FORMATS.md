@@ -39,6 +39,7 @@ A node is born at `draft` (created by *grow*/*init*) — there is **no** pre-spe
 
 **body sections** — this order, all `##`:
 `Overview` · `Requirements` · `Contract` · `AC` · `Subtasks` · `Change Log`
+- `Contract`: states the contract (takes·gives·guarantees), **not** the mechanism; may carry **deferral markers** `[→ child/deferred: <what>]` for detail intentionally left to a child or to implement — correct delegation, not a gap (verify treats a marked deferral as resolved; markers seed grow).
 - `AC`·`Subtasks`: `- [ ]` / `- [x]` checkboxes.
 - `Change Log`: `- YYYY-MM-DD — text` (ISO date).
 

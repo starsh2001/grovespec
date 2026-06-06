@@ -106,6 +106,8 @@ What gets exchanged (the interface) is decided early. It's big-frame, so it rare
 
 The how reveals itself as you build. Decide it early and it's just a guess. A structure set wrong by a guess is worse than nothing. What you didn't build, you can build later; but a structure built wrong forces every later piece of code to route around it, and it keeps snagging.
 
+This is also the spec's **scope rule**: a node's *Contract* states what it **takes · gives · guarantees** — never the *mechanism* (atomicity, schemas, concurrency, API/response shapes, algorithms), which is the *how*, deferred to the node's own implement or to a child. So an unspecified mechanism or a child-owned edge in a spec is **correct delegation, not a gap** — `grovespec-verify` enforces this, and a skeleton defers most detail with `[→ child/deferred: …]` markers. (Pinning all that into a root is the over-specification that makes verify churn.)
+
 ### Principle 3 — Sharing has two sources: visible at design time → up front, accidental overlap → extract after discovery
 
 Sharing has two sources. There's one test to tell them apart — **"without this, does the tree shape break?"**

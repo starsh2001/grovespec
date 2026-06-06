@@ -17,7 +17,7 @@ tdd_skip_reason: ""        # required when tdd: false
 {What it must do. From the user's point of view.}
 
 ## Contract
-{What it guarantees to the outside (the parent · other nodes): what it takes · what it gives · invariants (units · order · empty cases). Other nodes rely on this without seeing the internals.}
+{What it guarantees to the outside (the parent · other nodes): what it takes · what it gives · invariants (units · order · empty cases). Other nodes rely on this without seeing the internals. State the *contract*, not the *mechanism* — atomicity·schemas·concurrency·API shapes belong to implement or to children. Defer mechanism + child-owned edges with a marker — `[→ child/deferred: <what>]` — rather than pinning them here; a skeleton stays lean and defers most detail.}
 
 ## AC
 <!-- Measurable non-functional targets (latency · throughput · error rate) go here as checkable items, e.g. "- [ ] p95 < 200ms @ 100 rps". -->
