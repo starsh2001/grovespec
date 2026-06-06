@@ -3,7 +3,7 @@
 > grovespec-init reads this when there's *no code and no detailed doc* — just an idea or a rough spec. The **method** only; the brief format is owned by `.grovespec/templates/brief.md`/`FORMATS.md` — don't restate it, land on that.
 
 ## Big principles
-- **Talk in the user's language — from the first word.** Whatever language the user writes to you in *is* the language; mirror it, including your opening question (no-seed → ask in *their* language, e.g. Korean *"무엇을 만들까요?"*, **never** English). This doc is English — irrelevant to your output; don't mirror it. (If init already set `config.language`, use it.) **Never default to English.** The brief lands in `config.language`.
+- **Talk in `config.language`.** init sets it from the OS locale (`grovespec locale`; if undetectable, it asks — never a silent English default). Use that language for everything here, including your opening question. This doc is English — irrelevant to your output. The brief lands in `config.language`.
 - **Output is a brief, nothing else.** explore writes only `brief.md` — no tree, no Tasks, no code.
 - **Converse toward the shape; don't run a questionnaire.** Lead with the user's own words and follow where they go — no fixed question list, no set order. Lay the options out, name what's risky, and poke at what's being taken for granted (by them and by you).
 - **Land lean.** Think wide, but *finish narrow* — a brief someone reads at a glance and says "yes, that's the direction." A long document here would re-create the exact thing GroveSpec exists to kill (a spec no human can confirm), so the last move is always to *cut it down*.

@@ -252,6 +252,26 @@ cmd_lang() {
   if [ -n "$v" ]; then echo "$v"; else echo "(no config.language yet — run grovespec-init)"; fi
 }
 
+# ===================== locale (detect the OS language for init) =====================
+# Print a short language code (ko, en, ja…) for the OS UI locale, or NOTHING if undetectable (init then ASKS).
+# Unix: $LANG/LC_*. Windows/MSYS: $LANG is empty there, so read the registry via reg.exe (full path — it's not on the MSYS PATH).
+cmd_locale() {
+  local l="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"
+  l="${l%%.*}"; l="${l%%@*}"                       # strip .UTF-8 / @modifier
+  case "$l" in C|POSIX|"") l="" ;; esac            # a language-less locale is NOT a vote for English
+  if [ -z "$l" ]; then                             # Windows: pull the user locale from the registry
+    local reg
+    for reg in /c/Windows/System32/reg.exe /cygdrive/c/Windows/System32/reg.exe "$(command -v reg.exe 2>/dev/null)"; do
+      [ -n "$reg" ] && [ -x "$reg" ] || continue
+      l=$(MSYS_NO_PATHCONV=1 "$reg" query "HKCU\\Control Panel\\International" /v LocaleName 2>/dev/null \
+          | tr -d '\r' | awk '/LocaleName/{print $NF}')
+      [ -n "$l" ] && break
+    done
+  fi
+  [ -z "$l" ] && return 1                           # undetectable → caller (init) asks
+  echo "$l" | sed 's/[-_].*//' | tr 'A-Z' 'a-z'     # ko-KR → ko
+}
+
 # ===================== impact =====================
 cmd_impact() {
   local n="${1:-}"
@@ -287,7 +307,8 @@ case "${1:-}" in
   status)   cmd_status ;;
   check)    shift; cmd_check "${1:-}" ;;
   lang)     cmd_lang ;;
+  locale)   cmd_locale ;;
   impact)   shift; cmd_impact "${1:-}" ;;
   tree)     cmd_tree ;;
-  *) echo "grovespec — validate | status | check [TASK-N] | lang | impact TASK-N | tree"; exit 2 ;;
+  *) echo "grovespec — validate | status | check [TASK-N] | lang | locale | impact TASK-N | tree"; exit 2 ;;
 esac
