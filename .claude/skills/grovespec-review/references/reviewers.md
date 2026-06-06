@@ -61,11 +61,11 @@ Write findings in {config.language}.
 ```
 
 ## verify — the checklist the lenses fill (don't hunt open-endedly)
-A spec passes when this finite list is satisfied — NOT when "no reviewer can imagine an edge." Each lens fills its checks and marks **PASS / PARTIAL / FAIL**; the round's verdict is the table.
+A spec passes when this finite list is **affirmatively satisfied** — NOT when "no reviewer can imagine an edge," and **NOT when a reviewer merely 'found nothing'.** Each lens marks **PASS / PARTIAL / FAIL** *with the evidence that earned it*: a bare "looks fine" is **not** a PASS — that's exactly how a rubber-stamp waves an *under*-specified spec through (the failure GroveSpec exists to stop). **An unshown check is PARTIAL, never PASS.** The round's verdict is the table.
 
 **For a `skeleton`:**
-- **C1 Decomposition coverage** — do the named children's roles *sum to* the brief/parent scope: no gap, no overlap? *(coherence)*
-- **C2 Buildability** — could each named child/consumer build its part from this contract alone? *(consumer-impersonator)*
+- **C1 Decomposition coverage — mechanical, *paste the map*** — enumerate the brief/parent scope items and map each to **exactly one** child role: **0 unmapped (gap), 0 double-owned (overlap)**. And the *reverse*: every Contract clause must trace back to a brief scope item — **a clause outside the brief's Does/Doesn't is scope-creep → flag it** (cut it, or revise the brief; the brief is the scope SSoT). Assert nothing; show the mapping. *(coherence)*
+- **C2 Buildability — show it** — name a consumer/child and *sketch building its part* from this contract alone; the only hole is a spot you'd be **blocked** (not one you'd reasonably decide). *(consumer-impersonator)*
 - **C3 Boundaries & invariants** — are the child boundaries + the cross-cutting invariants all children must respect stated? A *deferred* edge is fine. *(gap-finder, at THE BAR)*
 - **C4 Scope discipline** — is mechanism/child-detail deferred (markers), not pinned? **An over-stuffed contract FAILs here** (too detailed for a skeleton → delegate). *(breaker — hunt unbuildable holes AND over-reach)*
 - **C5 AC testable** — is each AC measurable/verifiable (NFR as a checkable item)?
