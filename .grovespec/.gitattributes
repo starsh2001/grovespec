@@ -1,0 +1,10 @@
+# The runtime must check out LF everywhere: bin/grovespec is bash (CRLF breaks
+# the shebang), and schema/templates are parsed by grep/awk that treat a stray
+# \r as part of the value.
+#
+# This lives INSIDE the bundle on purpose. Copying .grovespec/ into a project
+# carries the rule along, so the install never has to edit — or overwrite — that
+# project's own root .gitattributes. A nested file also outranks any root rule
+# (gitattributes(5): the closer directory wins), so a project-wide `eol=crlf`
+# can't break the runtime.
+* text eol=lf

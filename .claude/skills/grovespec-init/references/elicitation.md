@@ -1,6 +1,6 @@
 # elicitation — drawing out a want the user can't yet state
 
-> explore (`explore.md`) reaches for this when forward questions stall — when the user "doesn't really know what they want." Distilled from BMAD's brainstorming *facilitation* (the how, not its session-theater). Reach for ONE move at a time; never run the list.
+> explore (`explore.md`) reaches for this when forward questions stall — when the user "doesn't really know what they want." Distilled from BMAD's brainstorming *facilitation* (the how, not its session-theater). Reach for ONE move at a time; never run the list — pick the move by the **facet you still need to cover** (`explore.md`), not down this menu. Each move is a way to draw out a blank facet, not an end in itself.
 
 ## Facilitation (how to run any move)
 - **Facilitate, don't generate for them.** Your job is to make *them* produce the idea — you prompt, prime, build. Generate *for* them only if they're stuck and ask.

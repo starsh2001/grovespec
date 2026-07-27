@@ -5,7 +5,7 @@ description: Implements a GroveSpec node — turns an *approved* spec into real 
 
 # grovespec-implement
 
-Turning an **`approved`** spec into *code*. (Verifying the spec is `grovespec-verify`; reviewing the code is `grovespec-review`.) Implement builds the node's own behavior — a **feature**'s leaf logic, or a **skeleton**'s structural code (container·interface·dispatch). It ends at `implemented`; it does **not** review or mark `done`.
+Turning an **`approved`** spec into *code*. (Verifying the spec is `grovespec-verify`; reviewing the code is `grovespec-review`.) Implement builds the node's own behavior — a **feature**'s leaf logic, or a **skeleton**'s structural code (container·interface·dispatch). For the **root skeleton** that structural code is the **base environment + an empty runnable shell** (the app boots / a blank page loads), with the **stack chosen here** and *no feature logic*. It ends at `implemented`; it does **not** review or mark `done`.
 
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language. These files are English; your output is not.
 
@@ -17,7 +17,7 @@ Thin — read only this node's Task and the *relevant* code. Don't pile up a lon
 ## Flow
 
 ### 0. Confirm it's this node's turn (the gate)
-The node must be **`approved`** (cold-verified + human-approved) and unblocked. Run `grovespec check <node>`. If it's ✗ (blocked) or not yet `approved`, **STOP** — `grovespec-verify` it first, or implement the node `grovespec check` reports ready. **Never implement a node whose parent isn't `done`** (bottom-up drift), or whose spec isn't `approved`.
+The node must be **`approved`** (cold-verified + human-approved) and unblocked. Run `grovespec check <node>`. If it's ✗ (blocked) or not yet `approved`, **STOP** — `grovespec-verify` it first, or implement the node `grovespec check` reports ready. **Never implement a node whose parent isn't `done`** (bottom-up drift), or whose spec isn't `approved`. **Start from a clean working tree** — uncommitted unrelated changes would blur this node's diff (the boundary `grovespec-review` reads — `FORMATS.md`); have the user commit/stash them first.
 
 ### 1. Pre-check (before writing)
 - **Look up risks**: any risk in `brief.md` this node touches? Go in knowing it.
@@ -30,21 +30,32 @@ The node must be **`approved`** (cold-verified + human-approved) and unblocked. 
   An isolated agent that writes the second copy, with the first not in front of it, won't know it duplicated — so "always search first here" is the rule.
 
 ### 2. Tests first
-From the AC, write *failing* tests — the target the implementation must hit. Obey the Task's `tdd` field (set at grow): `tdd: true` → failing tests first; `tdd: false` → skip (its `tdd_skip_reason` says why). If the field looks wrong for this node, that's a spec fix — go back to `grovespec-revise`; don't override it silently here.
+From the AC, write *failing* tests — the target the implementation must hit. (Skip AC items marked `(gap)` — deliberately undefined behavior, nothing to pin — `FORMATS.md`.) Obey the Task's `tdd` field (set at grow): `tdd: true` → failing tests first; `tdd: false` → skip (its `tdd_skip_reason` says why). If the field looks wrong for this node, that's a spec fix — go back to `grovespec-revise`; don't override it silently here.
 
 ### 3. Implement
-Write code until the tests pass.
-- **Write-scope (blast radius):** write only *this node's* code (`src/`), its tests (`tests/`), and *this node's* Task — plus `tree.md` if you extract/split (next bullet). **Don't edit another existing node's code or Task** to make yours pass; if a *shared* node you depend on must change, stop and `grovespec-revise` it.
+Write code until the tests pass. **Reversibility gate — before committing a deferred *how*:** if it's hard to reverse (stack · architecture · data model) or the cold review can't verify it (design direction · look-and-feel), **ask the human first** (recommend + options + free-form, per line 12) — late is fine, silent is not. Cheap and reversible hows (widget choice · naming · local structure) → decide and go; review + the human confirm are the net.
+- **A skeleton builds structural code — not nothing.** It assembles the glue/container its children slot into. **The root** stands up the **base environment + an empty runnable shell**: the stack is chosen here **with the human** (recommend + rationale; this is the least reversible decision in the project), the project is wired to build/run, and it *runs while doing nothing* (app boots / blank page loads / CLI prints help) — smoke-tested, with **zero feature logic** (features arrive as children — already sketched, detailed later). A root whose implement produces no runnable base is wrong: that setup work belongs to no single child, so it can't be deferred to one.
+- **Write-scope (blast radius):** write only *this node's* code (`src/`), its tests (`tests/`), and *this node's* Task — plus `tree.md` if you extract/split (next bullet), and **`conventions.md` when you establish a new cross-cutting rule/term** (the "Record conventions" bullet below). **Don't edit another existing node's code or Task** to make yours pass; if a *shared* node you depend on must change, stop and `grovespec-revise` it.
 - If you find a chunk 2+ nodes will use, extract it as a shared node (or split this one): add its id to `tree.md` so structure stays in sync with the code.
-- **If the code must diverge from the spec:** default to **conform the code to the spec** (the cheap, reversible direction). Call it *intentional* only if you can state the new contract clause that replaces the old — and that's a contract change, so do it via `grovespec-revise`, not a silent edit here.
+- **If the code must diverge from the spec:** for a *detail*, default to **conform the code to the spec** (the cheap, reversible direction). But **don't anchor to a draft the build has disproven**: if the code reveals the draft's *structure* (its decomposition or contract shape) is wrong, the draft is the hypothesis that loses — once code exists it becomes the truth (METHODOLOGY Principle 1). State the new contract clause replacing the old and do it via `grovespec-revise` (a structural change is hard-to-reverse → the reversibility gate above says surface it to the human), never a silent edit. *(With existing code present — brownfield, or earlier nodes — judge from the code, not from a plausible-but-stale draft.)*
+- **Record cross-cutting conventions you established.** If building this node set a **global rule, term, or stack choice that other nodes must follow**, append it to `conventions.md` (in `config.language`) — terms → *Glossary*, rules/stack/patterns → *Common Rules*. **Cross-cutting facts only**, never this node's local implementation detail (that lives in the code; over-recording bloats a doc every node reads). The **root / stack-choosing implement seeds it** — the stack + the foundational patterns children must follow (e.g. *web framework & router style · DB + ORM · the shared-client location/pattern · where tests live & the runner · where API routes go*) — so children read them here instead of re-deriving from code (the gap a real run hit: a chosen stack left only in the code). Update an entry if a later node changes the rule.
 
-### 4. Confirm whether this node needs children (decomposition)
-Building the node is what **confirms** its `role` (grow's was only a hypothesis):
-- **Leaf** → set `role: feature`. Nothing below it.
-- **Needs children** (it turned out to be a container/dispatch holding sub-behaviors) → set `role: skeleton` and **record its decomposition in the Change Log**: the children it needs, each child's role, and which clause of *this* node's Contract each child owns — every clause to exactly one child (0 gaps, 0 overlaps). Those children are grown later, one at a time (`grovespec-grow`), *after* this node is `done`. **Don't create the child Tasks now.**
+### 4. Confirm the decomposition against reality
+Greenfield, this node's children were already **sketched** at init. Building the node is what **confirms** them — and its `role`:
+- **Leaf** (no children sketched, build needs none) → `role: feature`.
+- **Skeleton** (has sketched children) → reconcile each sketch against what the build revealed this node actually needs:
+  - **still right** → keep it (grow details it later, after this node is `done`);
+  - **now wrong** (build shows it's unneeded or misframed) → **drop it *and any sketched descendants*** (remove them from `tree.md`, delete their sketch Tasks — sketches are pre-commitment, free to delete; leaving a grandchild behind fails `validate`'s orphan check) or fix the sketch;
+  - **missing** (the build reveals a child the sketch didn't) → add it as a new `sketch`.
+  Record the confirmed decomposition (children + which Contract clause each owns — 0 gaps, 0 overlaps) in the **Change Log**. **Don't write the children's full contracts here** — grow details each later.
+- **A `feature` that turned out to need children** (none sketched, but the build reveals sub-behaviors) → set `role: skeleton` and add the children as `sketch` nodes (a brownfield-style decomposition — this wasn't in the spec).
+
+**This can fire mid-build — don't push through a node that outgrew its contract.** Signals: you're building two-plus separable behaviors; Subtasks keep multiplying; the tests won't converge on one bounded target. (A review that later needs many rounds is the same signal, seen late.) Then stop building the extra behavior: finish only this node's *own* part (a feature's core behavior, or the structural glue), park the rest as new `sketch` children (ids into `tree.md`), move the AC items they own down to them (or mark `[→ child/deferred: …]`), set `role: skeleton` if it was a feature, and record the decomposition in the Change Log — the same reconciliation, invoked early.
 
 ### 5. Hand off → implemented
-Set the Task `status: implemented`. **Next: `grovespec-review`** — it runs the tests and a cold code review of *this node's diff*, then `grovespec-fix` if needed, then `done`. implement does not review its own work; cold eyes do.
+**Commit as `TASK-N: implement — <summary>`** (commits made while working this node carry the same `TASK-N:` prefix; this boundary is the diff `grovespec-review` reads — `FORMATS.md`). Set the Task `status: implemented`. **Next: `grovespec-review`** — it runs the tests and a cold code review of *this node's diff*, then `grovespec-fix` if needed, then `done`. implement does not review its own work; cold eyes do.
 
 ## When it's done
 Code·tests are in `src/`·`tests/`, the Task is `implemented` (plus a Change-Log decomposition if it became a skeleton). Next is `grovespec-review`.
+
+> **Recommend a new session for `grovespec-review`.** The agent that just wrote the code shouldn't also orchestrate its cold review — start it fresh, clean bounded context (WORKFLOW §5).

@@ -1,63 +1,62 @@
 ---
 name: grovespec-init
-description: Sets up GroveSpec in a project — opens with a fixed setup interview (language · review strength · reviewer models · test command), then creates the brief, tree.md, the root Task, and config. Use when the user wants to "start a new project with GroveSpec", "adopt GroveSpec in this codebase", "grovespec init", "set up the spec/tree", or "reconfigure / change the review settings or language". Re-invoking init on an existing project re-runs the setup interview and updates config (it does not recreate the project). To add the next node use grovespec-grow; to change a done node use grovespec-revise.
+description: Sets up GroveSpec in a project — opens with a fixed setup interview (language · review strength · reviewer models), then creates the brief, the detailed spec, the whole task tree (greenfield: all `sketch`; brownfield: all `done`), and config. Use when the user wants to "start a new project with GroveSpec", "adopt GroveSpec in this codebase", "grovespec init", "set up the spec/tree", or "reconfigure / change the review settings or language". Re-invoking init on an existing project re-runs the setup interview and updates config (it does not recreate the project). To detail or add a node use grovespec-grow; to change a done node use grovespec-revise.
 ---
 
 # grovespec-init
 
-Setup of a GroveSpec project — it **opens with a fixed setup interview** (`references/setup.md`: language · review strength · reviewer models · test command), then builds the brief + root. When that's done, the per-node cycle (`grow → verify → implement → review ⇄ fix → done`) takes over. **Re-invoke init anytime to *reconfigure*** — it re-asks the interview and updates `.grovespec/config.yaml`, without recreating the project.
+Setup of a GroveSpec project — it **opens with a fixed setup interview** (`references/setup.md`: language · review strength · reviewer models — the test command is auto-detected, not asked), then builds the brief + the sketched tree. When that's done, the per-node cycle (`grow → verify → implement → review ⇄ fix → done`) takes over. **Re-invoke init anytime to *reconfigure*** — it re-asks the interview and updates `.grovespec/config.yaml`, without recreating the project.
 
-> **Language — detect, then CONFIRM (don't assume).** Run `bash .grovespec/bin/grovespec locale` → a code (`ko`/`en`/`ja`/…) read from the OS (Unix `$LANG`/`LC_*`; on **Windows/MSYS the registry**, since bash `$LANG` is empty there). **Then confirm it with the user** — that's the setup interview's Q1 (*"locale=ko — 이 언어로 진행할까요?"*, default = the detected one). Reply in the chosen language from word one. If detection returns **nothing**, **ASK** outright; **never silently default to English** (an empty locale isn't a vote for English). The choice is written to `config.language`; later skills just read it. (These files are English — irrelevant to your output.)
+> **Language — detect, then CONFIRM (don't assume).** Run `bash .grovespec/bin/grovespec locale` → a code (`ko`/`en`/`ja`/…) read from the OS (Unix `$LANG`/`LC_*`; on **Windows/MSYS the registry**, since bash `$LANG` is empty there). **Then confirm it with the user** — that's the setup interview's Q1, asked with the language as a **word, not the code** (*"OS 언어가 한국어로 잡혔어요 — 이 언어로 진행할까요?"*, default = the detected one; the code is stored to `config.language`, never shown). Reply in the chosen language from word one. If detection returns **nothing**, **ASK** outright; **never silently default to English** (an empty locale isn't a vote for English). The choice is written to `config.language`; later skills just read it. (These files are English — irrelevant to your output.)
 
-## One principle: only the root, nothing below yet (greenfield)
+## One principle: the full tree up front, all `sketch` (greenfield)
 
-Starting from an idea or a spec doc, don't unfold the tree. Write **only the root** — one Task, `status: draft`. Everything below is grown later, one node at a time, *after* the root is built and `done`.
+Starting from an idea or a spec doc, **draw out a detailed spec and map the whole tree as sketches** — every node placed with a one-line responsibility + rough I/O (`status: sketch`), no full contracts yet. The build details each sketch into a contract (`grow`), then runs it through the gates (verify → implement → review → `done`). Mapping the whole structure cheaply (one-liners) gives each node *grounded intent* instead of a vacuum, without the cost of writing 50 contracts in one session — and `sketch`/`draft` both mean nothing is frozen.
 
-Because — bake unverified assumptions into the tree and, when one turns out wrong while building the top, you redo everything below it. The tree is *a hypothesis, not a fixed design*; commit nothing below the root until the root is done.
-
-(*Brownfield* — existing code — is the exception: the code is already-built reality, so `references/code-to-tree.md` maps the whole existing structure at once, all `done`. "Root only" is about not pre-baking what *isn't built yet*.)
+(*Brownfield* — existing code — maps the same way but all `done`: the code is already-built reality, so `references/code-to-tree.md` maps the whole existing structure at once.)
 
 ## Flow
 
 ### 1. Figure out what you have
-**Check the directory first** (glob for source files + any docs); ask the user only if it's ambiguous. **Already a GroveSpec project (a `tree.md` exists)?** → this is a *reconfigure*: run only **§2 (the setup interview)**, update config, and **stop** — don't recreate brief/tree/tasks. (Add a node → grovespec-grow; change a done node → grovespec-revise.) Otherwise, first-time setup — you need two things:
+**Check the directory first** (glob for source files + any docs); ask the user only if it's ambiguous. **Already a GroveSpec project (a `tree.md` exists)?** → this is a *reconfigure*: run only **§2 (the setup interview)**, update config, and **stop** — don't recreate brief/tree/tasks. (Add a node → grovespec-grow; change a done node → grovespec-revise.) **A *half-finished* init** (a prior session stopped mid-way)? Resume where the artifacts stop, don't restart: a `ref/` spec exists but no `tree.md` → re-enter at `spec-to-tree.md` (brownfield: `code-to-tree.md`); a brief exists but no ref spec → resume `explore.md` (re-reading the brief so far); the §2 interview still runs (three quick questions — confirm or adjust). Otherwise, first-time setup — you need two things:
 - **Is there code?** (source files exist → brownfield)
-- **Are there docs to reference?** (a spec doc, etc.) — and if so, *detailed or rough?* **Detailed = per-feature, AC-level behavior; anything less is a rough idea** → explore. When unsure, treat it as rough and `explore` (the cheap, reversible path).
+- **Are there docs to reference?** (a spec doc, etc.) — and if so, *detailed or rough?* **Detailed = per-feature, AC-level behavior; anything less is a rough idea.** Either way, the goal is the same: a **detailed spec** (drawn out via `explore.md` or read from the user's doc + gaps filled) that `spec-to-tree.md` maps into the full tree of all-`sketch` Tasks.
 
 | What you have | How to build the tree | Reference docs |
 |---|---|---|
-| Just an idea / rough spec | explore it out → a lean brief (`references/explore.md`) | none |
-| Detailed spec doc | root only; `grow` unfolds the rest later | keep in ref/ |
-| Existing code (±docs) | read the code and extract it | in ref/ if present |
+| Just an idea / rough spec | explore → detailed spec → `spec-to-tree` → all-`sketch` tree | the spec (produced, saved as ref) |
+| Detailed spec doc | fill the gaps the doc leaves blank (`explore.md`) → `spec-to-tree` → all-`sketch` tree | the doc (kept in ref/) |
+| Existing code (±docs) | `code-to-tree` → all-`done` tree | in ref/ if present |
 
 ### 2. Setup interview (the fixed questionnaire — ask before starting)
-Run the **fixed** interview in `references/setup.md` — **language** (confirm the detected locale) · **review strength** · **reviewer models** · **test command** — and write the answers to `.grovespec/config.yaml`. Ask **exactly** those questions, in order (don't improvise or skip any) — a fixed interview is what keeps every project configured the same and nothing decided silently. Do this **before** per-case prep, so the rest of init runs in the chosen language. (Re-invoked on an existing project, this is the *only* step — update config and stop.)
+Run the **fixed** interview in `references/setup.md` — **language** (confirm the detected locale) · **review strength** · **reviewer models** — and write the answers to `.grovespec/config.yaml`. Ask **exactly** those **three** questions, in order (don't improvise or skip any) — a fixed interview is what keeps every project configured the same and nothing decided silently. (The **test command is not asked** — it's a derivable value, auto-detected per `setup.md`'s note; see §3/§5.) Do this **before** per-case prep, so the rest of init runs in the chosen language. (Re-invoked on an existing project, this is the *only* step — update config and stop.)
 
 ### 3. Per-case prep
-- **If there are reference docs** → read and follow `references/ref-docs.md` (keep the originals as-is + make a location map. Don't convert them into a tree).
-- **If there's code** → read and follow `references/code-to-tree.md` (read the code first to extract the tree. Even with docs present, code comes first — docs can drift from code). **Brownfield: set `paths` in `.grovespec/config.yaml` to the existing layout** (e.g. `src`, `tasks`) so later searches hit the real dirs — METHODOLOGY §7 calls this a hard requirement.
-- **If it's just an idea / rough spec** (no code, no detailed doc) → read and follow `references/explore.md` (explore the idea as a thinking-partner; it lands on a lean brief — no tree or code yet).
+- **If there are reference docs** → read and follow `references/ref-docs.md` (keep the originals as-is + make a location map) — **and fill the gaps the doc leaves blank with the user** via `references/explore.md` (the direction facets + any missing feature detail). Then `references/spec-to-tree.md` maps the result into the all-`sketch` tree.
+- **If there's code** → read and follow `references/code-to-tree.md` (read the code first to extract the tree. Even with docs present, code comes first — docs can drift from code). **Brownfield: set `paths` in `.grovespec/config.yaml` to the existing layout** (e.g. `src`, `tasks`) so later searches hit the real dirs — METHODOLOGY §7 calls this a hard requirement. **Also detect the test command here** (`package.json` `scripts.test` / `pyproject`·pytest config / `Makefile` / `cargo`·`go` layout / …) and write `review.test` — it's a derivable value, not an interview question (`setup.md`); leave it empty only if nothing is clearly detectable.
+- **If it's just an idea / rough spec** (no code, no detailed doc) → read and follow `references/explore.md` (explore the idea thoroughly — direction facets + feature detail — it lands on a detailed spec saved as ref + a brief). Then `references/spec-to-tree.md` maps the spec into the all-`sketch` tree.
 
-### 4. Write brief.md
-Only the **broad direction · scope · visible risks**. Short, plain words — *a person should be able to read it at a glance and say "yes, that's right."*
+### 4. Write brief.md + detailed spec
+- **The detailed spec** (produced by explore, or the user's doc with gaps filled) is saved in `ref/` — it's the original intent, unedited from here (same as any ref doc).
+- **brief.md** is the lean overview extracted from the spec: **direction · scope · visible risks**. Short, plain words — *a person should be able to read it at a glance and say "yes, that's right."*
 
 Risks hold only "where it might break." Leave out "what to build."
 - In: "payment and inventory totals can drift out of sync"
 - Out: "the profile should have name and email"
 
 ### 5. Make the files
-- **tree.md** — *greenfield*: just the root. *brownfield*: the whole existing structure (from `code-to-tree.md`). Ids only.
-  ```
-  - TASK-1
-  ```
-- **tasks/** — *greenfield*: only the root (`TASK-1`), concept only, `status: draft`. *brownfield*: one Task per existing node, `status: done` (see `code-to-tree.md`). Follow `.grovespec/templates/task.md` + `FORMATS.md`. **Don't create any child Task here** — greenfield children are grown one at a time later; brownfield children already exist.
-- **conventions.md** — start empty (filled in as you build). For a *brownfield* project, **do** fill in the facts the code guarantees (terms·global rules) — don't leave it empty (→ `references/code-to-tree.md` §7).
-- **config** — `.grovespec/config.yaml` was created from the template and filled by the **§2 setup interview** (`language` · `verify/review.strength` · `models` · `review.test`). Here, only set any custom **paths** — *brownfield*: point them at the existing layout (e.g. `src`, `tasks`); *greenfield*: keep the defaults under `docs/...`.
+- **tree.md** — *greenfield*: the full tree from `spec-to-tree.md`, all `sketch`. *brownfield*: the whole existing structure from `code-to-tree.md`, all `done`. Ids only.
+- **tasks/** — *greenfield*: all Tasks from `spec-to-tree.md`, `status: sketch` (thinly filled — one-line responsibility + rough I/O; `grovespec-grow` details each into a full contract later). *brownfield*: one Task per existing node, `status: done` (see `code-to-tree.md`). Follow `.grovespec/templates/task.md` + `FORMATS.md`.
+  - **Mark the root's own deliverable in its sketch.** The root isn't pure delegation: note (in its sketch) that it builds the **base environment + an empty runnable shell** (smoke-testable — blank page loads / server boots / CLI runs). Its full smoke-test AC + base-env Subtask get written when `grovespec-grow` details the root sketch; the stack is chosen at the root's `implement` (→ METHODOLOGY "Skeleton role").
+- **conventions.md** — *greenfield*: start empty; it gets **seeded at the root's `implement`** (the chosen stack + foundational patterns) and grows as each node establishes a cross-cutting rule (→ `grovespec-implement`). For a *brownfield* project, **do** fill in the facts the code guarantees (terms·global rules) now — don't leave it empty (→ `references/code-to-tree.md` §7).
+- **findings.md · restructuring.md** — *brownfield only, and only if non-empty*: the backlog `code-to-tree.md` parked while mapping (`findings.md` = node-level bugs·duplications·doc↔code mismatches; `restructuring.md` = tree-level structural debt). The tree stays all-`done`; these hold what's *wrong with* it, for `grovespec-revise` to work off. **Greenfield / clean code: don't create them** (no empty files).
+- **config** — `.grovespec/config.yaml` was created from the template and filled by the **§2 setup interview** (`language` · `verify/review.strength` · `models`). Set any custom **paths** here — *brownfield*: point them at the existing layout (e.g. `src`, `tasks`); *greenfield*: keep the defaults under `docs/...`. **`review.test` is not from the interview** — *brownfield*: write the command detected in §3; *greenfield*: leave it `""` (the first `grovespec-review` derives it from the stack and writes it back).
 
-### 6. Human check → hand off
-Show the brief and the root (greenfield) or the extracted tree (brownfield) to the human and get **"is this right?"** confirmed — the checkpoint *before* more effort.
-- *Greenfield*: **next is `grovespec-verify TASK-1`** (cold-verify the root's draft → human approve → `approved`), then `implement` → `review` → `done`; once the root is `done`, `grovespec-grow` its first child.
-- *Brownfield*: the tree is now documented (`done`). Work proceeds via `grovespec-grow` / `grovespec-revise` on the parts you change next.
+### 6. Hand off — the decomposition gate (greenfield) / human check (brownfield)
+- *Greenfield*: the **sketch tree** is a *hypothesis*, and it gets the cold gate — not just a human glance (eyeballing a raw decomposition is the rubber-stamp GroveSpec exists to stop; the AMS run proved a human catches *some* gaps but a cold gate catches more). Briefly show the tree, then **next is `grovespec-verify` on the tree** (`target_type: tree`): cold reviewers check the decomposition (D1–D5: scope coverage · system completeness · actor closure · boundaries · depth) → fix → **human approves the *vetted* tree**. Only then does the per-node build begin — `grovespec-grow` the root (detail its sketch → `draft`) → `verify` (spec) → `implement` → `review`, top-down.
+- *Brownfield*: no decomposition gate — the code *is* the decomposition (all `done`), and what's wrong with it is already parked in `findings.md`·`restructuring.md`. Show the brief + extracted tree + those backlogs to the human, get **"is this right?"** confirmed. Work proceeds via `grovespec-revise` on the parts you change, or `grovespec-grow` to add what's new.
+
+> **Recommend a new session for the next step** (greenfield: `verify` the tree; brownfield: `revise`/`grow`). The agent that just built the tree shouldn't also orchestrate its cold review — start it fresh, with clean bounded context (WORKFLOW §5).
 
 If it's not right, loop back (re-`explore` the brief / re-read the code) — don't proceed on a wrong direction.
 
@@ -65,8 +64,10 @@ If it's not right, loop back (re-`explore` the brief / re-read the code) — don
 ```
 docs/
   brief.md           broad direction·scope·risks
-  tree.md            greenfield: just the root · brownfield: the whole existing tree (ids only)
-  conventions.md     (empty greenfield / filled brownfield)
-  tasks/             greenfield: root only (draft) · brownfield: one per existing node (done)
-  ref/               reference originals + location map (only if present)
+  tree.md            greenfield: the full tree, all sketch · brownfield: the whole existing tree, all done (ids only)
+  conventions.md     (seeded if the spec/code states cross-cutting rules / empty otherwise)
+  tasks/             greenfield: all Tasks (sketch) · brownfield: one per existing node (done)
+  findings.md        brownfield backlog: bugs·duplications·doc↔code mismatches (only if non-empty)
+  restructuring.md   brownfield backlog: tree-level structural debt (only if non-empty)
+  ref/               greenfield: the detailed spec explore authored (always) · brownfield: brought-in originals (if any) + location map
 ```

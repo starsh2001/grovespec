@@ -23,22 +23,22 @@ Off-the-shelf SDD tools write the spec once and then don't update it when the co
 
 ---
 
-## 2. The core idea: start rough
+## 2. The core idea: detailed but uncommitted
 
-The spec exists from the start, but it starts rough. It gets more detailed as you build.
+The spec exists from the start, and it starts **detailed** — as a hypothesis. It gets *refined* as you build.
 
-Some things are fine to decide up front; some are not.
+The old fear was that early detail gets frozen and then costs rework. But the problem was never the *detail* — it was the *freezing*. A detailed spec held as the tree's hypothesis (each node `sketch` → `draft`, then verified → implemented → reviewed before `done`) is exactly that — a hypothesis, not a commitment. The build changes things; the gates catch what's wrong.
 
-- **Fine to decide up front — the broad direction**: "it's a shop with payment, inventory, and auth", "there are these three screens." Big-frame things, rarely change.
-- **Not fine to decide up front — the details**: "the payment screen has 7 buttons, the validation rules are these, the state transitions are those." The finer the detail, the more likely it changes as you build. Decide it early and you'll have to fix it later when it no longer fits.
+Without detail, each node starts from a vacuum — the agent either exhausts the user asking for intent, or freestyles. A detailed spec is the source that prevents both: each node has grounded intent from the start, but nothing is committed until it passes the gates.
 
-So GroveSpec doesn't say "don't decide up front" — it says "decide only the broad direction you can be sure of right now."
+- **Fine to spec up front — everything**, as long as it's held as a hypothesis. The detailed spec (kept as `ref`) is to greenfield what existing code is to brownfield: the source the tree is mapped from. The tree itself is mapped as **sketches** (structure + one-liners), each detailed into a full `draft` contract just before it's built — so the whole structure is visible cheaply, yet no single session writes 50 contracts.
+- **Not fine — freezing detail without the gates.** Off-the-shelf SDD tools freeze the spec before building. GroveSpec sketches the whole tree, details each node to `draft`, and gates it individually. The detail is a starting point, not a contract, until `verify` says it holds.
 
 ---
 
 ## 3. The spec–implementation cycle
 
-GroveSpec starts with a rough spec and grows it as it builds and reviews. Here's that order, compared to off-the-shelf SDD tools.
+GroveSpec starts with a detailed spec and gates each node through cold review as it builds. Here's that order, compared to off-the-shelf SDD tools.
 
 ### The off-the-shelf SDD order
 
@@ -46,41 +46,40 @@ GroveSpec starts with a rough spec and grows it as it builds and reviews. Here's
 finalize the full PRD → finalize the full Architecture → [ story → build → QA ] repeat
 ```
 
-The PRD and architecture are finished before building starts. The only thing that repeats is the story implementation inside; the spec itself is all fixed at the start.
+The PRD and architecture are *finished* (frozen) before building starts. When building reveals they were wrong, changing them is expensive — so they rarely get changed, and the drift compounds.
 
 ### The GroveSpec order
 
 ```
-1. grow:      write ONE node's draft Task   (Overview·Requirements·Contract·AC)
-   ↓
-2. verify:    cold multi-persona check of the draft → fix → human approve   (draft → approved)
-   ↓
-3. implement: tests first (from the AC) → code → confirm the node's decomposition   (→ implemented)
-   ↓
-4. review:    run the tests + cold-review the diff → fix loop → human confirm   (→ reviewed → done)
-   ↓
-5. grow the next node   (a child of this now-done node)
-   ↓
-   back to step 1 (repeat)
+init:  explore → detailed spec (ref) + the whole tree as sketches
+  → verify (tree):  cold review of the decomposition → fix → human approve   (once)
+  → per node, top-down:  grow → verify → implement → review ⇄ fix → done
+  → later expansion:  grow ONE new node → the same per-node gate
 ```
 
-The order matters. The spec is verified *before* any code (a contract flaw caught there is free), and the code is gated by *tests* plus a cold review of its *diff*. You don't write code first and reconcile the spec afterward. If the code diverges from the spec: a mistake → conform the code; an intentional change → that's a contract change, done via *revise* (+ Change Log), never a silent edit.
+(The step definitions — what each does, with what inputs and outputs — live once, in [WORKFLOW.md](WORKFLOW.md) §1–§2.)
 
-The spec leads the code by only one step. You have to decide what to build next, so you need a plan one step ahead. But decide details much further out, well ahead, and you'll have to fix them when they don't fit as you build.
+The difference from off-the-shelf SDD: the structure is laid out from the start, but nothing is *frozen* — every node is `sketch`, then `draft`, until it passes the gates. The gates are where reality meets intent: a contract flaw caught at verify is free; a code flaw caught at review is cheap. The build can change things; the spec is a starting point, not a prison.
+
+And the *decomposition itself* gets a cold gate before any node is built — `verify` at **tree scale** (D1–D5): is a whole feature missing (the system scaffolding a domain doc never mentions — settings·admin·audit), is a one-liner hiding a subtree, does an actor have no owner? This is the same cold-review medicine GroveSpec spends on specs and code, finally applied to the structure — the one decision that used to get only a human glance (which, on a real run, let a missing settings screen and a naive approval model through until a human caught them). It's affordable only because the tree is `sketch` (one-liners): a reviewer holds the whole decomposition at once.
+
+The order matters. The spec is verified *before* any code, and the code is gated by *tests* plus a cold review of its *diff*. You don't write code first and reconcile the spec afterward. If the code diverges from the spec: a mistake → conform the code; an intentional change → that's a contract change, done via *revise* (+ Change Log), never a silent edit.
 
 ### The three layers of spec
 
 The spec splits into three layers.
 
 - **Brief** — the whole-project overview. Direction·scope·risks. Rarely changes. → `docs/brief.md`
-- **Conventions** — implementation notes. Term definitions·common rules·global constraints. Cross-cutting *rules* (e.g. every screen checks auth first) go here too — shared *code* becomes a node (Principle 3), but shared *rules* go in conventions. Filled in as you build. → `docs/conventions.md`
+- **Conventions** — implementation notes. Term definitions·common rules·global constraints. Cross-cutting *rules* (e.g. every screen checks auth first) go here too — shared *code* becomes a node (Principle 3), but shared *rules* go in conventions. Filled in as you build: **`implement` records a new cross-cutting rule/term the moment it establishes one, and the root's implement seeds the chosen stack + foundational patterns** — so later nodes read them here instead of re-deriving from code. → `docs/conventions.md`
 - **Per-Task spec** — each node's concept (intent·requirements·contract·AC) in one file. → `docs/tasks/{node}.md`
+
+Greenfield adds a fourth, *frozen* source beside these living layers: the **detailed spec** `explore` draws out, kept in **`ref/`** — the full body of intent that `grow` details every node's contract from (it is to greenfield what existing *code* is to brownfield). The **brief is its lean compression** (direction·scope·risks, human-confirmable at a glance); the ref spec is the detail behind it. Both are written together at init from the same exploration — the brief extracted from the ref spec. So intent flows **ref spec → brief (its summary) → Per-Task contract (committed, written by grow)**, with Conventions holding the cross-cutting rules throughout.
 
 ---
 
 ## 4. The four principles
 
-All four principles below come from the idea in §2 — start rough, get detailed as you build.
+All four principles below come from the idea in §2 — spec everything as a hypothesis, gate each node before committing.
 
 ### Principle 1 — Split into a tree by entry point, and split a feature further if it's complex
 
@@ -94,7 +93,7 @@ When a feature needs to be shared, you don't design it up front; you split it ou
 
 Stand up the top skeleton first, top-down, and dig one layer deeper at a time. Because a parent skeleton lays out the structure its children will slot into, and the children slot in there, **there's no later step where you merge things back together.**
 
-**The tree is a hypothesis, not a fixed design.** It isn't drawn whole up front — `tree.md` holds only the nodes that currently exist, and grows one node at a time as each parent is built and reveals what it needs. Nothing below a node is committed until that node is `done`; when building reveals a planned child was wrong, you simply don't grow it (or *revise*).
+**The tree is a hypothesis, not a fixed design.** It's drawn whole at init (all `sketch`), but nothing is *committed* until each node passes the gates (verify → implement → review → `done`). `grow` details each sketch into a `draft` contract just before it's built; when building reveals a planned node was wrong, you *revise* or drop it — a `sketch`/`draft` costs near zero to change. Later, `grow` also expands the tree beyond the initial spec.
 
 **The tree structure is written separately in `docs/tree.md`.** It's a file that expresses the tree shape with Task numbers only (→ §5). The structure is recorded here so you don't have to re-derive the tree from the code every time.
 
@@ -141,7 +140,7 @@ Each node in the tree becomes a **Task** file on disk (`docs/tasks/{node}.md`). 
 
 **There's only one kind of Task.** No tier names like epic·story. Every Task, wherever it sits, is the same kind, and by its tree position it takes **one of two roles**:
 
-- **Skeleton role** — holds what's below *and* builds its own structural code: the container, the interface, the dispatch/glue children slot into (a screen's layout, a CLI's command table, a module's public interface). A skeleton is *not* code-free — it's implemented like a feature. Whether a node *is* a skeleton, and what its children are, is **confirmed when it's implemented** (recorded as its decomposition in the Change Log); the children are then grown one at a time, after it's `done`.
+- **Skeleton role** — holds what's below *and* builds its own structural code: the container, the interface, the dispatch/glue children slot into (a screen's layout, a CLI's command table, a module's public interface). A skeleton is *not* code-free — it's implemented like a feature. **The root skeleton's structural code is the base environment + an empty end-to-end runnable shell** — the project *stood up* (stack chosen, build/run wired) so it actually runs while doing nothing: a blank page that loads, a server that boots, a CLI that prints help. Nothing exists below the root yet, so standing up that runnable shell is the root's *own* build (no feature logic — those are the children); **the tech stack is chosen here.** Whether a node *is* a skeleton, and what its children are, is **confirmed when it's implemented** — its sketched children reconciled against the build (keep / drop / add), recorded as its decomposition in the Change Log; each child is then detailed (`grow`) one at a time, after it's `done`.
 - **Feature role** — builds the actual leaf behavior. If a feature is complex, split it into smaller features inside (Principle 1).
 
 Individual components (buttons·dropdowns) are neither, so they're not Tasks — they're details decided when you build (Principle 2).
@@ -204,35 +203,19 @@ The procedure is in [WORKFLOW.md](WORKFLOW.md) under revise.
 
 ## 6. The per-node gate
 
-Every node goes through the same gate, starting once its parent is `done`.
+Every node goes through the same gate, starting once its parent is `done`:
 
 ```
-grow (draft) → verify (→ approved) → [ pre-check → tests first → build ] (→ implemented) → review: tests + cold diff review ⇄ fix (→ done)
+grow (sketch → draft) → verify (→ approved) → implement (→ implemented) → review ⇄ fix (→ done)
 ```
 
-The spec is checked *before* any code (`verify`); the code is gated by *tests* + a cold review of its *diff* (`review`). The middle three — pre-check, tests-first, build — are `implement`.
+The procedure — what each step does, in what order, with what inputs — is defined once, in [WORKFLOW.md](WORKFLOW.md) §2–§3 and the skills. What belongs *here* is why the gate has this shape:
 
-### Pre-check
-1. **Look up risks** — is there a risk in `docs/brief.md` this Task touches? If so, go in knowing it before building.
-2. **Check conventions** — check the terms·rules in `docs/conventions.md` related to this Task.
-3. **Search existing code** — find related existing code to reuse, or discover it anew (Principle 3).
-
-### Write tests first
-Write tests from the AC first. With no implementation yet, the tests fail. These failing tests become the target of the implementation.
-
-That said, for cases hard to pin down with tests up front — exploratory prototypes·UI work·hardware-dependent checks — this step may be skipped. If skipped, record the reason in the Task frontmatter's `tdd_skip_reason`. The detailed judgment is handled by the skill.
-
-### Build
-Write code until the tests pass. Because you build knowing the risks and the existing code, the risky parts come out right from the start and no duplication arises. Building also **confirms the node's `role`**: a leaf, or a skeleton whose **decomposition** (its children + each child's contract clause) is recorded in the Change Log. The node is now `implemented`.
-
-### Two review points: verify (spec) then review (code)
-The cold multi-persona scrutiny runs **twice, on different things**:
-- **verify** (before code) asks *is the contract good?* — consumer-impersonation, gap-finding, coherence (does this node fill the parent; and for a skeleton, does its contract decompose cleanly into covering children — a top-down check made from the spec, before the children exist), non-expert. Spending it here is the point: a contract flaw caught before code is free.
-- **review** (after code) asks *is this code good?* — it runs the **tests** (every AC item should have a passing test) and cold-reviews **only this node's diff** (correctness · security · maintainer · breaker · test-quality). It does **not** re-ask spec questions, and it never reads the wider codebase — that bound keeps cost flat as the project grows.
-
-Both run several reviewers — who *didn't see how it was built* — in parallel as subagents, aggregate, and (on `full`) check "is it over-strict." Strength·repeat·scale come from config (`verify:` / `review:`), each round a new cold session. Detailed rules: [WORKFLOW.md](WORKFLOW.md) §3.
-
-Because reviewers are *cold* (no memory of earlier rounds — or of a review months ago), a decision once made would be re-made. So when verify/review closes, the *dropped-as-nitpick · accepted-gap* adjudications are recorded (with the reason) in the node's **Change Log**, so a later cold review — or a future revision's — doesn't re-litigate them. (A Change-Log line, not a separate gate file.)
+- **Pre-check before building** (risks · conventions · search existing code — inside `implement`). A person carries "I think I've seen this before" into every task; an agent, isolated to what it sees, doesn't — so the look-around is forced as a step (→ §8). Building with the risks and the existing code in front of you is what makes the risky parts come out right the first time and keeps duplication from arising.
+- **Tests first.** Written from the AC while there is no implementation, they fail — and become the fixed target the build must hit, instead of a moving one. Nodes that resist up-front tests (exploratory prototypes · UI · hardware-dependent checks) may skip, with the reason recorded in the Task (`tdd_skip_reason`). Because TDD is decided per *node*, one project can mix both — an unplanned strength of the tree structure.
+- **Building confirms the decomposition.** The sketched children were a hypothesis; building the node is what reconciles them against reality (keep · drop · add) and confirms its `role`, recorded in the Change Log.
+- **Two cold reviews, on different things.** verify checks the *contract* before any code exists — a flaw caught there is free; caught after building, it costs the build. review checks the *code* — the tests are the deterministic spine, and the cold reviewers read only this node's diff, which is what keeps review cost flat as the project grows. review never re-asks spec questions; verify settled those. (A third, once-only cold review runs at init on the whole decomposition — §3.)
+- **Closed decisions are remembered.** Cold reviewers have no memory of earlier rounds, so a call once made would be re-litigated forever. The dropped-as-nitpick · accepted-gap adjudications go into the node's Change Log, where any later cold round reads them.
 
 ---
 
@@ -242,23 +225,23 @@ There are several situations you start GroveSpec from. The initial prep differs 
 
 | Starting situation | What you have | How to build the tree | ref |
 |---|---|---|---|
-| Blank slate | just an idea | greenfield (drawn out in conversation) | none |
-| Rough spec | simple requirements | greenfield | none (reflected in the brief) |
-| Detailed spec | a detailed spec doc | greenfield | the spec doc |
-| Existing code only | source code | built by analyzing the code | none |
-| Existing code + docs | code + spec doc | built by analyzing the code | the spec doc |
+| Blank slate | just an idea | explore → detailed spec → all-`sketch` tree | the spec (produced at init) |
+| Rough spec | simple requirements | explore fills gaps → detailed spec → all-`sketch` tree | the spec (produced at init) |
+| Detailed spec | a detailed spec doc | fill gaps → all-`sketch` tree | the spec doc |
+| Existing code only | source code | code-to-tree → all-`done` tree | none |
+| Existing code + docs | code + spec doc | code-to-tree → all-`done` tree | the spec doc |
 
-The key — **whatever you start with, it all converges on a Task tree.** Once the tree is built, the cycle after that (§3) is the same in every case. Only the starting point differs.
+The key — **whatever you start with, it all converges on a Task tree.** Once the tree is built, the per-node cycle (§3, §6) is the same in every case. Only the starting point differs.
 
-### The tree is always built one step at a time
+### The tree is mapped whole, not grown one step at a time
 
-Even if you brought a detailed spec, you don't unfold it into a tree all at once. You build it top-down one step at a time, like greenfield. The reason is the same as §2 — bake a whole detailed spec into the tree and unverified assumptions blanket the entire tree. If an assumption turns out wrong while building the top, you have to redo the whole tree below.
+Greenfield maps the **full tree at init** — all `sketch` (structure + one-liners). The old "one node at a time" rule tried to avoid baking unverified assumptions, but created a vacuum: each node started from nothing, so the agent either exhausted the user asking for intent, or improvised. The fix isn't to avoid detail — it's to mark it as a *hypothesis*: the whole structure is sketched cheaply, then `grow` details each node into a `draft` contract and it goes through the gates (verify → implement → review) before becoming `done`. Any node that turns out wrong is revised or dropped at near-zero cost (a sketch isn't even a commitment). Writing all the *contracts* up front would be the "too much in one head" blow-up GroveSpec exists to avoid — so the contract detail stays bounded, one node per `grow`.
 
-Instead the detailed spec is kept as **ref (reference docs)**. Each time you make a Task and run the gate, you reference the relevant part of ref. That way you don't bake the whole spec in up front, yet you don't stray from the implementation the person wanted.
+The detailed spec — produced by explore or brought by the user — is kept as **ref** (reference docs). It's the record of "this is what we meant to do." When implementation diverges, the spec stays as-is; the divergence goes in the Task's Change Log.
 
 ### ref is kept as the original
 
-ref is kept exactly as it came in and is not edited. ref is the record of "this is what we originally meant to do."
+ref is kept exactly as it came in and is not edited. ref is the record of "this is what we originally meant to do." **Greenfield, GroveSpec itself *authors* `ref/spec.md` (via explore) — but once it's written and human-approved at init, it's frozen exactly like a brought-in doc: a fixed baseline, so every later build divergence shows up as a Change-Log delta against stable intent rather than being edited away. If the *intent itself* was captured wrong, that's a re-`explore` (re-state the intent), not a silent in-place edit of ref.**
 
 If building diverges from ref — leave ref as-is and record the divergence and its reason in that Task's Change Log. This keeps all three: the original intent (ref), the actual implementation (code and spec), and why they diverged (Change Log).
 
@@ -268,7 +251,7 @@ Make a location map once at the start — what's where — and you don't have to
 
 When there's existing code, build the tree from the code. Even with a spec doc alongside, look at the code first. The spec doc may have drifted from the code — stale, or not built as first planned. Code is "what actually is"; docs are "what was meant to be." So build the tree from the code, then keep the spec doc as ref and reference it only for intent or risks.
 
-This is why off-the-shelf SDD tools are weak on existing projects. With no design doc, you have to reconstruct the spec backward from the code, and in that process an AI easily fabricates things that aren't true. GroveSpec doesn't reconstruct — it searches the code as it goes (Principle 3) — so it doesn't have this problem.
+This is why off-the-shelf SDD tools are weak on existing projects. With no design doc, you have to reconstruct the spec backward from the code, and in that process an AI easily fabricates things that aren't true. GroveSpec doesn't reconstruct — it searches the code as it goes (Principle 3) — so it doesn't have this problem. And it maps the code *honestly*, all `done`, even where the structure is poor: what the mapping finds *wrong* — bugs, duplications, doc↔code disagreements, or a structure too tangled to tree cleanly — isn't forced into the tree (that would make the tree lie about the code), but parked as a draft backlog (`findings.md` for node-level, `restructuring.md` for tree-shape) that `revise` works off later.
 
 ### Paths are changeable
 
@@ -312,9 +295,9 @@ Success rides on two things.
 | Aspect | Vibe coding | GroveSpec | Off-the-shelf SDD tools |
 |---|---|---|---|
 | Spec exists | No | Yes | Yes |
-| When the spec is known | — | grow→verify→implement→review→next node | all fixed before start |
-| Where the spec lives | — | inside the cycle (keeps growing) | outside the cycle (fixed once) |
-| How far the spec leads the code | 0 (not written) | just the next step | all up front |
+| When the spec is known | — | structure at init (sketched); each contract detailed per node, gated | all fixed before start |
+| Where the spec lives | — | inside the cycle (each node gated individually) | outside the cycle (fixed once) |
+| How far the spec leads the code | 0 (not written) | the whole structure (sketched), contracts detailed as you build | all up front (frozen) |
 | Unit of work | none | one kind of Task, two roles (skeleton/feature) | epic ⊃ story (multiple kinds) |
 | How it's split | — | by entry point: skeleton + feature (components are out) | — |
 | How hierarchy is expressed | — | tree.md (parent-child) + `blocked_by` (cross-tree deps) | kind separation + separate docs |
@@ -334,7 +317,9 @@ project root/
     conventions.md         #   implementation notes (terms·common rules·global constraints)
     tasks/                 #   Task files (node concept: intent·requirements·contract·AC)
       {node}.md
-    ref/                   #   reference docs (detailed·existing specs). Originals, unchanged. May be absent
+    findings.md            #   brownfield backlog: node-level bugs·duplications·doc↔code mismatches (optional)
+    restructuring.md       #   brownfield backlog: tree-level structural debt (optional)
+    ref/                   #   the detailed spec (greenfield: explore authored it — always present) or brought-in reference docs (brownfield: if any). Frozen, unchanged. + a location map
   .claude/skills/          # ── platform (Claude) owns: the methodology skills ──
     grovespec-init/  grovespec-grow/  grovespec-verify/  grovespec-implement/  grovespec-review/  grovespec-fix/  grovespec-revise/
   .grovespec/              # ── the tool owns: config·templates only ──

@@ -1,43 +1,51 @@
 ---
 name: grovespec-grow
-description: Grows the GroveSpec tree by one node — writes the *draft spec* for ONE new node (a child of a node that's already `done`); no code, and the new node's own children are decided later (at implement), not here. Use when the user wants to "write the next node / write the next spec / unfold this / grow the tree further / add a child / grovespec grow". For verifying a draft use grovespec-verify; for code use grovespec-implement; to change a done node use grovespec-revise.
+description: Details ONE node's spec from a sketch into a full draft (sketch → draft) — writes its Contract·AC from the reference spec; no code. The per-node detailing step of the initial build (init lays the whole tree out as sketches; grow details each one just before it's verified), AND the tool for LATER expansion (add a brand-new node beyond the spec). Use when the user wants to "detail the next node / write the next spec / flesh out this sketch / add a new node / expand the tree / grovespec grow". For verifying the draft use grovespec-verify; for code use grovespec-implement; to change a done node use grovespec-revise.
 ---
 
 # grovespec-grow
 
-Writing **one new node's draft spec** — a child of a node that's already `done`. No code, concept only. (Verifying the draft is `grovespec-verify`; building it is `grovespec-implement`.)
+Turning **one node's `sketch` into a full `draft`** — writing its Contract·AC from the reference spec, no code. (Verifying the draft is `grovespec-verify`; building it is `grovespec-implement`.)
+
+> **Two uses, same action (sketch → draft):**
+> - **Initial build (the common case).** `grovespec-init` laid the whole tree out as `sketch` nodes (structure only), and `verify`-tree cold-vetted that decomposition — so the structure you detail into is already approved. grow details the next sketch — its full contract — just before it's verified. The sketch + the detailed spec in `ref/` ground it, so this is *not* invention from a vacuum.
+> - **Later expansion.** A node the original spec didn't cover (a new requirement, something `implement` revealed). Under a **`done`** parent, grow *creates* it as a `draft` directly. If it belongs under a parent **not built yet** (still `sketch`/`draft`), add it as a **`sketch`** there instead and let that parent's own `implement` reconcile it — don't draft a node under an unbuilt parent (`grovespec check` blocks it anyway).
 
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language. These files are English; your output is not.
 
 > **Decisions: recommend + leave a way out.** When you ask the user to decide (an approach, a contract choice…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (the AskUserQuestion tool's *Other*, or an explicit free-form choice in an inline list). Don't force a closed pick.
 
-## One principle: one node, only under a done parent
-Grow exactly **one** node — a child its `done` parent already planned (in that parent's decomposition). **Don't define this node's *own* children here**; whether it needs any, and which, is decided when *this* node is implemented. Going deeper before a node is built bakes a hypothesis you'll likely redo.
+## One principle: one node, under a done parent
+Detail exactly **one** node, and only when its parent is **`done`** (so you write its contract against a real, built parent, not a guess). **Don't (re)define this node's *own* children here** — greenfield they're already sketched in the tree (from init); their contracts get detailed later, each after *this* node is `done`. (For an expansion node with no sketched children, whether it needs any is confirmed at *its* implement, as a brownfield-style decomposition.)
 
 ## Flow
 
-### 1. Pick what to grow
-Grow a child of a node that is **`done`**. A done node records its **decomposition** — the children it needs + each child's role and the Contract clause it owns — in its Change Log; `grovespec check` flags done skeletons that still have children to grow.
-- **The parent must be `done`** — confirm it mechanically (`grovespec check`, or read the parent's `status`). **Never grow under a parent that isn't done** — that's bottom-up drift, the exact failure this prevents.
-- Pick the next ungrown child from the parent's decomposition (or the one the user points at). It is *not* in `tree.md` yet — this step creates it.
+### 1. Pick what to detail
+- **Initial build**: the next `sketch` node whose parent is `done` — `grovespec check` lists it (`sketch → grow (detail → draft)`). Confirm the parent is `done` mechanically; **never detail under a non-`done` parent** (bottom-up drift).
+- **Expansion**: the user points at a new capability not in the tree. Create a new Task (next `TASK-N`) under a `done` parent and add its id to `tree.md`. (Belongs under a not-yet-`done` parent? Add it as a `sketch`, not a draft — see the callout above.)
 
 ### 2. Read only what you need (thin)
-- The parent's **Contract** + the parent's **decomposition entry for this child** (its role · which Contract clause it must fill).
-- The risks in `brief.md` this node touches; the relevant terms·rules in `conventions.md`.
+- **The node's sketch** (its one-line responsibility + rough I/O) and **the relevant part of the detailed spec in `ref/`** — the spec is the intent source the full contract is written from. (Use the ref location map so you read only the relevant section.)
+- The parent's **Contract** + this node's place in it (which clause it fills).
+- The risks in `brief.md` this node touches; the terms·rules in `conventions.md`.
 
 Don't pile up a long context. The truth is on disk; re-read when you need it.
 
-### 3. Write the draft (concept only)
-Copy `.grovespec/templates/task.md`, fill it in, set `id` to the new `TASK-N`, `status: draft`. Format is fixed by `FORMATS.md` (frontmatter + Overview·Requirements·**Contract**·AC). Write the *content* in `config.language`.
-- **The Contract matters most**: precise enough that another node can rely on it alone, without seeing the internals (what it takes·gives·empty cases) — and it must fill the clause the parent's decomposition assigned to this child.
-- **`role` is a hypothesis here** (skeleton if it'll likely hold children, feature if a leaf). It's **confirmed at implement**, not pinned now — and you do *not* define this node's children here.
-- **`tdd`**: default `true` (tests come first at implement). Set `false` only for nodes that resist up-front tests (exploratory prototype · UI · hardware-dependent), and then `tdd_skip_reason` is required.
-- **`blocked_by`** = the shared/cross-tree nodes this one consumes (often `[]`); *not* the parent (that's in tree.md).
-- **Measurable NFR targets** (latency·throughput·error-rate, where they apply) go in the AC as checkable items — don't leave them implicit.
-- **Add this node's id to `tree.md`**, indented under its parent — it enters the tree now, at `draft`.
+### 3. Write the draft (concept only) — sketch → draft
+Fill the Task out fully: keep the `id`, set `status: draft`. Format is fixed by `FORMATS.md` (Overview·Requirements·**Contract**·AC). Write the *content* in `config.language`, from the ref spec + the sketch.
+- **The Contract matters most**: precise enough that another node can rely on it alone, without seeing the internals (what it takes·gives·empty cases) — and it must fill the clause the parent's contract assigned this node. Replace the sketch's rough I/O with the real contract.
+- **Stay true to the ref spec.** This is where the spec's intent becomes a contract. If you must diverge from the spec, note it (it's recorded in the Change Log at implement, per `ref-docs.md`).
+- **`role` is a hypothesis** (skeleton if it'll hold children — greenfield, those children are already sketched under it; feature if a leaf). Confirmed at implement.
+- **If it's a skeleton, it still builds *its own* structural glue** — capture (in AC/Subtasks) what *this* node assembles: the container/dispatch its children slot into. A draft whose AC/Subtasks are *only* "the children" means implement builds nothing → verify will FAIL it. (The **root**: when you detail its sketch, its deliverable is the base env + an empty runnable shell — write its AC as a smoke test + a base-env Subtask; the stack is chosen at the root's implement. → METHODOLOGY "Skeleton role".)
+- **Mark the spec's gaps** as unchecked AC prefixed `(gap)` (`FORMATS.md`) — don't invent behavior the spec doesn't state. verify probes each in-scope gap: it gets resolved with the user, or survives as an adjudicated `accepted-gap`.
+- **`tdd`**: default `true`. Set `false` only for nodes that resist up-front tests (exploratory prototype · UI · hardware-dependent), and then `tdd_skip_reason` is required.
+- **`blocked_by`** = the shared/cross-tree nodes this one consumes (often `[]`); *not* the parent (that's in tree.md). (Already set on the sketch — confirm it.)
+- **Measurable NFR targets** (latency·throughput·error-rate) go in the AC as checkable items.
 
 ### 4. Done → verify next
-The node's Task now exists as concept (`status: draft`) and is in `tree.md`. **Next is `grovespec-verify <this node>`** — the cold multi-persona check of the draft + human approval (`draft` → `approved`). grow itself does **no** review and sets **no** approval; that is verify's job, kept separate so the reviewers stay cold.
+The node is now a full `draft`. **Next is `grovespec-verify <this node>`** — the cold multi-persona check of the draft + human approval (`draft` → `approved`). grow does **no** review and sets **no** approval; that is verify's job, kept separate so the reviewers stay cold.
 
 ## When it's done
-One new node's draft is written (`draft`) and placed in `tree.md`. The expensive steps follow, one at a time: `grovespec-verify` → (human approve → `approved`) → `grovespec-implement` → `grovespec-review` → (human confirm → `done`). Only once *this* node is `done` are *its* children grown.
+One node's `sketch` is now a full `draft` (or, for expansion, a new `draft` exists in `tree.md`). The expensive steps follow, one at a time: `grovespec-verify` → (approve → `approved`) → `grovespec-implement` → `grovespec-review` → (confirm → `done`). Only once *this* node is `done` are *its* (already-sketched) children detailed.
+
+> **Recommend a new session for the next step** (`grovespec-verify` this draft). The agent that just wrote the draft shouldn't also orchestrate its cold review — start it fresh, clean bounded context (WORKFLOW §5).

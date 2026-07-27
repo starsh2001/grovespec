@@ -1,0 +1,5 @@
+# Store everything normalized.
+# The runtime's own LF requirement is NOT here — it lives in
+# .grovespec/.gitattributes, so it travels with the bundle when it's copied into
+# a project instead of having to be added to that project's root file.
+* text=auto

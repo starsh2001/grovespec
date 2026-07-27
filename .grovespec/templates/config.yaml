@@ -12,6 +12,8 @@ paths:
   conventions: docs/conventions.md
   tasks: docs/tasks/
   ref: docs/ref/
+  findings: docs/findings.md          # brownfield backlog — node-level bugs·duplications·doc↔code mismatches. Optional: created only if non-empty.
+  restructuring: docs/restructuring.md # brownfield backlog — tree-level structural debt. Optional: created only if non-empty.
   src: src/                 # where implemented code goes
   tests: tests/             # where tests go
   review: .grovespec/review/  # cold-review state (<id>.verify.yaml + <id>.review.yaml per node)
@@ -20,7 +22,7 @@ paths:
 #   verify = the SPEC (the draft) — code not written yet.
 #   review = the CODE (this node's DIFF only) + the test results.
 
-# verify — spec cold-review (multi-persona on the draft). Scales to how far the contract reaches.
+# verify — cold-review: a node's draft spec (C1–C6) AND, once at init, the whole sketch tree's decomposition (D1–D5). Same scale/strength/models.
 verify:
   strength: 2        # how far to block: 1=Critical · 2=+Should Fix · 3=+Nice to Have
   max_rounds: 5
@@ -40,7 +42,8 @@ verify:
 
 # review — code cold-review on THIS NODE'S DIFF only (never the whole codebase) + tests.
 review:
-  test: ""           # command to run this project's tests (e.g. "pytest -q", "npm test"). Empty → review infers/asks.
+  test: ""           # command to run this project's tests (e.g. "pytest -q", "npm test"). NOT asked at init — auto-detected:
+                     #   brownfield: filled from the project at init · greenfield: empty until the first review derives it from the stack (asked only if undeterminable).
   strength: 2
   max_rounds: 5
   # Reviewer model — OPTIONAL. Omit → every reviewer inherits the session model (the default: no extra cost, no forced Opus).

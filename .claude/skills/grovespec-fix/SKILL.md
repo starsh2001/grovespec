@@ -22,7 +22,9 @@ Apply each open issue.
 - Keep fixes to exactly what the issues call for — don't refactor beyond them; that just enlarges the next diff to review.
 
 ### 3. Re-review
-Set the Task `status: fixed`, then **re-run `grovespec-review`** on the same node — it reuses `<id>.review.yaml`, runs the tests again, and spawns a *fresh* cold round, so the fix is checked by cold eyes (not the fixer). The `reviewed ⇄ fixed` loop continues until a clean terminal pass → `done`.
+**Commit as `TASK-N: fix — <summary>`** (the `TASK-N:` prefix keeps the node's diff boundary mechanical — `FORMATS.md`). Set the Task `status: fixed`, then **re-run `grovespec-review`** on the same node — it reuses `<id>.review.yaml`, runs the tests again, and spawns a *fresh* cold round, so the fix is checked by cold eyes (not the fixer). The `reviewed ⇄ fixed` loop continues until a clean terminal pass → `done`.
 
 ## When it's done
 The open issues are cleared, `status: fixed`, and `grovespec-review` is running again. fix never marks `done` itself — only review's clean terminal pass + human confirm does.
+
+> **Recommend a new session to re-run `grovespec-review`** (or continue in-session if the fix was tiny). review spawns fresh cold reviewers either way, but a clean orchestrator keeps context bounded across the `reviewed ⇄ fixed` loop (WORKFLOW §5).

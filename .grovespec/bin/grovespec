@@ -4,6 +4,7 @@
 #   status     each node's status + which are unblocked, + next
 #   impact ID  who a contract change on ID reaches (the consumer set / blast radius)
 #   tree       the id-only tree.md rendered with names + status
+#   version    the installed runtime's version (.grovespec/VERSION)
 #
 # No runtime beyond bash + POSIX tools (grep/awk/sed/sort). Ships inside .grovespec/ — no install.
 # Format SoT: .grovespec/schema   Paths: .grovespec/config.yaml
@@ -39,7 +40,8 @@ TREE=$(cfg tree  "docs/tree.md")
 BRIEF=$(cfg brief "docs/brief.md")
 CONV=$(cfg conventions "docs/conventions.md")
 SRC=$(cfg src "src/")
-TASKS=${TASKS%/}; SRC=${SRC%/}   # drop trailing slash for clean paths
+REVIEW=$(cfg review ".grovespec/review/")
+TASKS=${TASKS%/}; SRC=${SRC%/}; REVIEW=${REVIEW%/}   # drop trailing slash for clean paths
 
 # ---- schema reader ----
 sch()   { grep -E "^$1:" "$SCHEMA" 2>/dev/null | head -1 | sed -E "s/^$1:[[:space:]]*//"; }
@@ -134,8 +136,8 @@ cmd_validate() {
       for b in $(blocked_ids "$TASKS/$t.md"); do
         [ "$(status_of "$b")" != "done" ] && prob "$t is done but blocked_by $b is $(status_of "$b")"
       done
-      # (removed) a done skeleton may legitimately have 0 children in tree.md yet —
-      # children are grown one at a time AFTER the skeleton is done (tree.md = current reality).
+      # (removed) a skeleton's child count isn't a validate concern — greenfield they're
+      # sketched from init, but implement may drop/add them (tree.md = current reality).
     fi
   done
 
@@ -183,6 +185,24 @@ cmd_validate() {
   else echo "✗ validate: $PROBLEMS problem(s)"; return 1; fi
 }
 
+# ===================== decomposition gate =====================
+# Greenfield: sketch nodes exist but the tree hasn't passed its cold verify (verify-tree) →
+# node work (grow/verify/implement) must wait. Same condition verify's auto-routing uses.
+has_sketch() {
+  local f
+  for f in $(task_files); do [ "$(fm "$f" status)" = "sketch" ] && return 0; done
+  return 1
+}
+tree_gate_pending() {
+  has_sketch || return 1
+  local tv="$REVIEW/tree.verify.yaml" st
+  [ -f "$tv" ] || return 0
+  st=$(grep -E '^status:' "$tv" 2>/dev/null | head -1 \
+       | sed -E 's/^status:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]*$//')
+  [ "$st" = "passed" ] && return 1 || return 0
+}
+GATE_MSG="decomposition gate pending — sketch nodes exist but the tree has not passed its cold verify. Run grovespec-verify on the TREE first (fix → human approval); node work (grow/verify/implement) starts after that."
+
 # ===================== status =====================
 unblocked() { # $1=tid -> "yes"/"no:reason"
   local p b
@@ -195,33 +215,41 @@ unblocked() { # $1=tid -> "yes"/"no:reason"
 }
 next_action() { # $1=tid -> the next skill to run on this (unblocked) node, from its status
   case "$(status_of "$1")" in
+    sketch)      echo "grow (detail → draft)" ;;
     draft)       echo "verify" ;;
     approved)    echo "implement" ;;
     implemented) echo "review" ;;
     reviewed)    echo "fix (if issues) else confirm → done" ;;
     fixed)       echo "review (re-run)" ;;
-    done)        [ "$(role_of "$1")" = "skeleton" ] && echo "grow (children)" || echo "—" ;;
+    done)        [ "$(role_of "$1")" = "skeleton" ] && echo "— (children already sketched; grow to add beyond the spec)" || echo "—" ;;
     *)           echo "?" ;;
   esac
 }
 cmd_status() {
-  local t st ub rl nexts=""
+  local t st ub rl nexts="" gate=""
+  tree_gate_pending && { gate=1; echo "! $GATE_MSG"; }
   for t in $(tree_ids); do
     st=$(status_of "$t"); ub=$(unblocked "$t"); rl=$(role_of "$t")
     if [ "$st" = "done" ]; then
-      if [ "$rl" = "skeleton" ]; then printf '%-8s done        → grow (children, if its spec calls for more)\n' "$t"
+      if [ "$rl" = "skeleton" ]; then printf '%-8s done        (children already sketched → work them; grow only to add beyond the spec)\n' "$t"
       else printf '%-8s done\n' "$t"; fi
+    elif [ -n "$gate" ]; then printf '%-8s %-12s (awaiting the tree gate)\n' "$t" "$st"
     elif [ "$ub" = "yes" ]; then printf '%-8s %-12s → %s\n' "$t" "$st" "$(next_action "$t")"; nexts="$nexts $t"
     else printf '%-8s %-12s (%s)\n' "$t" "$st" "${ub#no:}"
     fi
   done
-  [ -n "$nexts" ] && echo "next:$nexts"
+  if [ -n "$gate" ]; then echo "next: grovespec-verify the tree (the decomposition gate)"
+  else [ -n "$nexts" ] && echo "next:$nexts"; fi
 }
 
 # ===================== check (the top-down gate) =====================
 # check TASK-N -> is this node ready to work? (exit 0 yes / 1 no). check (no arg) -> list ready nodes.
 cmd_check() {
   local n="${1:-}" t any="" doneskel="" ub
+  if tree_gate_pending; then
+    if [ -z "$n" ]; then echo "✗ $GATE_MSG"; else echo "✗ $n: $GATE_MSG"; fi
+    return 1
+  fi
   if [ -z "$n" ]; then
     echo "ready to work now (top-down):"
     for t in $(tree_ids); do
@@ -232,7 +260,7 @@ cmd_check() {
       if [ "$(unblocked "$t")" = "yes" ]; then printf '  %-8s %-12s → %s\n' "$t" "$(status_of "$t")" "$(next_action "$t")"; any=1; fi
     done
     [ -z "$any" ] && echo "  (none — every non-done node is blocked)"
-    [ -n "$doneskel" ] && echo "  + done skeletons may have children left to grow — see 'grovespec tree' / each skeleton's decomposition"
+    [ -n "$doneskel" ] && echo "  + done skeletons: their children are already sketched (work them above); 'grow' only adds children beyond the spec"
     return 0
   fi
   [ -f "$TASKS/$n.md" ] || { echo "✗ $n: no task file"; return 2; }
@@ -272,6 +300,15 @@ cmd_locale() {
   echo "$l" | sed 's/[-_].*//' | tr 'A-Z' 'a-z'     # ko-KR → ko
 }
 
+# ===================== version =====================
+# The installed runtime's version (.grovespec/VERSION). A project carries a COPY of the
+# skills + .grovespec/, so compare this against the distribution repo before trusting an old install.
+cmd_version() {
+  if   [ -f "$ROOT/.grovespec/VERSION" ]; then cat "$ROOT/.grovespec/VERSION"
+  elif [ -f "$SCRIPT_DIR/../VERSION" ];   then cat "$SCRIPT_DIR/../VERSION"
+  else echo "(no VERSION file)"; return 1; fi
+}
+
 # ===================== impact =====================
 cmd_impact() {
   local n="${1:-}"
@@ -288,7 +325,7 @@ cmd_impact() {
       [ "$b" = "$n" ] && echo "  consumer  $tid  $(name_of "$tid")"
     done
   done
-  echo "  -- hint (name appears in code/specs — verify) --"
+  echo "  -- hint: name-grep only (authoritative = the node's exported symbols, grepped from its code — see grovespec-revise) --"
   grep -rln -- "$(name_of "$n")" "$SRC" "$TASKS" 2>/dev/null \
     | grep -v "/$n\.md$" | sed 's/^/  /' || true
 }
@@ -310,5 +347,6 @@ case "${1:-}" in
   locale)   cmd_locale ;;
   impact)   shift; cmd_impact "${1:-}" ;;
   tree)     cmd_tree ;;
-  *) echo "grovespec — validate | status | check [TASK-N] | lang | locale | impact TASK-N | tree"; exit 2 ;;
+  version)  cmd_version ;;
+  *) echo "grovespec — validate | status | check [TASK-N] | lang | locale | impact TASK-N | tree | version"; exit 2 ;;
 esac
