@@ -50,4 +50,6 @@ For each node, fill the Task **thinly**, `status: sketch`:
 - **conventions.md**: if the spec states cross-cutting rules (all amounts whole-won · every request authenticated · key terms), seed them now.
 
 ## When done
-Return to `grovespec-init`'s flow — the sketch tree now goes through the **decomposition gate**: `grovespec-verify` on the tree (`target_type: tree`) cold-checks the whole decomposition (D1–D5: scope coverage · system completeness · actor closure · boundaries · depth) → fix → human approves the vetted tree. The sketch tree is a hypothesis, and this is its cold review — exactly as a node's draft gets one. *Then* the per-node build runs top-down: `grovespec-grow` details the next sketch → `verify` (spec) → `implement` → `review` → `done`.
+Return to `grovespec-init`'s flow — the sketch tree now goes through the **decomposition gate**:
+- `grovespec-verify` on the tree (`target_type: tree`) cold-checks the whole decomposition (D1–D5: scope coverage · system completeness · actor closure · boundaries · depth) → fix → human approves the vetted tree.
+- *Then* the per-node build runs top-down: `grovespec-grow` details the next sketch → `verify` (spec) → `implement` → `review` → `done`.

@@ -8,7 +8,7 @@ tdd: true                  # true | false
 tdd_skip_reason: ""        # required when tdd: false
 ---
 
-<!-- Headers below are FIXED (the parser contract). Write the CONTENT in the project's language (config.language). -->
+<!-- Headers below are FIXED (the parser contract). Write the CONTENT in the project's language (config.language) — plain words, no coined terms, readable in one pass by someone new to the project. This file is read by a person and an agent alike (→ FORMATS.md "How the prose is written"). -->
 
 ## Overview
 {What this node is, and why. 2-3 sentences.}
@@ -30,4 +30,4 @@ tdd_skip_reason: ""        # required when tdd: false
 
 ## Change Log
 <!-- Also record review outcomes + any dropped-as-nitpick / accepted-gap adjudications (with the reason) here, so a future cold review doesn't re-litigate them. For a skeleton, record the decomposition here too: which children it needs + which Contract clause each child owns. -->
-- {YYYY-MM-DD} — {what changed and why, conceptually. Code diffs live in git.}
+- {YYYY-MM-DD} — {what changed and why, in one plain sentence a newcomer can follow. Code diffs live in git.}

@@ -5,7 +5,9 @@
 
 ## Big principles
 - **Code is the truth.** Even with docs present, look at the code first (docs can be stale — doc handling is in `ref-docs.md`).
-- **Be honest to the real structure — even when it's ugly.** Don't invent an intermediate layer the code doesn't have. If the code *resists* a clean tree (no clear entry point · a god-module doing everything · a circular dependency · dead code), **map it as-is anyway — never fabricate a tidy hierarchy it lacks.** A tree that lies about the code is the drift GroveSpec exists to stop; every later task inherits the lie. Record the structural problem in `restructuring.md` (step 8) instead — the tree stays honest, the fix-direction isn't lost.
+- **Be honest to the real structure — even when it's ugly.** Don't invent an intermediate layer the code doesn't have.
+  - If the code *resists* a clean tree (no clear entry point · a god-module doing everything · a circular dependency · dead code), **map it as-is anyway — never fabricate a tidy hierarchy it lacks.** Every later task would inherit the lie.
+  - Record the structural problem in `restructuring.md` (step 8) instead — the tree stays honest, the fix-direction isn't lost.
 - **Uncertain → mark it as a gap.** Where the code doesn't pin down behavior, don't fill it with a guess — mark it (leave the AC unchecked).
 - **Map reality, park the defects.** The tree maps what *exists* (all `done`). What's *wrong with* it — bugs · duplications · doc↔code disagreements (node-level), or structural problems (tree-level) — does **not** go in the tree; it's parked as a draft backlog (`findings.md` · `restructuring.md`) and worked off later by `grovespec-revise` (step 8). A backlog gets actioned; a note buried in brief risks gets lost.
 - **Greenfield's "top layer + hypothesis" doesn't apply here.** That rule is about not pre-baking what's *not built yet*. Code is already-built, verified structure, so map it *as-is* (all `done`). If the code is huge, map from the top and dig deeper into a region when you work on it — the reason is *cost·need*, not lack of verification.

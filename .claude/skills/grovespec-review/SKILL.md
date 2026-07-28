@@ -16,7 +16,9 @@ Two things, both bounded to **this one node**, so cost never scales with the cod
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language (the reviewers' findings too). These files are English; your output is not.
 
 ## What it takes in
-- **the node** — *if none is named*, take an `implemented` or `fixed` node `grovespec check` reports ready (next step = review). What you review: its **diff** — mechanically: everything since the parent of this cycle's first `TASK-N:` commit (implement/fix each end in one — `FORMATS.md`), plus any uncommitted changes, limited to this node's files; a cycle starts when the node leaves `approved`, and a `revise` reopening starts a new one — + its **AC·Contract** (criteria) + the **test results**.
+- **the node** — *if none is named*, take an `implemented` or `fixed` node `grovespec check` reports ready (next step = review).
+- **what you review** — its **diff** + its **AC·Contract** (the criteria) + the **test results**.
+  - *The diff, mechanically*: everything since the parent of this cycle's first `TASK-N:` commit (implement/fix each end in one — `FORMATS.md`), plus any uncommitted changes, limited to this node's files. A cycle starts when the node leaves `approved`; a `revise` reopening starts a new one.
 - `test` command + `strength`·`max_rounds`·`scale` from `.grovespec/config.yaml` `review:` (overridable per node).
 
 > **Where it runs (the invocation contract).** Run grovespec-review in your **main Claude Code session** — it spawns the cold reviewers as **subagents**. **Never run a grovespec skill *as* a subagent** — then it can't spawn reviewers and silently degrades to a non-cold self-check.
@@ -25,7 +27,10 @@ Two things, both bounded to **this one node**, so cost never scales with the cod
 `.grovespec/review/<id>.review.yaml` (template `review-state.yaml`, `target_type: result`). Separate from verify's `<id>.verify.yaml` — they never collide.
 
 ## 1. Run the tests (the spine)
-Run `config.review.test`. **Empty?** (greenfield leaves it empty at init — there was no stack yet) → **derive it from the stack/project** (`pytest` for Python, `npm test`/`node --test` for Node, `cargo test`, a `Makefile` target, …), and **write it back to `config.review.test`** so later reviews reuse it. **Ask the human only if you genuinely can't tell** (no clear runner, or several equally-plausible ones) — and then as a *"이게 맞아?"* confirm with your best guess, never a blank "what's your command?". Collect pass/fail per test and **map them to the AC**: every AC item should have a passing test (items marked `(gap)` are excluded — deliberately undefined behavior, `FORMATS.md`). Measurable NFR targets in the AC (e.g. `p95 < 200ms`) are checked here too; a target with **no runnable check** (no bench/load tooling behind the test command) is marked **unverified** and surfaced at the human confirm — never silently counted as met.
+Run `config.review.test`.
+- **Empty?** (greenfield leaves it empty at init — there was no stack yet) → **derive it from the stack/project** (`pytest` for Python, `npm test`/`node --test` for Node, `cargo test`, a `Makefile` target, …) and **write it back to `config.review.test`** so later reviews reuse it. **Ask the human only if you genuinely can't tell** (no clear runner, or several equally-plausible ones) — and then as a *"이게 맞아?"* confirm with your best guess, never a blank "what's your command?".
+- **Map the results to the AC.** Collect pass/fail per test; every AC item should have a passing test (items marked `(gap)` are excluded — deliberately undefined behavior, `FORMATS.md`).
+- **Measurable NFR targets** in the AC (e.g. `p95 < 200ms`) are checked here too. A target with **no runnable check** (no bench/load tooling behind the test command) is marked **unverified** and surfaced at the human confirm — never silently counted as met.
 - A **failed test** is a `critical` issue (the implementation doesn't meet its AC) → straight to the verdict (fix), no cold round needed yet.
 - **`tdd: false`** node (no tests): note it; this review leans entirely on the cold diff review below — the *only* gate available — and the unmet AC items stay unchecked.
 

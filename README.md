@@ -39,7 +39,7 @@ One per step of a node's life: `sketch → draft → approved → implemented �
 |---|---|
 | `grovespec-init` | First-time setup (once). From whatever you have — idea, spec, or existing code — produces the brief, the detailed spec, and the whole tree: greenfield as `sketch`, brownfield as `done`. |
 | `grovespec-grow` | Detail one node's *sketch* into a full *draft* spec (no code), from the reference spec — the per-node step of the initial build, and the tool for later expansion. |
-| `grovespec-verify` | Cold, multi-role, parallel review of the **draft spec** → human approve (`draft → approved`). The anti-rubber-stamp gate, spent where a flaw is cheapest. |
+| `grovespec-verify` | Cold, multi-role, parallel review of the **draft spec** → human approve (`draft → approved`). The anti-rubber-stamp gate, spent where a flaw is cheapest. At `full` it also prunes entries this node made stale from `conventions.md` — only `implement` adds there, so nothing else would ever remove. |
 | `grovespec-implement` | Turn an approved spec into code: pre-check → tests first → code → confirm the node's decomposition (`approved → implemented`). |
 | `grovespec-review` | Run the **tests** + cold-review **only this node's diff** (not the codebase) → confirmed issue list (`implemented → reviewed`). |
 | `grovespec-fix` | Apply the review's issues to this node's code → re-review (`reviewed ⇄ fixed`), until clean → `done`. |
@@ -104,7 +104,7 @@ GroveSpec stands on earlier spec-driven work, with thanks. Its *explore* stance 
 
 ## Status
 
-**v0.1.0 — early, partly proven.** The cold-review engine is the piece with real evidence behind it: a controlled cold-spawn multi-reviewer run on a planted-flaw sample caught the planted flaws, emergent ones, *and* flaws its own fixes introduced (no false convergence) — and the brownfield mapping (code → tree + contracts) was validated on a sample too. What has **not** been run end-to-end is the greenfield full cycle (grow → verify → implement → review → done) on a real project, or init on a large codebase. Expect rough edges there; the skills and formats may still shift before 1.0.
+**v0.2.0 — early, partly proven.** The cold-review engine is the piece with real evidence behind it: a controlled cold-spawn multi-reviewer run on a planted-flaw sample caught the planted flaws, emergent ones, *and* flaws its own fixes introduced (no false convergence) — and the brownfield mapping (code → tree + contracts) was validated on a sample too. What has **not** been run end-to-end is the greenfield full cycle (grow → verify → implement → review → done) on a real project, or init on a large codebase. Expect rough edges there; the skills and formats may still shift before 1.0.
 
 ## License and the name
 

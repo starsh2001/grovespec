@@ -6,6 +6,13 @@ So that tools can read these files and process them mechanically, **the format i
 
 > Headers and field names are fixed and English. The *content* (prose) is written in the project's language (`config.language`).
 
+> **How the prose is written.** Every artifact here is read by a **person and an agent, from the same file** — so write for a competent person who does *not* know this project and is reading it months later. This is the same bar the `non-expert` reviewer applies (C6), so writing to it is what gets a spec through:
+> - **Plainest exact word wins.** Don't coin terms, labels, or tier names — say the thing. A term you genuinely can't avoid goes in `conventions.md` *Glossary*, and then it's always the same word (search finds letters, not meanings).
+> - **No filler.** Cut anything that survives deletion — throat-clearing, a restated header, "it is important to note".
+> - **Readable in one pass.** If a line needs a second read to parse, split it or cut it. Applies to the running record too: a Change-Log entry says *what changed and why* in a sentence, not a transcript.
+
+
+
 ## tasks/TASK-N.md
 YAML frontmatter + fixed sections.
 
@@ -42,7 +49,7 @@ A greenfield node is born at `sketch` (the whole tree, mapped by *init* from the
 `Overview` · `Requirements` · `Contract` · `AC` · `Subtasks` · `Change Log`
 - `Contract`: states the contract (takes·gives·guarantees), **not** the mechanism; may carry **deferral markers** `[→ child/deferred: <what>]` for detail intentionally left to a child or to implement — correct delegation, not a gap (verify treats a marked deferral as resolved; markers seed grow).
 - `AC`·`Subtasks`: `- [ ]` / `- [x]` checkboxes. An AC item prefixed **`(gap)`** marks behavior *deliberately left undefined* (the spec/code is silent there): *verify* probes it (resolved into behavior, or adjudicated `accepted-gap` — then the item stays, and the Change-Log adjudication stops re-litigation); *implement* builds nothing for it; *review* excludes it from the every-AC-has-a-test mapping. A later *revise* turns a gap into behavior.
-- `Change Log`: `- YYYY-MM-DD — text` (ISO date).
+- `Change Log`: `- YYYY-MM-DD — text` (ISO date). `text` = **what changed and why, in one plain sentence** a newcomer can follow — not a transcript of the review. Written at every step that touches the node (`verify` approve · `implement` decomposition · `review` done · each `revise`), so it is the running record a person reads to understand why the node is the way it is: the prose rule above applies to it as much as to the Contract.
 
 ## tree.md
 2-space indented list. Items are `id` only. Indent depth = tree depth.

@@ -1,8 +1,15 @@
 # setup — the fixed setup interview (init asks these, verbatim)
 
-> grovespec-init reads this and asks **exactly these questions, in this order, every time it runs** — first-time setup AND re-invocation (reconfigure). **Do not improvise new questions, reorder, or skip any.** A *fixed* interview is the point: every project gets configured the same way, and **nothing is decided silently**. Ask with the **AskUserQuestion** tool (discrete options + a free-form *Other*); put the **(추천)** default first with a one-line why; write each answer to `.grovespec/config.yaml`. Q1 sets the language — ask Q1 in the *detected* language, the rest in the chosen `config.language`. You may batch Q2–Q3 in one AskUserQuestion call. (Only **three** questions are asked — the test command is **not** one; see the note after Q3 for why.)
+> grovespec-init reads this and asks **exactly these questions, in this order, every time it runs** — first-time setup AND re-invocation (reconfigure). **Do not improvise new questions, reorder, or skip any.** A *fixed* interview is the point: every project gets configured the same way, and **nothing is decided silently**.
+> - Ask with the **AskUserQuestion** tool (discrete options + a free-form *Other*); put the **(추천)** default first with a one-line why.
+> - Write each answer to `.grovespec/config.yaml`.
+> - **Q1 sets the language** — ask Q1 in the *detected* language, the rest in the chosen `config.language`. You may batch Q2–Q3 in one AskUserQuestion call.
+> - Only **three** questions are asked; the test command is **not** one (see the note after Q3 for why).
 
-> **This is a FIXED questionnaire — reproduce the strings, do NOT compose them.** Each question below gives an **ASK** block (the exact words, with the plain-language explanation already built in — written for someone who's never seen the workflow and may not code) and **Options** (exact labels + descriptions). Put the **ASK** text into the AskUserQuestion `question` field and use the **Options** as given. There is **no** separate preamble to write and **no** rephrasing — the explanation lives inside the ASK text, so it shows with the buttons (don't also write a chat preamble; that's what made one question short and another a wall).
+> **This is a FIXED questionnaire — reproduce the strings, do NOT compose them.**
+> - Each question below gives an **ASK** block (the exact words, with the plain-language explanation already built in — written for someone who's never seen the workflow and may not code) and **Options** (exact labels + descriptions).
+> - Put the **ASK** text into the AskUserQuestion `question` field and use the **Options** as given.
+> - There is **no** separate preamble to write and **no** rephrasing — the explanation lives inside the ASK text, so it shows with the buttons. Don't also write a chat preamble.
 > - **If `config.language` is the language these are written in (Korean), copy them character-for-character.** Do NOT paraphrase, summarize, retype from memory, add words (don't turn 「리뷰어 모델」 into 「리뷰어 AI 모델」), or "fix" them. Re-typing instead of copying is exactly how garbled Korean appears — `섞을까요`→"섯을까요", `비싸요`→"비주요", `어느`→"어는". **Copy, don't compose.**
 > - **Only when `config.language` differs do you translate** — faithfully, in correct natural prose, keeping the same meaning and structure.
 > - **`Write:`** lines are instructions to *you* (how to fill config) — never shown to the user. (Q1 — language — is the one you compose, since it depends on the detected language.)

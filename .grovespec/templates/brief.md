@@ -2,7 +2,7 @@
 name: "{project name}"
 ---
 
-<!-- Headers are fixed. Write the content in the project's language (config.language). -->
+<!-- Headers are fixed. Write the content in the project's language (config.language) — plain words, no coined terms; a person should read this at a glance and say "yes, that's right" (→ FORMATS.md "How the prose is written"). -->
 
 ## Direction
 {What you're building, and why. 2-3 sentences.}
