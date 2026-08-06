@@ -43,6 +43,7 @@ So that another node can use this one *without seeing the internals*:
 
 ### 5. Fill the meta
 - `status: done` — it's already-working code.
+- `origin: mapped` — this node was mapped, not gated; `validate`'s status↔evidence checks exempt it (until a later revise sends it through a real gate).
 - `role`: skeleton if it holds children, feature if it's actual behavior.
 - `blocked_by`: the number of a shared node it uses.
 - `tdd`: existing code is usually `false` + `tdd_skip_reason` ("existing code, documenting the contract after the fact; tests to follow"). Validation·test gaps go unchecked in the AC·Subtasks.

@@ -7,7 +7,7 @@ description: Applies the issues grovespec-review found — edits THIS node's cod
 
 Clearing the issues `grovespec-review` found — the `reviewed` → `fixed` → (re-review) half of the loop. (Finding the issues is `grovespec-review`; fixing needs no independence, so it's a separate, plain step in the implementer's context.)
 
-> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language. These files are English; your output is not.
+> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
 
 ## Flow
 
@@ -26,5 +26,7 @@ Apply each open issue.
 
 ## When it's done
 The open issues are cleared, `status: fixed`, and `grovespec-review` is running again. fix never marks `done` itself — only review's clean terminal pass + human confirm does.
+
+> **Surface, don't point.** An issue you could *not* fix (spec-level, shared-node, needs a human ruling) goes *in the closing message itself* (what it is · the issue in one line · what's needed); a file path comes after the substance, never instead of it.
 
 > **Recommend a new session to re-run `grovespec-review`** (or continue in-session if the fix was tiny). review spawns fresh cold reviewers either way, but a clean orchestrator keeps context bounded across the `reviewed ⇄ fixed` loop (WORKFLOW §5).

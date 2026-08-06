@@ -125,10 +125,9 @@ A Task holds *concept* only — **it does not record what the code looks like** 
 
 ## 7. Not yet settled
 
-Settled: contract verification (§3) · structure change (§2 revise) · **brownfield code→tree** (init `code-to-tree`, sample-validated) · **cost = bounded scrutiny** (verify reads the draft, review reads the diff — §3·§5) · **the verify/review split** (spec cold personas + tests/diff code review). Remaining:
+Settled: contract verification (§3) · structure change (§2 revise) · **brownfield code→tree** (init `code-to-tree`, sample-validated) · **cost = bounded scrutiny** (verify reads the draft, review reads the diff — §3·§5) · **the verify/review split** (spec cold personas + tests/diff code review) · **out-of-band edits** (`fresh` reports src/tests changes that skipped the skills; `validate` requires each advanced status to show its passed gate records and flags a pinned spec that changed after its gate; `revise` is the reconcile path). Remaining:
 
 - **Terminal-convergence demo** — a full node through to a clean pass + repeat consecutive passes.
 - The **full cycle** grow→verify→implement→review→fix end-to-end, and init on a large codebase.
 - When two far-apart nodes share a contract — their common parent is the top, so the partial tree grows large.
 - When several agents work *different branches at the same time* (spec conflicts — the failure other spec tools hit when parallel changes touch the same requirement).
-- **Out-of-band edits** — a human hot-fixing a `done` node's code outside the skills. Nothing detects it today; the whole-suite test run at each later review is a partial net (only where tests cover the broken contract). Candidates: a freshness check in `validate`, or an explicit "all changes go through revise" CI contract.

@@ -58,7 +58,7 @@ docs/
   config.yaml         paths · review settings · language
   schema              the format contract (machine SoT; FORMATS.md mirrors it)
   templates/          fill-in templates + FORMATS.md (the parser contract)
-  bin/grovespec       deterministic checks — validate · status · check · impact · tree · version
+  bin/grovespec.mjs   deterministic checks — validate · status · check · diff · test · fresh · pin · impact · tree · version
   VERSION             the runtime bundle version — compare an install against this repo
 ```
 
@@ -68,25 +68,31 @@ docs/
 
 GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 
-1. Copy `.claude/skills/grovespec-*` and `.grovespec/` into your repo — the *whole* `.grovespec/` directory, dotfiles included: it ships its own `.gitattributes` so the runtime checks out as LF (`bin/grovespec` is bash — CRLF breaks it). Your project's own `.gitattributes` isn't touched.
+1. Copy `.claude/skills/grovespec-*` and `.grovespec/` into your repo — the *whole* `.grovespec/` directory, dotfiles included: it ships its own `.gitattributes` so the bundle checks out byte-stable (schema/templates are read byte-wise). Your project's own `.gitattributes` isn't touched.
 2. Ask Claude: **"grovespec init"** — it draws out a detailed spec and lays out the whole tree as sketches (brownfield: maps your existing code), plus `.grovespec/config.yaml`.
 3. From there, per node: **"detail the next node"** (grow) → **"verify it"** → **"implement it"** → **"review it"** (→ **"fix"** if issues), top-down.
 
-**Keeping installs in sync.** A project carries a *copy* of the skills + `.grovespec/`, so it can fall behind. `bash .grovespec/bin/grovespec version` prints the installed runtime's version (`.grovespec/VERSION`); compare it against this repo's before trusting an old install.
+**Keeping installs in sync.** A project carries a *copy* of the skills + `.grovespec/`, so it can fall behind. `node .grovespec/bin/grovespec.mjs version` prints the installed runtime's version (`.grovespec/VERSION`); compare it against this repo's before trusting an old install.
 
 **When it pays.** Every node asks the human for two confirmations — approve the spec, confirm the result. That's deliberate friction, spent where drift starts. For software you'll keep and grow it's cheap insurance; for a throwaway script it's overkill — GroveSpec is built for the first case.
 
 **See a complete worked project:** [examples/expense-cli](examples/expense-cli) — a **brownfield** mini-CLI: its existing code *documented* as filled brief · tree · Tasks (real Contracts, honest gaps). The best way to see what good specs look like before you start.
 
-**Optional deterministic checks** ship in `.grovespec/bin/grovespec` (no install — needs only `bash`, which the required `git` already provides on every OS):
+**Optional deterministic checks** ship in `.grovespec/bin/grovespec.mjs` (no install — needs only **Node 18+**, which running Claude Code already implies: node builtins only, no `package.json`, no `npm install`):
 
-- `validate` — format + graph coherence (orphans, cycles, impossible states); exits non-zero with fixes.
-- `status` — each node's state + which are unblocked, and what's next.
+- `validate` — format + graph coherence (orphans, cycles, impossible states) + **status ↔ evidence** (an advanced status must show the passed gate records that let it advance; a pinned spec that changed after its gate is flagged stale). Prints an **`examined:`** line before the verdict, so "I did not look" (a wrong path, an empty tasks dir) can never read as "I looked and found nothing". Exits non-zero with fixes.
+- `status` — each node's state + which are unblocked, **what's waiting on the human** (approvals · confirms · escalations), and what's next.
 - `check [TASK-N]` — is a node ready to work (parent done + blocked_by done), and what's the next step (verify/implement/review/fix/grow)? The top-down gate `grow`/`verify`/`implement` run, so the build can't drift bottom-up.
+- `diff TASK-N` — the node's **cycle diff, computed**: its `TASK-N:` commits, their file set, base → working tree. This is what review reads — never hand-assembled (a hand-assembled diff misses files silently).
+- `test [TASK-N]` — runs `config.review.test`; with an id, records the exit code + log as the node's evidence (`last_test` + `<id>.test.log`) — "the tests passed" is a machine-written fact.
+- `fresh` — out-of-band signals: src/tests changes that never went through the skills (uncommitted edits, non-`TASK-` commits). A report, not a gate — the answer is `revise`.
+- `pin TASK-N` — binds a gate verdict to its bytes: the spec digest at approve, the reviewed commit + digest at done-confirm. `validate` flags a later silent spec edit; `diff` uses the pin as the previous cycle's closing line.
 - `impact TASK-N` — the consumer set a contract change reaches (the blast radius).
-- `tree` — the id-only tree rendered with names + status. `version` — the installed runtime's version.
+- `tree` — the id-only tree rendered with names + status. `version` — the installed runtime's version **plus a content fingerprint** (compare two installs by bytes, not labels).
 
-They're a bonus enforcement floor — run `validate` + your test suite in CI to catch drift and out-of-band edits between sessions; the core loop runs on the skills + cold review without them.
+> On Windows, invoke it through **PowerShell** (`node .grovespec/bin/grovespec.mjs …`) rather than Git Bash — Git Bash pays ~290ms per process to emulate Unix. And never wrap it in a `.ps1`: the execution policy applies to `.ps1` files, while `node script.mjs` is not subject to it at all.
+
+Together they are the deterministic floor under the AI gates: the runtime owns the bookkeeping facts (what the diff is, whether tests ran, whether a status has its evidence, whether approved bytes changed), and the skills spend the AI's judgment on meaning. Run `validate` + `fresh` in CI to catch drift and out-of-band edits between sessions; the core loop runs on the skills + cold review without them.
 
 > A one-command installer (`npx grovespec`) is on the roadmap.
 
@@ -104,7 +110,9 @@ GroveSpec stands on earlier spec-driven work, with thanks. Its *explore* stance 
 
 ## Status
 
-**v0.2.0 — early, partly proven.** The cold-review engine is the piece with real evidence behind it: a controlled cold-spawn multi-reviewer run on a planted-flaw sample caught the planted flaws, emergent ones, *and* flaws its own fixes introduced (no false convergence) — and the brownfield mapping (code → tree + contracts) was validated on a sample too. What has **not** been run end-to-end is the greenfield full cycle (grow → verify → implement → review → done) on a real project, or init on a large codebase. Expect rough edges there; the skills and formats may still shift before 1.0.
+**v0.3.0 — early, partly proven.** The cold-review engine is the piece with real evidence behind it: a controlled cold-spawn multi-reviewer run on a planted-flaw sample caught the planted flaws, emergent ones, *and* flaws its own fixes introduced (no false convergence) — and the brownfield mapping (code → tree + contracts) was validated on a sample too. What has **not** been run end-to-end is the greenfield full cycle (grow → verify → implement → review → done) on a real project, or init on a large codebase. Expect rough edges there; the skills and formats may still shift before 1.0.
+
+v0.3.0 adds the **deterministic floor** (and moves the runtime from bash to Node): the runtime computes the review's diff, records test runs, requires every advanced status to show its passed gate records, pins approved specs to content digests, and reports out-of-band edits — the facts a session could misreport are now recomputed, not trusted. Migrating a pre-0.3.0 tree: add `origin: mapped` to each brownfield-mapped node's frontmatter (the evidence checks exempt those), and change calls from `bash .grovespec/bin/grovespec` to `node .grovespec/bin/grovespec.mjs`.
 
 ## License and the name
 

@@ -3,6 +3,7 @@ id: TASK-5
 name: "report command"
 role: feature
 status: done
+origin: mapped
 blocked_by: [TASK-2]
 tdd: false
 tdd_skip_reason: "existing code, documented after the fact (brownfield); tests to follow"

@@ -21,7 +21,7 @@ The mechanics below (cold subagents, THE BAR, fix loop, triage, strength) are **
 
 > **THE BAR — *sufficient*, not exhaustive.** A flaw is real only if a **competent implementer/child** would be **blocked or build the wrong thing** — *name who, and on what decision*. **It cuts both ways:** a check PASSes only when a reviewer *shows* it holds — "found nothing" is **not** a pass. *Lenient on imagined edges; strict on shown sufficiency.* Both directions are needed here, for step 3 (triage) and step 5 (judgment). **The SSoT for both is `reviewers.md` — §THE BAR (full text) and §SCOPE (what a spec may and may not contain, incl. what a skeleton defers). Load them; don't restate them here.**
 
-> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language (the cold reviewers' findings too). These files are English; your output is not.
+> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language (the cold reviewers' findings too). These files are English; your output is not.
 
 ## Why cold · several · different
 An open-ended "just review it" gets rubber-stamped, and exhaustive flaw-hunting never converges. So we stack: ① cold reviewers (didn't see how it was written), ② *different* roles, ③ *several* in parallel, ④ each **filling a bounded checklist at THE BAR** (not open hunting), ⑤ a triage that drops over-reach, ⑥ repeat until a clean round — then a human approves.
@@ -74,12 +74,14 @@ verify picks the level from checkable inputs — ① did the contract change ②
 
 ## Human approval
 On a clean terminal pass, show the human the result and get confirmation.
-- **`spec`** → show the draft, **"is this what you want?"** → Yes: set the Task `status: approved`, copy surviving `adjudications` into the node's **Change Log**.
+- **`spec`** → show the draft, **"is this what you want?"** → Yes: set the Task `status: approved`, copy surviving `adjudications` into the node's **Change Log**, and run **`node .grovespec/bin/grovespec.mjs pin TASK-N`** — it pins the approved spec's digest, so `validate` catches any later silent edit to what was approved.
 - **`tree`** → show the **whole decomposition** (the tree + the D-table of what the cold gate checked/fixed), **"is this the right decomposition?"** → Yes: the tree is cleared for building. Surviving `adjudications` stay in `tree.verify.yaml` (a later structural re-verify reads them from there — no need to copy elsewhere; brief.md has no Change Log section). The human is now confirming an *already cold-vetted* tree — not doing the vetting themselves.
 - **Escalated, or human rejects** → fix the draft / the sketch tree and loop back; nothing advances.
 
 ## When it's done
 - **`spec`**: the node is `approved` → **next: `grovespec-implement`**.
 - **`tree`**: the decomposition is cold-verified + human-approved → **the per-node build begins**: `grovespec-grow` the root (detail its sketch → draft), then `verify` (spec) → `implement` → `review`, top-down.
+
+> **Surface, don't point.** Open issues, an escalation, gap rulings waiting on the human — each goes *in the closing message itself* (what it is · the issue in one line · what's needed); a file path comes after the substance, never instead of it. "review 파일을 확인하세요" alone re-creates the no-reviewable-surface failure at the handoff.
 
 > **Recommend a new session for the next step** (implement, or the first `grow`). Clean, bounded context per step keeps GroveSpec's cost flat and its next reviewers cold (WORKFLOW §5).

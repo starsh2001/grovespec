@@ -3,6 +3,7 @@ id: TASK-1
 name: "expense-cli (CLI dispatcher)"
 role: skeleton
 status: done
+origin: mapped
 blocked_by: []
 tdd: false
 tdd_skip_reason: "thin dispatcher; behavior is covered by the command tasks' tests"

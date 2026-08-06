@@ -7,7 +7,7 @@ description: Changes an already-done node in GroveSpec — change its behavior u
 
 Changing an already-`done` node *later*. (Fixing mid-build is `grovespec-verify` for the spec, and `grovespec-review` → `grovespec-fix` for the code.)
 
-> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language. These files are English; your output is not.
+> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
 
 > **Decisions: recommend + leave a way out.** When you ask the user to decide (split·merge·move, how to change…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (the AskUserQuestion tool's *Other*, or an explicit free-form choice in an inline list). Don't force a closed pick.
 
@@ -32,6 +32,8 @@ Don't make clones — one node = one Task. Old code lives in git; why it changed
 2. Change it (spec and/or code), then run it forward through the normal gates from there: `draft` → `grovespec-verify` → `grovespec-implement` → `grovespec-review` → `done`; or `approved` → `grovespec-implement` → `grovespec-review` (→ `fix`) → `done`.
 3. **If the contract changed** → compute the consumer set (above) and **propagate**: reopen each `approved`+ consumer the same way (its spec touched → `draft` + re-`verify`; only its code touched → `approved` + re-`implement` → re-`review`) and run it forward. Skip consumers still at `sketch`/`draft` — they read the *current* contract when grown. This is the expensive part; bias to doing it. (`grovespec impact <id>` lists the blast radius.)
 4. Record *why it changed* in the Change Log of each touched node; each returns to `done` through its own gate. On an `escalated` verify/review, stop — don't re-close that node.
+
+> `node .grovespec/bin/grovespec.mjs fresh` lists src/tests changes that never went through the skills — hand-fixes waiting to be reconciled. Each is a revise candidate: reopen the owning node and absorb the change through its gates.
 
 ### B. Structure change (split·merge·move)
 Change the shape in **`tree.md` only** — it's the single source of truth for parent-child structure; Task files don't record parent or children (`FORMATS.md`). Here too, if the contract changes, propagate (consumer set as above).
@@ -67,5 +69,7 @@ Thin — read only the Task·relevant code of the node you're changing, and (if 
 
 ## When it's done
 The changed node is `done` again, with the reason in the Change Log. If the contract changed, the consumers have been re-reviewed and are coherent again.
+
+> **Surface, don't point.** Consumers you did *not* re-close, an escalated gate, a propagation still owed — each goes *in the closing message itself* (what it is · the issue in one line · what's needed); a file path comes after the substance, never instead of it.
 
 > **Recommend a new session for each step of a revise** (the re-verify / re-implement / re-review of the node and each propagated consumer). Reopening a node runs it through the normal gates — same rule: one step, one fresh session (WORKFLOW §5).

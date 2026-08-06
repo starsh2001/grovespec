@@ -8,7 +8,7 @@ description: Sets up GroveSpec in a project — opens with a fixed setup intervi
 Setup of a GroveSpec project — it **opens with a fixed setup interview** (`references/setup.md`: language · review strength · reviewer models — the test command is auto-detected, not asked), then builds the brief + the sketched tree. When that's done, the per-node cycle (`grow → verify → implement → review ⇄ fix → done`) takes over. **Re-invoke init anytime to *reconfigure*** — it re-asks the interview and updates `.grovespec/config.yaml`, without recreating the project.
 
 > **Language — detect, then CONFIRM (don't assume).**
-> - **Detect**: `bash .grovespec/bin/grovespec locale` → a code (`ko`/`en`/`ja`/…) read from the OS (Unix `$LANG`/`LC_*`; on **Windows/MSYS the registry**, since bash `$LANG` is empty there).
+> - **Detect**: `node .grovespec/bin/grovespec.mjs locale` → a code (`ko`/`en`/`ja`/…) read from the OS (`$LANG`/`LC_*` when set; elsewhere the OS locale Node's `Intl` reports — works on Windows too, where `$LANG` is empty).
 > - **Confirm it with the user** — that's the setup interview's Q1, asked with the language as a **word, not the code** (*"OS 언어가 한국어로 잡혔어요 — 이 언어로 진행할까요?"*, default = the detected one; the code is stored to `config.language`, never shown). Reply in the chosen language from word one.
 > - **Detection returned nothing? ASK outright** — **never silently default to English** (an empty locale isn't a vote for English).
 >
@@ -71,6 +71,8 @@ Risks hold only "where it might break." Leave out "what to build."
 ### 6. Hand off — the decomposition gate (greenfield) / human check (brownfield)
 - *Greenfield*: the **sketch tree** is a *hypothesis*, and it gets the cold gate — not just a human glance. Briefly show the tree, then **next is `grovespec-verify` on the tree** (`target_type: tree`): cold reviewers check the decomposition (D1–D5: scope coverage · system completeness · actor closure · boundaries · depth) → fix → **human approves the *vetted* tree**. Only then does the per-node build begin — `grovespec-grow` the root (detail its sketch → `draft`) → `verify` (spec) → `implement` → `review`, top-down.
 - *Brownfield*: no decomposition gate — the code *is* the decomposition (all `done`), and what's wrong with it is already parked in `findings.md`·`restructuring.md`. Show the brief + extracted tree + those backlogs to the human, get **"is this right?"** confirmed. Work proceeds via `grovespec-revise` on the parts you change, or `grovespec-grow` to add what's new.
+
+> **Surface, don't point.** What init leaves waiting on the human — the tree to approve, backlog items, unanswered setup questions — goes *in the closing message itself* (what it is · the issue in one line · what's needed); a file path comes after the substance, never instead of it.
 
 > **Recommend a new session for the next step** (greenfield: `verify` the tree; brownfield: `revise`/`grow`). The agent that just built the tree shouldn't also orchestrate its cold review — start it fresh, with clean bounded context (WORKFLOW §5).
 

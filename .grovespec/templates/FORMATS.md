@@ -2,7 +2,7 @@
 
 So that tools can read these files and process them mechanically, **the format is fixed**. Don't change header names·order, field names·types, or the date format on a whim. (This is itself GroveSpec's *contract* to outside tools.)
 
-> **Machine source of truth:** the checkable lists (frontmatter fields · enums · sections) are defined in `.grovespec/schema` and enforced by `.grovespec/bin/grovespec validate`. This doc is the human-readable contract; the lists below mirror `schema` — if they ever differ, `schema` (what `validate` reads) wins. Edit `schema` first.
+> **Machine source of truth:** the checkable lists (frontmatter fields · enums · sections) are defined in `.grovespec/schema` and enforced by `.grovespec/bin/grovespec.mjs validate`. This doc is the human-readable contract; the lists below mirror `schema` — if they ever differ, `schema` (what `validate` reads) wins. Edit `schema` first.
 
 > Headers and field names are fixed and English. The *content* (prose) is written in the project's language (`config.language`).
 
@@ -27,6 +27,7 @@ YAML frontmatter + fixed sections.
 | `blocked_by` | list | `[TASK-2, ...]`, `[]` if none |
 | `tdd` | bool | `true` \| `false` |
 | `tdd_skip_reason` | string | required when `tdd: false` |
+| `origin` | enum, optional | `mapped` — brownfield only: born `done` from existing code (code-to-tree), no gate records behind it. Absent on every built node. |
 
 **Status lifecycle** (defined here once — skills point here, don't restate). Each status = a completed gate; a node advances one skill at a time:
 - `sketch` — **greenfield only.** Placed in the tree with a one-line responsibility + rough I/O, no full contract yet. Created by *init* (`spec-to-tree`) for the whole tree at once. Detailed into `draft` by *grow*. (Brownfield nodes skip this — they're born `done`.)
@@ -78,7 +79,7 @@ Lightweight checklists `code-to-tree` parks while mapping existing code into the
 Location: `.grovespec/config.yaml`. Keys: `version`, `language`, `paths` (`brief·tree·conventions·tasks·ref·findings·restructuring·src·tests·review` — only the locations are changeable; the structure is fixed; `findings·restructuring` are brownfield-optional), `verify` (`strength` 1–3 · `max_rounds` · `scale` · optional `models` — the spec cold-review) and `review` (`strength` · `max_rounds` · `scale` · `test` command · optional `models` — the code diff-review). `models` (optional, either block) maps a lens name — or `default` / `triage` — to a model; **omit it and every reviewer inherits the session model** (no forced cost).
 
 ## Commits (the node diff boundary)
-Commits made while working a node are prefixed **`TASK-N: `** (`TASK-3: implement — …`, `TASK-3: fix — …`); *implement* and *fix* each **end with one**. A node's **cycle diff** — what *review* reads — is everything since the parent of the cycle's first `TASK-N:` commit, plus uncommitted changes, limited to the node's files. A cycle starts when the node leaves `approved`; a *revise* reopening starts a new cycle. (*implement* starts from a clean working tree, so nothing unrelated blurs the boundary.)
+Commits made while working a node are prefixed **`TASK-N: `** (`TASK-3: implement — …`, `TASK-3: fix — …`); *implement* and *fix* each **end with one**. A node's **cycle diff** — what *review* reads — is everything since the parent of the cycle's first `TASK-N:` commit, plus uncommitted changes, limited to the node's files. A cycle starts when the node leaves `approved`; a *revise* reopening starts a new cycle. (*implement* starts from a clean working tree, so nothing unrelated blurs the boundary.) `grovespec diff TASK-N` is the one mechanical derivation of this — skills read the cycle from it, never assemble it by hand.
 
 ## review-cycle state (verify & review)
 *verify* (spec) and *review* (code) each run the cold-reviewer cycle and keep state at `paths.review` (default `.grovespec/review/`). Because both act on the **same** node id at different stages, they write **separate** files so they never collide:
@@ -87,3 +88,9 @@ Commits made while working a node are prefixed **`TASK-N: `** (`TASK-3: implemen
 - `<id>.review.yaml` — the code-review cycle (`target_type: result`, diff-scoped).
 
 Fields (all): `target`, `target_type` (`tree|spec|result`), `level` (`skip|light|standard|full`), `strength` (1–3), `repeat`, `max_rounds`, `round`, `consecutive_passes`, `status` (`in-progress|passed|escalated`), `rounds[]` (per-round outcome), `open_issues[]`, `adjudications[]`. Template: `.grovespec/templates/review-state.yaml`.
+
+**Status ↔ evidence.** A Task's `status` is a claim about gates passed, and `validate` checks the claim against these records: `approved` or beyond requires the node's `<id>.verify.yaml` with `status: passed`; `done` also requires `<id>.review.yaml` with `status: passed`; a `passed` record may not still carry `open_issues`. `origin: mapped` nodes with **no** review files are exempt — brownfield init maps existing code straight to `done`; the rules bind from the first gate a reopened node enters.
+
+**`last_test` + `<id>.test.log`.** `grovespec test TASK-N` runs `config.review.test` and writes the machine record itself: a `last_test:` block in `<id>.review.yaml` (`command` · `exit` · `when`) plus the full output in `<id>.test.log`. "The tests passed" is this record, not a session's reading of its scrollback.
+
+**Pins — `spec_digest` · `reviewed_commit`.** Written only by `grovespec pin TASK-N`: at approve, the spec digest into `<id>.verify.yaml`; at done-confirm, the reviewed commit (HEAD) + spec digest into `<id>.review.yaml`. The digest has **one spelling** (`bin/lib/core.mjs specSpanText`): sha256 over the `## Overview` … `## AC` sections (headers included, CRLF-normalized) — frontmatter, Subtasks and Change Log are excluded because status flips, checkbox ticks and log appends are legitimate after approval. `validate` flags a mismatch as a stale spec (the verdict no longer covers these bytes), and `diff` uses `reviewed_commit` as the previous cycle's closing line. A record without a digest is **legacy-unbound** — preserved, binds nothing.

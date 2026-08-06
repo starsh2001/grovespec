@@ -11,7 +11,7 @@ Turning **one node's `sketch` into a full `draft`** — writing its Contract·AC
 > - **Initial build (the common case).** `grovespec-init` laid the whole tree out as `sketch` nodes (structure only), and `verify`-tree cold-vetted that decomposition — so the structure you detail into is already approved. grow details the next sketch — its full contract — just before it's verified. The sketch + the detailed spec in `ref/` ground it, so this is *not* invention from a vacuum.
 > - **Later expansion.** A node the original spec didn't cover (a new requirement, something `implement` revealed). Under a **`done`** parent, grow *creates* it as a `draft` directly. If it belongs under a parent **not built yet** (still `sketch`/`draft`), add it as a **`sketch`** there instead and let that parent's own `implement` reconcile it — don't draft a node under an unbuilt parent (`grovespec check` blocks it anyway).
 
-> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language. These files are English; your output is not.
+> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
 
 > **Decisions: recommend + leave a way out.** When you ask the user to decide (an approach, a contract choice…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (the AskUserQuestion tool's *Other*, or an explicit free-form choice in an inline list). Don't force a closed pick.
 
@@ -47,5 +47,7 @@ The node is now a full `draft`. **Next is `grovespec-verify <this node>`** — t
 
 ## When it's done
 One node's `sketch` is now a full `draft` (or, for expansion, a new `draft` exists in `tree.md`). The expensive steps follow, one at a time: `grovespec-verify` → (approve → `approved`) → `grovespec-implement` → `grovespec-review` → (confirm → `done`). Only once *this* node is `done` are *its* (already-sketched) children detailed.
+
+> **Surface, don't point.** Anything this run leaves waiting on the human — open questions, gaps needing a ruling — goes *in the closing message itself* (what it is · the issue in one line · what's needed); a file path comes after the substance, never instead of it.
 
 > **Recommend a new session for the next step** (`grovespec-verify` this draft). The agent that just wrote the draft shouldn't also orchestrate its cold review — start it fresh, clean bounded context (WORKFLOW §5).

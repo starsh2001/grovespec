@@ -13,12 +13,12 @@ Two things, both bounded to **this one node**, so cost never scales with the cod
 
 > review never re-asks *spec* questions ("is the contract complete?") — `grovespec-verify` settled those cold, before any code. Here the spec (AC·Contract) is the *yardstick*, not the subject.
 
-> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language (the reviewers' findings too). These files are English; your output is not.
+> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language (the reviewers' findings too). These files are English; your output is not.
 
 ## What it takes in
 - **the node** — *if none is named*, take an `implemented` or `fixed` node `grovespec check` reports ready (next step = review).
 - **what you review** — its **diff** + its **AC·Contract** (the criteria) + the **test results**.
-  - *The diff, mechanically*: everything since the parent of this cycle's first `TASK-N:` commit (implement/fix each end in one — `FORMATS.md`), plus any uncommitted changes, limited to this node's files. A cycle starts when the node leaves `approved`; a `revise` reopening starts a new one.
+  - *The diff, mechanically*: **`node .grovespec/bin/grovespec.mjs diff TASK-N`** computes it — the cycle's `TASK-N:` commits, their file set, and the base→working-tree diff (cycle definition: `FORMATS.md`). **Never assemble the diff by hand** — a hand-assembled diff misses files, and the cold reviewers then review the wrong subject without anyone knowing.
 - `test` command + `strength`·`max_rounds`·`scale` from `.grovespec/config.yaml` `review:` (overridable per node).
 
 > **Where it runs (the invocation contract).** Run grovespec-review in your **main Claude Code session** — it spawns the cold reviewers as **subagents**. **Never run a grovespec skill *as* a subagent** — then it can't spawn reviewers and silently degrades to a non-cold self-check.
@@ -27,8 +27,8 @@ Two things, both bounded to **this one node**, so cost never scales with the cod
 `.grovespec/review/<id>.review.yaml` (template `review-state.yaml`, `target_type: result`). Separate from verify's `<id>.verify.yaml` — they never collide.
 
 ## 1. Run the tests (the spine)
-Run `config.review.test`.
-- **Empty?** (greenfield leaves it empty at init — there was no stack yet) → **derive it from the stack/project** (`pytest` for Python, `npm test`/`node --test` for Node, `cargo test`, a `Makefile` target, …) and **write it back to `config.review.test`** so later reviews reuse it. **Ask the human only if you genuinely can't tell** (no clear runner, or several equally-plausible ones) — and then as a *"이게 맞아?"* confirm with your best guess, never a blank "what's your command?".
+Run **`node .grovespec/bin/grovespec.mjs test TASK-N`** — it executes `config.review.test` and records the exit code + log into the node's review state (`last_test` + `<id>.test.log`), so *"the tests passed" is a machine-written fact, not your reading of scrollback*. Your job here is the interpretation (the AC mapping below), not the bookkeeping.
+- **Empty?** (greenfield leaves it empty at init — there was no stack yet) → **derive it from the stack/project** (`pytest` for Python, `npm test`/`node --test` for Node, `cargo test`, a `Makefile` target, …), **write it back to `config.review.test`**, then run `grovespec test TASK-N` again. **Ask the human only if you genuinely can't tell** (no clear runner, or several equally-plausible ones) — and then as a *"이게 맞아?"* confirm with your best guess, never a blank "what's your command?".
 - **Map the results to the AC.** Collect pass/fail per test; every AC item should have a passing test (items marked `(gap)` are excluded — deliberately undefined behavior, `FORMATS.md`).
 - **Measurable NFR targets** in the AC (e.g. `p95 < 200ms`) are checked here too. A target with **no runnable check** (no bench/load tooling behind the test command) is marked **unverified** and surfaced at the human confirm — never silently counted as met.
 - A **failed test** is a `critical` issue (the implementation doesn't meet its AC) → straight to the verdict (fix), no cold round needed yet.
@@ -55,9 +55,11 @@ Run cold rounds — each: spawn the reviewers in parallel (subagents, empty cont
 
 ## 3. Verdict
 - **Issues remain** → `status: reviewed` with `open_issues`; next is **`grovespec-fix`** (it applies them → `fixed` → re-run `grovespec-review`). review does **not** fix — the diff stays the cold reviewers' subject, and fixing needs no independence (cold already gave that).
-- **Clean terminal pass** (tests green + cold review passed `repeat` times running) → show the human the result + test summary; on **confirm** set `status: done` and copy the surviving `adjudications` into the node's **Change Log** (so a future revision's cold review won't re-litigate them).
+- **Clean terminal pass** (tests green + cold review passed `repeat` times running) → run **`grovespec validate`** (must pass — a format/evidence violation blocks `done`) and **`grovespec fresh`**, then show the human the result + test summary + any fresh signals; on **confirm** set `status: done`, run **`grovespec pin TASK-N`** (reviewed commit + spec digest — closes the cycle, arms the stale check), and copy the surviving `adjudications` into the node's **Change Log** (a later cold round reads them instead of re-litigating).
 
 ## When it's done
 On `done`: the node's tests pass, its diff is cold-reviewed clean, the human confirmed. A `done` skeleton's children can now be grown (`grovespec-grow`); a `done` leaf ends its branch.
+
+> **Surface, don't point.** Open issues, an escalation, fresh signals, unverified NFR targets — each goes *in the closing message itself* (what it is · the issue in one line · what's needed); a file path comes after the substance, never instead of it.
 
 > **Recommend a new session for the next node** (`grovespec-grow` the next sketch). Each node starts fresh — clean, bounded context is what keeps GroveSpec's cost flat as the tree grows (WORKFLOW §5).

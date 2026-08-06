@@ -1,6 +1,6 @@
-# The runtime must check out LF everywhere: bin/grovespec is bash (CRLF breaks
-# the shebang), and schema/templates are parsed by grep/awk that treat a stray
-# \r as part of the value.
+# The runtime bundle must check out LF everywhere: schema/templates are read
+# byte-wise (a stray \r must not become part of a value), and two installs are
+# compared by their bytes — the same bundle must check out identical on every OS.
 #
 # This lives INSIDE the bundle on purpose. Copying .grovespec/ into a project
 # carries the rule along, so the install never has to edit — or overwrite — that

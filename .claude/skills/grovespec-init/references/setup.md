@@ -15,7 +15,7 @@
 > - **`Write:`** lines are instructions to *you* (how to fill config) — never shown to the user. (Q1 — language — is the one you compose, since it depends on the detected language.)
 
 ## Q1 — Working language → `config.language`
-Detect first: `bash .grovespec/bin/grovespec locale` → a code (`ko`/`en`/…) or empty. **Offer languages as words, never codes** — most people don't read `ko`/`ja`/`zh`. Map the code → its name *in that language* for display (`ko`→한국어 · `en`→English · `ja`→日本語 · `zh`→中文 · `es`→Español · …) and ask in the detected language. **Confirm — don't assume:**
+Detect first: `node .grovespec/bin/grovespec.mjs locale` → a code (`ko`/`en`/…) or empty. **Offer languages as words, never codes** — most people don't read `ko`/`ja`/`zh`. Map the code → its name *in that language* for display (`ko`→한국어 · `en`→English · `ja`→日本語 · `zh`→中文 · `es`→Español · …) and ask in the detected language. **Confirm — don't assume:**
 - Detected → e.g. *"OS 언어가 **한국어**로 잡혔어요 — 이 언어로 진행할까요?"*; options are **words**, recommended first: **한국어 (추천)** · English · 日本語 · *(Other)* 다른 언어 직접 입력. (Drop whichever common alternate equals the detected one so it isn't listed twice.)
 - Empty → no default; ask outright *"어느 언어로 진행할까요?"* with word options (**English · 한국어 · 日本語 · *(Other)***). **Never** silently English.
 - **Show the word, store the code:** map the chosen word back to its code → `config.language` (한국어→`ko` · English→`en` · 日本語→`ja` · …); for a free-form *Other*, resolve the name to its code (fall back to the written name if you can't). Later skills read the code, not the word.

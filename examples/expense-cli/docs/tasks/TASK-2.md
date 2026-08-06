@@ -3,6 +3,7 @@ id: TASK-2
 name: "storage (shared store)"
 role: feature
 status: done
+origin: mapped
 blocked_by: []
 tdd: false
 tdd_skip_reason: "existing code, documented after the fact (brownfield); tests to follow"

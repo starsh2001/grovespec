@@ -7,7 +7,7 @@ description: Implements a GroveSpec node — turns an *approved* spec into real 
 
 Turning an **`approved`** spec into *code*. (Verifying the spec is `grovespec-verify`; reviewing the code is `grovespec-review`.) Implement builds the node's own behavior — a **feature**'s leaf logic, or a **skeleton**'s structural code (container·interface·dispatch). For the **root skeleton** that structural code is the **base environment + an empty runnable shell** (the app boots / a blank page loads), with the **stack chosen here** and *no feature logic*. It ends at `implemented`; it does **not** review or mark `done`.
 
-> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `bash .grovespec/bin/grovespec lang`) and write **every** reply in that language. These files are English; your output is not.
+> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
 
 > **Decisions: recommend + leave a way out.** When you ask the user to decide (tech stack, library, approach…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (the AskUserQuestion tool's *Other*, or an explicit free-form choice in an inline list). Don't force a closed pick.
 
@@ -69,5 +69,7 @@ Greenfield, this node's children were already **sketched** at init. Building the
 
 ## When it's done
 Code·tests are in `src/`·`tests/`, the Task is `implemented` (plus a Change-Log decomposition if it became a skeleton). Next is `grovespec-review`.
+
+> **Surface, don't point.** Anything this run leaves waiting on the human — an unresolved decomposition call, a blocked dependency — goes *in the closing message itself* (what it is · the issue in one line · what's needed); a file path comes after the substance, never instead of it.
 
 > **Recommend a new session for `grovespec-review`.** The agent that just wrote the code shouldn't also orchestrate its cold review — start it fresh, clean bounded context (WORKFLOW §5).
