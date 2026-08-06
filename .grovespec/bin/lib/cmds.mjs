@@ -91,6 +91,8 @@ export function cmdValidate (P) {
     if (topValue(text, 'status') === 'passed' && listItemCount(text, 'open_issues') > 0) {
       prob(`${rf}  status: passed but open_issues is not empty`)
     }
+    v = topValue(text, 'approved_by')
+    if (v !== '' && !pipes(P.sch('review.enum.approved_by')).includes(v)) prob(`${rf}  approved_by '${v}' invalid → use ${P.sch('review.enum.approved_by')}`)
   }
 
   // --- status ↔ evidence: an advanced status must show the gate that let it advance ---
@@ -169,6 +171,12 @@ export function cmdValidate (P) {
   // What this run actually looked at — so "I did not look" (a wrong path, an empty
   // tasks dir) can never read as "I looked and found nothing".
   say(`examined: tasks ${P.taskFiles().length} · tree nodes ${ids.length} · review files ${P.reviewFiles().length}`)
+  // A notice, not a problem: an auto-taken gate is a legitimate state, but it is never
+  // allowed to look like a human-taken one — so every run says how many are outstanding.
+  const unratified = ids.filter(t => P.unratified(t).length)
+  if (unratified.length) {
+    say(`notice: ${unratified.length} node(s) auto-approved by machine, not yet ratified — ${unratified.join(', ')} (grovespec ratify <id>…)`)
+  }
   if (problems === 0) { say('✓ validate: all checks passed'); return 0 }
   say(`✗ validate: ${problems} problem(s)`)
   return 1
@@ -195,17 +203,16 @@ export function cmdStatus (P) {
     waiting.push(`${pad('tree', 8)} decomposition verify escalated — needs a human ruling (${P.reviewDir}/tree.verify.yaml)`)
   }
   for (const t of P.treeIds()) {
-    const st = P.statusOf(t)
-    const vst = P.reviewStatus(P.verifyYamlPath(t))
-    const rst = P.reviewStatus(P.reviewYamlPath(t))
-    if (st === 'draft' && vst === 'passed') waiting.push(`${pad(t, 8)} spec verify passed — awaiting approval (→ approved)`)
-    if (vst === 'escalated') waiting.push(`${pad(t, 8)} spec verify escalated — needs a human ruling (${P.verifyYamlPath(t)})`)
-    if (st === 'reviewed' && rst === 'passed') waiting.push(`${pad(t, 8)} review passed — awaiting confirm (→ done)`)
-    if (rst === 'escalated') waiting.push(`${pad(t, 8)} review escalated — needs a human ruling (${P.reviewYamlPath(t)})`)
+    for (const w of P.humanWaits(t)) waiting.push(`${pad(t, 8)} ${w.text}`)
   }
   if (waiting.length) {
     say('waiting on human:')
     for (const w of waiting) say(`  ${w}`)
+  }
+  const unratified = P.treeIds().map(t => [t, P.unratified(t)]).filter(([, l]) => l.length)
+  if (unratified.length) {
+    say('auto-approved by machine, not yet ratified:')
+    for (const [t, labels] of unratified) say(`  ${pad(t, 8)} ${labels.join(' · ')} gate taken automatically — no human has looked (grovespec ratify ${t})`)
   }
   if (gate) { say('next: grovespec-verify the tree (the decomposition gate)'); return 0 }
   if (nexts !== '') say(`next:${nexts}`)

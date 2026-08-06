@@ -119,6 +119,8 @@ A Task holds *concept* only — **it does not record what the code looks like** 
 2. **Spawn cold subagents where independence is needed** (verify, review). Never nest a grovespec skill inside a subagent.
 3. **Keep the skill body thin**, with the shared review mechanics in `reviewers.md`, loaded only when a round runs.
 
+4. **A driver may pick the step; a gate it takes must say so.** `grovespec-next` (over the seven, adding no rules of its own) runs the one step `grovespec next` reports due and stops — the repetition belongs to its caller, so each step still gets a fresh session. By default the human's gates are skipped, never performed. Its **auto mode** may take a gate that came out *clean*, and then the record says `approved_by: machine` and every later `status`/`validate` names it until a human ratifies — an escalation or an open issue is never approved past, and the tree gate stays the human's in both modes. What auto mode trades away is stated plainly: the cold review still runs; the intent check doesn't.
+
 > The split is by *step*, not by role. Each step ends and hands to the next explicitly.
 
 ---

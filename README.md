@@ -45,6 +45,10 @@ One per step of a node's life: `sketch → draft → approved → implemented �
 | `grovespec-fix` | Apply the review's issues to this node's code → re-review (`reviewed ⇄ fixed`), until clean → `done`. |
 | `grovespec-revise` | Change an already-done node — behavior (reopen + propagate), structure (split·merge·move), or promote a leaf to a skeleton. |
 
+Plus a driver over them: **`grovespec-next`** runs whichever step is due, once, and stops — so you can keep going without tracking which node or which skill is next, or drive the build from a script. It carries no rules of its own. When nothing can proceed without you, its last line is `NOTHING_TO_WORK — <reason>`, which a queue runner or `@loop until=…` stops on.
+
+It has two modes. By default it *skips* the human's gates (approve a spec · confirm a result) and reports what each is waiting for — so the loop stops early and often, which is the gates doing their job. Ask for **auto** in that same invocation and it also takes gates that came out **clean**, recording them as `approved_by: machine` — never as human approval: `status` and `validate` name every unratified one on every run until you look and `ratify`. It still refuses to approve past an escalation or an open issue, still stops at a question with no defensible default, and the tree gate stays yours in both modes. The trade is exact — **you keep the cold-review quality and give up the intent check**, because reviewers see the spec and the code, never what you meant.
+
 ## Artifacts
 
 ```
@@ -58,7 +62,7 @@ docs/
   config.yaml         paths · review settings · language
   schema              the format contract (machine SoT; FORMATS.md mirrors it)
   templates/          fill-in templates + FORMATS.md (the parser contract)
-  bin/grovespec.mjs   deterministic checks — validate · status · check · diff · test · fresh · pin · impact · tree · version
+  bin/grovespec.mjs   deterministic checks — validate · status · check · next · approve · ratify · diff · files · test · fresh · pin · impact · tree · version
   VERSION             the runtime bundle version — compare an install against this repo
 ```
 
@@ -83,7 +87,10 @@ GroveSpec is currently a set of Claude Code skills. To adopt it in a project:
 - `validate` — format + graph coherence (orphans, cycles, impossible states) + **status ↔ evidence** (an advanced status must show the passed gate records that let it advance; a pinned spec that changed after its gate is flagged stale). Prints an **`examined:`** line before the verdict, so "I did not look" (a wrong path, an empty tasks dir) can never read as "I looked and found nothing". Exits non-zero with fixes.
 - `status` — each node's state + which are unblocked, **what's waiting on the human** (approvals · confirms · escalations), and what's next.
 - `check [TASK-N]` — is a node ready to work (parent done + blocked_by done), and what's the next step (verify/implement/review/fix/grow)? The top-down gate `grow`/`verify`/`implement` run, so the build can't drift bottom-up.
+- `next [--auto]` — the single step due now, decided mechanically (so a driver never assembles it by hand, and never picks differently twice). Nodes parked on a human decision are **skipped, never picked**; when only those are left it says so, node by node. `--auto` offers a gate that came out *clean* as a machine-takeable step instead.
+- `approve TASK-N` / `ratify TASK-N…` — the auto-run mode's gate and its counterpart. `approve` takes the due gate (`draft → approved`, `reviewed → done`) and records `approved_by: machine`; it refuses an escalated record or one still carrying open issues. Every later `status`/`validate` names the unratified ones until a human runs `ratify`.
 - `diff TASK-N` — the node's **cycle diff, computed**: its `TASK-N:` commits, their file set, base → working tree. This is what review reads — never hand-assembled (a hand-assembled diff misses files silently).
+- `files TASK-N` — which code belongs to the node, across every cycle — the screen, the endpoint, the migration a feature actually spans. Derived from history each time, never stored, so it can't drift. Use it to *bound a read*: what these objects do and what calls what is then a question about these files, not about the codebase.
 - `test [TASK-N]` — runs `config.review.test`; with an id, records the exit code + log as the node's evidence (`last_test` + `<id>.test.log`) — "the tests passed" is a machine-written fact.
 - `fresh` — out-of-band signals: src/tests changes that never went through the skills (uncommitted edits, non-`TASK-` commits). A report, not a gate — the answer is `revise`.
 - `pin TASK-N` — binds a gate verdict to its bytes: the spec digest at approve, the reviewed commit + digest at done-confirm. `validate` flags a later silent spec edit; `diff` uses the pin as the previous cycle's closing line.
@@ -110,9 +117,11 @@ GroveSpec stands on earlier spec-driven work, with thanks. Its *explore* stance 
 
 ## Status
 
-**v0.3.0 — early, partly proven.** The cold-review engine is the piece with real evidence behind it: a controlled cold-spawn multi-reviewer run on a planted-flaw sample caught the planted flaws, emergent ones, *and* flaws its own fixes introduced (no false convergence) — and the brownfield mapping (code → tree + contracts) was validated on a sample too. What has **not** been run end-to-end is the greenfield full cycle (grow → verify → implement → review → done) on a real project, or init on a large codebase. Expect rough edges there; the skills and formats may still shift before 1.0.
+**v0.4.0 — early, partly proven.** The cold-review engine is the piece with real evidence behind it: a controlled cold-spawn multi-reviewer run on a planted-flaw sample caught the planted flaws, emergent ones, *and* flaws its own fixes introduced (no false convergence) — and the brownfield mapping (code → tree + contracts) was validated on a sample too. What has **not** been run end-to-end is the greenfield full cycle (grow → verify → implement → review → done) on a real project, or init on a large codebase. Expect rough edges there; the skills and formats may still shift before 1.0.
 
-v0.3.0 adds the **deterministic floor** (and moves the runtime from bash to Node): the runtime computes the review's diff, records test runs, requires every advanced status to show its passed gate records, pins approved specs to content digests, and reports out-of-band edits — the facts a session could misreport are now recomputed, not trusted. Migrating a pre-0.3.0 tree: add `origin: mapped` to each brownfield-mapped node's frontmatter (the evidence checks exempt those), and change calls from `bash .grovespec/bin/grovespec` to `node .grovespec/bin/grovespec.mjs`.
+v0.3.0 added the **deterministic floor** (and moved the runtime from bash to Node): the runtime computes the review's diff, records test runs, requires every advanced status to show its passed gate records, pins approved specs to content digests, and reports out-of-band edits — the facts a session could misreport are now recomputed, not trusted. v0.4.0 adds the **driver**: `grovespec-next` runs whichever step is due (`next` · `files` locate the work; `approve` · `ratify` record a machine-taken gate honestly), so the build can be repeated from a script without a person tracking what comes next. Nothing about the gates changed — auto mode leaves a trail that says a machine took them.
+
+Migrating a pre-0.3.0 tree: add `origin: mapped` to each brownfield-mapped node's frontmatter (the evidence checks exempt those), and change calls from `bash .grovespec/bin/grovespec` to `node .grovespec/bin/grovespec.mjs`. Nothing else changes for 0.4.0 — the new commands and the driver are additions.
 
 ## License and the name
 

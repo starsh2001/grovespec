@@ -13,6 +13,7 @@ brief.sections: Direction|Scope|Risks
 conventions.sections: Glossary|Common Rules
 lifecycle: sketch|draft|approved|implemented|reviewed|fixed|done
 review.fm.required: target|target_type|level|strength|repeat|max_rounds|round|consecutive_passes|status
-review.fm.optional: spec_digest|reviewed_commit|last_test
+review.fm.optional: spec_digest|reviewed_commit|last_test|approved_by
 review.enum.status: in-progress|passed|escalated
 review.enum.target_type: tree|spec|result
+review.enum.approved_by: human|machine

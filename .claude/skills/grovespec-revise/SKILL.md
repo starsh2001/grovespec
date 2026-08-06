@@ -20,7 +20,7 @@ Changing an already-`done` node *later*. (Fixing mid-build is `grovespec-verify`
 
 **And make the consumer set mechanical too.** When the contract changed:
 - **consumers = (a) ∪ (b)** — (a) every Task whose `blocked_by` lists this node's id; (b) code/specs that grep-hit this node's **exported symbol names** across `src/` + `tasks/`. The set is complete only when *both* lists are enumerated. *Under-counting here is exactly the silent drift the whole tool exists to stop.*
-- **Read the symbols from the node's *code***, not its Contract — the public names consumers actually call (functions·classes·commands·routes); the Contract is concept-only and may name none. **Grep the *symbol*, never the node name** (names get renamed — `FORMATS.md`).
+- **Read the symbols from the node's *code***, not its Contract — the public names consumers actually call (functions·classes·commands·routes); the Contract is concept-only and may name none. **`node .grovespec/bin/grovespec.mjs files TASK-N`** lists that code (derived from the node's `TASK-N:` commits — a `mapped` brownfield node has none, so grep instead). **Grep the *symbol*, never the node name** (names get renamed — `FORMATS.md`).
 - **Only `approved`+ consumers get re-reviewed.** A `sketch`/`draft` consumer is pre-commitment (it never committed to the old contract) — leave it; when its turn comes, `grow`/`verify` check it against the *new* contract. So the re-review set = the **`approved`+ subset** of (a)∪(b). Early greenfield most consumers are still sketches, which is what keeps a revise from force-promoting half the tree.
 
 Don't make clones — one node = one Task. Old code lives in git; why it changed lives in the Change Log.

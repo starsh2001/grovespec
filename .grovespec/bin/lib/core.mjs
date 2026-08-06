@@ -112,6 +112,25 @@ export function specSpanText (text) {
   return lines.slice(start, end).join('\n')
 }
 
+// Rewrite ONE frontmatter field in place. Works on the raw text — every other line keeps
+// its bytes, and the edited line keeps its own line ending — so changing `status` in a
+// CRLF Task file does not rewrite the whole file. null = no frontmatter, or no such key
+// (the caller decides whether that is an error).
+export function setFmValue (text, key, value) {
+  const lines = text.split('\n')
+  const bare = l => l.replace(/\r$/, '')
+  if (!lines.length || !isFence(bare(lines[0]))) return null
+  const re = new RegExp(`^${reEscape(key)}${SP}*:`)
+  for (let i = 1; i < lines.length; i++) {
+    if (isFence(bare(lines[i]))) return null
+    if (re.test(bare(lines[i]))) {
+      lines[i] = `${key}: ${value}${lines[i].endsWith('\r') ? '\r' : ''}`
+      return lines.join('\n')
+    }
+  }
+  return null
+}
+
 // Review-state yamls have no frontmatter fences — a field is a top-level `key: value`
 // line. Comment and trailing spaces stripped; missing → ''.
 export function topValue (text, key) {

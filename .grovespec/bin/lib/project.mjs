@@ -104,6 +104,37 @@ export class Project {
     return t === null ? '' : topValue(t, 'status')
   }
   originOf (tid) { return this.fmOf(tid, 'origin') }
+  // What this node is waiting on a HUMAN for — one spelling, read by both `status`
+  // (which prints them) and `next` (which must never pick one: these transitions are
+  // the human's). Empty array = nothing parked on the user.
+  // Each entry: { kind, text }. `kind` is what a driver may act on — a clean gate
+  // (approve/confirm) can be taken by the machine in auto mode; `escalated` never can,
+  // because the machine itself reported that it did not converge.
+  humanWaits (tid) {
+    const st = this.statusOf(tid)
+    const vst = this.reviewStatus(this.verifyYamlPath(tid))
+    const rst = this.reviewStatus(this.reviewYamlPath(tid))
+    const out = []
+    if (st === 'draft' && vst === 'passed') out.push({ kind: 'approve', text: 'spec verify passed — awaiting approval (→ approved)' })
+    if (vst === 'escalated') out.push({ kind: 'escalated', text: `spec verify escalated — needs a human ruling (${this.verifyYamlPath(tid)})` })
+    if (st === 'reviewed' && rst === 'passed') out.push({ kind: 'confirm', text: 'review passed — awaiting confirm (→ done)' })
+    if (rst === 'escalated') out.push({ kind: 'escalated', text: `review escalated — needs a human ruling (${this.reviewYamlPath(tid)})` })
+    return out
+  }
+
+  // Gates a machine took on the human's behalf and nobody has ratified yet. Surfaced by
+  // `status` and `validate` every run: an auto-approved node is not a human-approved one,
+  // and the difference stops being a warranty the moment it stops being visible.
+  unratified (tid) {
+    const out = []
+    for (const [label, p] of [['spec', this.verifyYamlPath(tid)], ['result', this.reviewYamlPath(tid)]]) {
+      const t = this.read(p)
+      if (t !== null && topValue(t, 'approved_by') === 'machine') out.push(label)
+    }
+    return out
+  }
+
+  forget () { this.#cache.clear() }        // after a write, re-read from disk
   // A brownfield-mapped node that never entered a gate carries no evidence — exempt
   // until its first review file appears (a reopened node re-enters the rules with it).
   mappedExempt (tid) {
