@@ -6,6 +6,12 @@ version: 1
 language: en
 
 # Only the paths (locations) are changeable. The structure is fixed.
+# Every path below is a RELATIVE path inside the project, spelled the way the
+# filesystem spells it (case included). Absolute · drive-relative (C:src) · '..'
+# escaping the project · the project root itself ('.') are refused: these paths are
+# compared against git's own output, and a spelling git never prints is a comparison
+# that never matches — which reads as "nothing to report", not as an error.
+# `./x/`, `x//`, `a/../x` are accepted (one canonical form), just never needed.
 paths:
   brief: docs/brief.md
   tree: docs/tree.md
@@ -25,15 +31,15 @@ paths:
 # verify — cold-review: a node's draft spec (C1–C6) AND, once at init, the whole sketch tree's decomposition (D1–D5). Same scale/strength/models.
 verify:
   strength: 2        # how far to block: 1=Critical · 2=+Should Fix · 3=+Nice to Have
-  max_rounds: 5
-  # Reviewer model — OPTIONAL. Omit → every reviewer inherits the session model (the default: no extra cost, no forced Opus).
+  max_rounds: 15     # the escalation trigger, not the terminator — the CYCLE ends on lists: find’s ledger exhausted · the confirmed issues closed (reviewers.md §The cycle).
+  # Reviewer model — OPTIONAL. Omit → every reviewer inherits the session model (the portable default).
   # RECOMMENDED split if you customize: keep the broad finders on a cheap model (they drive recall), and lift only
-  # the deepest-reasoning lens + the triage to a stronger one (they set the ceiling + precision). Uncomment to follow:
+  # the deepest-reasoning lens + the triage to a stronger one (they set the ceiling + precision). Use model ids your host accepts:
   # models:
-  #   default: sonnet         # finder breadth — consumer-impersonator · gap-finder · non-expert · breaker
-  #   coherence: opus         # the spec lens needing the most reasoning (decomposition · cross-contract fit)
-  #   triage: opus            # the over-strictness pass — precision, so fewer real findings get dropped
-  # reviewer count·repeat, scaled to the change's reach (consumers / skeleton). verify picks the level.
+  #   default: <fast-model-id>       # finder breadth — consumer-impersonator · gap-finder · non-expert · breaker
+  #   coherence: <strong-model-id>   # the spec lens needing the most reasoning (decomposition · cross-contract fit)
+  #   triage: <strong-model-id>      # the over-strictness pass — precision, so fewer real findings get dropped
+  # reviewer count · repeat (= MINIMUM find waves — the recall floor), scaled to the change’s reach. verify picks the level.
   scale:
     skip:     { reviewers: 0, repeat: 0 }   # trivial spec edit (format·comment)
     light:    { reviewers: 2, repeat: 1 }   # small, contract unchanged
@@ -45,16 +51,16 @@ review:
   test: ""           # command to run this project's tests (e.g. "pytest -q", "npm test"). NOT asked at init — auto-detected:
                      #   brownfield: filled from the project at init · greenfield: empty until the first review derives it from the stack (asked only if undeterminable).
   strength: 2
-  max_rounds: 5
-  # Reviewer model — OPTIONAL. Omit → every reviewer inherits the session model (the default: no extra cost, no forced Opus).
+  max_rounds: 15     # the escalation trigger, not the terminator — the CYCLE ends on lists: find’s ledger exhausted · the confirmed issues closed (reviewers.md §The cycle).
+  # Reviewer model — OPTIONAL. Omit → every reviewer inherits the session model (the portable default).
   # RECOMMENDED split if you customize: cheap model for the broad finders (recall), a stronger one only on the
-  # lenses that need deep reasoning + the triage (ceiling + precision). Uncomment to follow:
+  # lenses that need deep reasoning + the triage (ceiling + precision). Use model ids your host accepts:
   # models:
-  #   default: sonnet         # finder breadth — the-6-month-maintainer · breaker · test-quality
-  #   correctness: opus       # subtle logic / contract-violation reasoning
-  #   security: opus          # exploit paths the tests rarely cover
-  #   triage: opus            # the over-strictness pass — precision
-  # reviewer count·repeat, scaled to the diff's size·risk (security-touching / big diff → higher). review picks the level.
+  #   default: <fast-model-id>        # finder breadth — the-6-month-maintainer · breaker · test-quality
+  #   correctness: <strong-model-id>  # subtle logic / contract-violation reasoning
+  #   security: <strong-model-id>     # exploit paths the tests rarely cover
+  #   triage: <strong-model-id>       # the over-strictness pass — precision
+  # reviewer count · repeat (= MINIMUM find waves — the recall floor), scaled to the diff’s size·risk. review picks the level.
   scale:
     skip:     { reviewers: 0, repeat: 0 }   # trivial diff (format·comment·≤2 lines)
     light:    { reviewers: 2, repeat: 1 }   # small diff, no new behavior

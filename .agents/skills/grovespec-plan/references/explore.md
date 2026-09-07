@@ -1,6 +1,6 @@
 # explore — drawing out a detailed spec from the user (greenfield)
 
-> grovespec-init reads this when there's *no code* — just an idea, a rough spec, or a detailed doc with intent gaps. The **method** only; artifact formats follow `.grovespec/templates/`.
+> grovespec-plan reads this at **plan #0** (no code — just an idea, a rough spec, or a detailed doc with intent gaps), and — much smaller — for the *new-wants* pass of a later plan. The **method** only; artifact formats follow `.grovespec/templates/`.
 
 ## Big principles
 - **Talk in `config.language`.** init sets it from the OS locale (`grovespec locale`; if undetectable, it asks — never a silent English default). Use that language for everything here, including your opening question. This doc is English — irrelevant to your output.
@@ -59,10 +59,10 @@ How to draw it out:
 ## Write the outputs
 
 ### 1. The detailed spec → ref/
-Write the full spec to `{paths.ref}/spec.md` (or a descriptive name). Once written here and human-approved at init, it's the **frozen intent baseline** — not edited in place afterward (like any ref doc): later build divergences are recorded in Change Logs, and a wrong *intent* is a re-`explore`, not a ref edit. Organized by feature area, in `config.language`, with gaps explicitly marked. Enough detail that `spec-to-tree.md` can place the tree and `grow` can later detail each node's contract from it.
+Write the full spec to `{paths.ref}/spec.md` (or a descriptive name). Once written it's a **frozen intent record** — the ref series rule (FORMATS): a later plan adds a new *dated* record naming what it supersedes; nobody edits an old one. Build divergences are recorded in Change Logs, and a wrong *intent* is a re-`explore` in a new record, not a ref edit. Organized by feature area, in `config.language`, with gaps explicitly marked. Enough detail that `spec-to-tree.md` can place the tree and `grow` can later detail each node's contract from it.
 
 ### 2. The brief → brief.md
 Compress the direction into `brief.md` (template `.grovespec/templates/brief.md`): **Direction** (2-3 sentences) · **Scope** (Does / Doesn't) · **Risks** (where it might break). Short, plain, in `config.language`. The brief is the overview; the detailed spec is the body.
 
 ## When done
-Return to `grovespec-init`'s flow — init reads `spec-to-tree.md` to map the detailed spec into the full tree of all-`sketch` Tasks (structure now; per-node contracts come later, when `grovespec-grow` details each sketch), with the human-check ("is this the right decomposition?") gating it before the gates start.
+Return to `grovespec-plan`'s flow — plan reads `spec-to-tree.md` to map the detailed spec into the full tree of all-`sketch` Tasks (structure now; per-node contracts come later, when `grovespec-grow` details each sketch), and ends at the decomposition gate ("is this the right decomposition?") before the build starts.

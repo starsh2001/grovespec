@@ -11,7 +11,8 @@
 // Wording note: this command never prints the driver's stop token. A machine loop watches
 // the SKILL's final line for it, and a runtime that echoed it would stop the loop early.
 import { listItemCount } from './core.mjs'
-import { GATE_MSG } from './project.mjs'
+import { treeGateMsg } from './project.mjs'
+import { freshSignals } from './cmd-fresh.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
@@ -41,10 +42,19 @@ function autoTakeable (P, tid, waits) {
 
 export function cmdNext (P, auto) {
   if (P.treeGatePending()) {
-    // The decomposition gate stays the human's even in auto mode: it is once per project,
-    // and a wrong tree is the most expensive thing to build forty nodes on top of.
-    say('next: tree → grovespec-verify (the decomposition gate)')
-    say(`  ${GATE_MSG}`)
+    // The tree gates stay the human's even in auto mode: once per project (decomposition)
+    // or once per adoption (survey fidelity), and a wrong tree is the most expensive
+    // thing to build forty nodes on top of.
+    const kind = P.treeGateKind()
+    if (P.treeAwaitingHuman()) {
+      say(`nothing runnable — waiting on you${auto ? ' (auto mode cannot take the tree gate)' : ''}:`)
+      say(kind === 'fidelity'
+        ? '  tree     survey passed its cold fidelity verify — look at the mapped tree, then: grovespec approve tree --human'
+        : '  tree     decomposition passed its cold verify — look at the tree, then: grovespec approve tree --human')
+      return 1
+    }
+    say(`next: tree → grovespec-verify (the ${kind === 'fidelity' ? 'survey fidelity' : 'decomposition'} gate)`)
+    say(`  ${treeGateMsg(P)}`)
     return 0
   }
 
@@ -87,9 +97,42 @@ export function cmdNext (P, auto) {
     say('nothing runnable — every remaining node is blocked:')
     for (const b of blocked) say(`  ${b}`)
   } else if (ids.length === 0) {
+    // An installed project with no tree = the pre-plan state: the first planning pass
+    // lays the tree (greenfield plan #0). Without even a config there is no project yet.
+    if (P.configText !== '') { say('next: plan — the tree is empty; the first planning pass lays it (grovespec-plan)'); return 0 }
     say('nothing runnable — the tree is empty (run grovespec-init)')
   } else {
-    say('nothing runnable — every node is done')
+    // Every node done. Parked work (followups · brownfield backlogs · fresh hand-edits)
+    // routes to the next planning pass — the driver must never end silently on top of
+    // known work. fresh is asked only here: the terminal is the one spot a hand-edit
+    // could otherwise slip out of the loop for good.
+    const b = P.backlogCounts()
+    const sig = freshSignals(P)
+    // A broken git contributes zero signals but must not read as "no signals" —
+    // the terminal below names it instead of ending quietly (or routing on it).
+    const fresh = sig.broken === null ? sig.dirty.length + sig.offband.length : 0
+    if (b.total + fresh > 0) {
+      const parts = []
+      if (b.followups) parts.push(`followups ${b.followups}`)
+      if (b.findings) parts.push(`findings ${b.findings}`)
+      if (b.restructuring) parts.push(`restructuring ${b.restructuring}`)
+      if (fresh) parts.push(`fresh ${fresh}`)
+      say(`next: plan — every node is done, parked work awaits: ${parts.join(' · ')} (grovespec-plan)`)
+      return 0
+    }
+    // The quiet terminal must say what it did NOT look at. Committed history goes
+    // unclassified when the project is nested in a larger repo, or when no adoption
+    // anchor exists — routing on "can't know" would never terminate, but a bare
+    // "every node is done" over that blind spot is a silent end on possibly-known work.
+    if (sig.broken !== null) {
+      say(`nothing decidable — every node is done but history cannot be classified (${sig.broken}); fix git, then re-run`)
+      return 1
+    }
+    const blind = !sig.repo ? ''
+      : sig.nested ? ' — committed hand-edits not classified (nested in a larger repository; grovespec fresh states the boundary)'
+      : sig.adoption === null ? ' — committed hand-edits not classified (no adoption anchor in history; grovespec fresh states the boundary)'
+      : ''
+    say(`nothing runnable — every node is done${blind}`)
   }
   return 1
 }

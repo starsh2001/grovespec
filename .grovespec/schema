@@ -1,6 +1,6 @@
-# GroveSpec format schema — the single source of truth for artifact formats.
+# GroveSpec format schema - the single source of truth for artifact formats.
 # Both bin/grovespec.mjs (the checker) and FORMATS.md (human prose) defer to THIS file.
-# Kept flat with |-separated lists — one line per rule, no YAML parser needed.
+# Kept flat with |-separated lists - one line per rule, no YAML parser needed.
 
 task.fm.required: id|name|role|status|blocked_by|tdd
 task.fm.optional: tdd_skip_reason|origin
@@ -13,7 +13,31 @@ brief.sections: Direction|Scope|Risks
 conventions.sections: Glossary|Common Rules
 lifecycle: sketch|draft|approved|implemented|reviewed|fixed|done
 review.fm.required: target|target_type|level|strength|repeat|max_rounds|round|consecutive_passes|status
-review.fm.optional: spec_digest|reviewed_commit|last_test|approved_by
+review.fm.optional: spec_digest|reviewed_commit|last_test|approved_by|tree_digest|phase
 review.enum.status: in-progress|passed|escalated
+review.enum.level: skip|light|standard|full
 review.enum.target_type: tree|spec|result
-review.enum.approved_by: human|machine
+review.enum.approved_by: pending|human|machine
+
+# A confirmed finding in `open_issues` or `followups`. `kind` chooses the lane first:
+# result reviews may block only on `defect`; spec/tree may also block on `contract-gap`;
+# `concern` never blocks. `family` dedupes "the same hole, new path". The three gates are
+# FIELDS, not prose, because `validate` recomputes the severity from them - a grade can't
+# be argued past its gates.
+# One entry of `rounds` — a pass's COUNTABLE result, never the story of it. The round's
+# reasoning has its own home (<id>.round<N>.brief.md · .judge.md · .confirm.md); `note` is
+# the one-line pointer to it. Unbounded, `note` became where the narrative actually lived:
+# one node's `rounds` reached 394 lines of block-scalar prose, and every later cold round
+# had to carry it. An entry is FLAT — every field on ONE line at the entry's own indent,
+# `found` written as a one-line flow map ({ critical: 0, should_fix: 0, nice: 0 }). Depth
+# is what validate reads, because a marker check ('note: >-') only catches one of the four
+# spellings the same prose walks back in through.
+round.fm.required: n|outcome
+round.fm.optional: phase|found|note
+
+finding.fm.required: kind|family|severity|proposed|gate1|gate2|gate3|where|what
+finding.fm.optional: id|trigger|clause|workaround|harm|measured|closer|gates_note
+finding.enum.kind: defect|contract-gap|concern
+finding.enum.severity: critical|should-fix|nice-to-have
+finding.enum.gate1: behavior|mechanism|contrived|story
+finding.enum.gate: yes|no

@@ -1,11 +1,11 @@
 # spec-to-tree — mapping a detailed spec into an all-sketch tree (greenfield)
 
-> grovespec-init reads this after a **detailed spec** exists (drawn out by `explore.md`, or brought by the user). The greenfield parallel to `code-to-tree.md`: that one maps *code* (reality) into an all-`done` tree; this one maps a *spec* (intent) into an all-`sketch` tree — the structure, not yet the full contracts.
+> grovespec-plan reads this (plan #0) after a **detailed spec** exists (drawn out by `explore.md`, or brought by the user). The greenfield parallel to init's `code-to-tree.md`: that one maps *code* (reality) into an all-`done` tree; this one maps a *spec* (intent) into an all-`sketch` tree — the structure, not yet the full contracts.
 
 ## What a sketch is (and isn't)
 A **sketch** is a node placed in the tree with just enough to see the shape: its **name**, a **one-line responsibility**, and its **rough I/O** (what it roughly takes / gives) — `status: sketch`. It is **not** a full contract; that gets written later, one node at a time, by `grovespec-grow` (sketch → draft), reading the detailed spec. The point: lay out the **whole structure cheaply** (50 one-liners fit one session; 50 full contracts don't), then detail each node just before building it.
 
-> Why sketch, not draft: a `draft` is a full contract that `verify` cold-checks. Writing 50 full contracts at init is the "too much in one head" blow-up GroveSpec exists to avoid. The sketch holds the *structure* (the expensive-to-reverse decision, gated by the human at init); the *contract detail* stays bounded — one node per grow.
+> Why sketch, not draft: a `draft` is a full contract that `verify` cold-checks. Writing 50 full contracts in one pass is the "too much in one head" blow-up GroveSpec exists to avoid. The sketch holds the *structure* (the expensive-to-reverse decision, gated at the tree gate); the *contract detail* stays bounded — one node per grow.
 
 ## Big principles
 - **The spec is intent, not truth.** Unlike brownfield (code = reality, mapped `done`), the spec is a *hypothesis* — mapped all `sketch`, refined through the gates. The build will change things; that's expected.
@@ -50,6 +50,6 @@ For each node, fill the Task **thinly**, `status: sketch`:
 - **conventions.md**: if the spec states cross-cutting rules (all amounts whole-won · every request authenticated · key terms), seed them now.
 
 ## When done
-Return to `grovespec-init`'s flow — the sketch tree now goes through the **decomposition gate**:
+Return to `grovespec-plan`'s flow — the sketch tree now goes through the **decomposition gate**:
 - `grovespec-verify` on the tree (`target_type: tree`) cold-checks the whole decomposition (D1–D5: scope coverage · system completeness · actor closure · boundaries · depth) → fix → human approves the vetted tree.
 - *Then* the per-node build runs top-down: `grovespec-grow` details the next sketch → `verify` (spec) → `implement` → `review` → `done`.

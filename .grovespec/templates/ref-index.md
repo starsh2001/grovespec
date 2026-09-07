@@ -1,4 +1,4 @@
-<!-- Never edit the originals in ref/. This is just a "what's where" guide. ref doesn't change, so this table doesn't go stale. Columns are fixed. -->
+<!-- Never edit the originals in ref/ — records are frozen; a later plan ADDS a dated record whose sections name what they supersede. This table is the living catalog: keep each Topic row pointing at its CURRENT record (the index moves, the records don't). Columns are fixed. -->
 
 ## Ref location map
 | Topic | File | Location |

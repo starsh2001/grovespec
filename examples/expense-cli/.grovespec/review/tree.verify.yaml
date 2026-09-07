@@ -1,0 +1,23 @@
+# Survey fidelity gate — the mapped (brownfield) tree was cold-verified against the code
+# (code↔tree coverage · contract↔behavior samples · no beautification · backlog honesty),
+# then a human approved the survey. This is what a completed brownfield adoption carries.
+target: docs/tree.md
+target_type: tree
+level: standard
+strength: 2
+repeat: 1
+max_rounds: 5
+
+round: 1
+consecutive_passes: 1
+status: passed
+approved_by: human
+
+rounds:
+  - n: 1
+    outcome: pass
+    found: { critical: 0, should_fix: 0, nice: 0 }
+
+open_issues: []
+
+adjudications: []

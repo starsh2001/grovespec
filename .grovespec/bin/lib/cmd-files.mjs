@@ -5,17 +5,31 @@
 // what calls what) is then a read of THESE files rather than a grep of the codebase.
 //
 // Nothing is stored: the mapping is derived from history every time, so it cannot drift.
-import { existsSync } from 'node:fs'
-import { inRepo, log, touched } from './git.mjs'
+import { git, repoState, shallowState, showPrefix, trackedPaths, log, touched } from './git.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
 export function cmdFiles (P, n) {
   if (n === '') { say('usage: grovespec files TASK-N'); return 2 }
   if (P.read(P.taskPath(n)) === null) { say(`no such node: ${n}`); return 2 }
-  if (!inRepo(P.root)) { say("not a git repository — files reads the node's TASK- commits"); return 2 }
+  const rs = repoState(P.root)
+  if (rs === 'broken') { say('git did not answer (missing or failing git) — nothing was listed'); return 2 }
+  if (rs === 'none') { say("not a git repository — files reads the node's TASK- commits"); return 2 }
+  const sh = shallowState(P.root)
+  if (sh === 'broken') { say('git rev-parse --is-shallow-repository failed — nothing was listed'); return 2 }
+  if (sh === 'shallow') { say('this is a shallow clone — cycles behind the cut are invisible, so the footprint would under-count; unshallow it (git fetch --unshallow), then re-run'); return 2 }
+  // touched() speaks repo-root-relative; this command answers project-relative.
+  const pfx = showPrefix(P.root)
+  if (pfx === null) { say('git rev-parse --show-prefix failed — nothing was listed'); return 2 }
+  // "Still there" is a question about git's index, not the filesystem: existsSync said
+  // yes to a DIRECTORY that had replaced a deleted file of that name, and on Windows
+  // it answers yes to `Foo.js` and `foo.js` alike after a case-only rename.
+  const tracked = trackedPaths(P.root)
+  if (tracked === null) { say('git ls-files failed — nothing was listed'); return 2 }
 
-  const commits = log(P.root).filter(c => c.s.startsWith(`${n}: `))
+  const history = log(P.root)
+  if (history === null) { say('git log failed — nothing was listed'); return 2 }
+  const commits = history.filter(c => c.s.startsWith(`${n}: `))
   if (commits.length === 0) {
     say(`files of ${n} (${P.nameOf(n)}) — no '${n}:' commits, so no code is attributed to this node yet`)
     if (P.originOf(n) === 'mapped') {
@@ -28,11 +42,21 @@ export function cmdFiles (P, n) {
   const ownTask = rel(P.taskPath(n))            // the node's own Task file — known by definition
 
   const seen = new Set()
-  for (const c of commits) for (const f of touched(P.root, c.h)) seen.add(f)
+  for (const c of commits) {
+    const tf = touched(P.root, c.h)
+    if (tf === null) { say(`cannot read the files of ${c.h.slice(0, 7)} — git show failed (git >= 2.31 is required for merge-aware diffs); nothing was listed`); return 2 }
+    // Strip the repo prefix so a nested project's own files exist-check and print in
+    // its own coordinates; a commit's files OUTSIDE the project (monorepo siblings)
+    // are still part of the footprint — listed repo-rooted as `:/…`, never dropped.
+    for (const f of tf) seen.add(f.startsWith(pfx) ? f.slice(pfx.length) : `:/${f}`)
+  }
   if (ownTask !== null) seen.delete(ownTask)
 
   const all = [...seen].sort()
-  const live = all.filter(f => existsSync(`${P.root}/${f}`))
+  // Both coordinates answer to the same index — "outside the project" never means
+  // "assumed alive" (a deleted sibling stayed listed while its twin inside the
+  // project was correctly dropped).
+  const live = all.filter(f => tracked.has(f.startsWith(':/') ? f.slice(2) : `${pfx}${f}`))
   const gone = all.length - live.length
   const dirs = new Set(live.map(f => (f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '.')))
 

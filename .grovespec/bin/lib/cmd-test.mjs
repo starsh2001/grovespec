@@ -2,9 +2,11 @@
 // "the tests passed" is a machine-written fact (exit code + log), not a reading of
 // scrollback. The skill's job stays the interpretation (mapping results to the AC);
 // this owns the running and the record.
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { cfgValue, splitLines } from './core.mjs'
+import { writeAtomic } from './project.mjs'
+import { git, inRepo } from './git.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
@@ -21,17 +23,20 @@ function skeleton (P, tid) {
   const rel = P.tasksDir.startsWith(`${P.root}/`) ? P.tasksDir.slice(P.root.length + 1) : P.tasksDir
   return [
     `target: ${rel}/${tid}.md`, 'target_type: result', 'level: standard', 'strength: 2',
-    'repeat: 1', 'max_rounds: 5', '', 'round: 0', 'consecutive_passes: 0',
-    'status: in-progress', '', 'rounds: []', '', 'open_issues: []', '', 'adjudications: []', ''
+    'repeat: 1', 'max_rounds: 15', '', 'round: 0', 'consecutive_passes: 0',
+    'status: in-progress', '', 'rounds: []', '', 'open_issues: []', '', 'followups: []', '', 'adjudications: []', ''
   ].join('\n')
 }
 
-function upsertLastTest (text, cmd, exit) {
+function upsertLastTest (text, cmd, exit, commit) {
+  // `commit` binds the verdict to the code it ran on — approve (machine) compares it
+  // against HEAD, so "the tests passed" can never quietly mean "…on some earlier code".
   const block = [
     'last_test:',
     `  command: ${JSON.stringify(cmd)}`,
     `  exit: ${exit}`,
-    `  when: "${new Date().toISOString()}"`
+    `  when: "${new Date().toISOString()}"`,
+    ...(commit !== '' ? [`  commit: ${commit}`] : [])
   ]
   const lines = splitLines(text)
   const start = lines.findIndex(l => /^last_test[ \t]*:/.test(l))
@@ -56,11 +61,16 @@ export function cmdTest (P, tid) {
   say(`test: exit ${exit} (${exit === 0 ? 'pass' : 'FAIL'})`)
 
   if (tid !== '') {
+    let commit = ''
+    if (inRepo(P.root)) {
+      const head = git(P.root, ['rev-parse', 'HEAD'])
+      if (head.ok) commit = head.out.trim()
+    }
     mkdirSync(P.reviewDir, { recursive: true })
     const yamlPath = P.reviewYamlPath(tid)
     const existing = P.read(yamlPath)
-    writeFileSync(yamlPath, upsertLastTest(existing ?? skeleton(P, tid), cmd, exit))
-    writeFileSync(`${P.reviewDir}/${tid}.test.log`, out)
+    writeAtomic(yamlPath, upsertLastTest(existing ?? skeleton(P, tid), cmd, exit, commit))
+    writeAtomic(`${P.reviewDir}/${tid}.test.log`, out)
     say(`recorded → ${yamlPath} (last_test) + ${tid}.test.log`)
   }
   return exit === 0 ? 0 : 1

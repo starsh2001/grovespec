@@ -17,7 +17,7 @@ tdd_skip_reason: ""        # required when tdd: false
 {What it must do. From the user's point of view.}
 
 ## Contract
-{What it guarantees to the outside (the parent · other nodes): what it takes · what it gives · invariants (units · order · empty cases). Other nodes rely on this without seeing the internals. State the *contract*, not the *mechanism* — atomicity·schemas·concurrency·API shapes belong to implement or to children. Defer mechanism + child-owned edges with a marker — `[→ child/deferred: <what>]` — rather than pinning them here; a skeleton stays lean and defers most detail.}
+{What it guarantees to the outside (the parent · other nodes): what it takes · what it gives · invariants (units · order · empty cases). Other nodes rely on this without seeing the internals. The line is **consumer observability**: public names·boundary shapes·errors·ordering·observable atomicity/concurrency promises are contract; algorithms·private structure·transaction internals belong to implement or to children. Defer mechanism + child-owned edges with a marker — `[→ child/deferred: <what>]` — rather than pinning them here; a skeleton stays lean and defers most detail.}
 
 ## AC
 <!-- Measurable non-functional targets (latency · throughput · error rate) go here as checkable items, e.g. "- [ ] p95 < 200ms @ 100 rps". An item prefixed "(gap)" = behavior deliberately left undefined (see FORMATS: verify probes it; implement/review skip it). -->
@@ -29,5 +29,5 @@ tdd_skip_reason: ""        # required when tdd: false
 - [ ] {implementation step}
 
 ## Change Log
-<!-- Also record review outcomes + any dropped-as-nitpick / accepted-gap adjudications (with the reason) here, so a future cold review doesn't re-litigate them. For a skeleton, record the decomposition here too: which children it needs + which Contract clause each child owns. -->
+<!-- Record review outcomes here in one line. Dropped-as-nitpick / accepted-gap adjudications do NOT go here — they stay in the node's review record, which reopen preserves (a Change Log carrying verdicts reaches the cold reviewers through the Task file). For a skeleton, record the decomposition here too: which children it needs + which Contract clause each child owns. -->
 - {YYYY-MM-DD} — {what changed and why, in one plain sentence a newcomer can follow. Code diffs live in git.}
