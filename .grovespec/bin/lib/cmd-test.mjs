@@ -13,7 +13,7 @@ const say = s => process.stdout.write(s + '\n')
 function testCommand (P) {
   // Strip the quotes only when the value is actually quoted ("" or "pytest -q") —
   // a bare command ENDING in a quote (`node -e "…"`) must come through untouched.
-  const v = cfgValue(P.configText, 'test')
+  const v = cfgValue(P.configText, 'review', 'test')
   return v.length >= 2 && v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v
 }
 

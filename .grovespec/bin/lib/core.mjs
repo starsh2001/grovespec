@@ -44,14 +44,138 @@ function stripComment (s) {
 
 // Frontmatter value: first line-1 `---` fence to the next fence; `key :` at line start;
 // strip trailing spaces, then one leading and one trailing quote. Missing → ''.
-export function fmValue (text, key) {
+const escapedAt = (s, at) => {
+  let slashes = 0
+  for (let i = at - 1; i >= 0 && s[i] === '\\'; i--) slashes++
+  return slashes % 2 === 1
+}
+
+function inlineBlockBoundary (line) {
+  if (/^[ \t]*$/.test(line)) return true
+  if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|(?:`{3,}|~{3,})|>|<!--)/.test(line)) return true
+  if (/^ {0,3}(?:[-+*][ \t]+|\d{1,9}[.)][ \t]+)/.test(line)) return true
+  return /^ {0,3}(?:=+|-+)[ \t]*$/.test(line)
+}
+
+function hasCodeSpanClose (lines, lineIndex, column, length) {
+  const headingLine = /^ {0,3}#{1,6}(?:[ \t]+|$)/.test(lines[lineIndex])
+  for (let i = lineIndex; i < lines.length; i++) {
+    if (i > lineIndex && (headingLine || inlineBlockBoundary(lines[i]))) return false
+    const line = lines[i]
+    for (let at = i === lineIndex ? column : 0; at < line.length;) {
+      if (line[at] !== '\x60') { at++; continue }
+      let n = 1
+      while (line[at + n] === '\x60') n++
+      if (n === length) return true
+      at += n
+    }
+  }
+  return false
+}
+
+// One Markdown block scan for every contract-bearing heading consumer. Fenced and
+// indented code stays content but cannot introduce/terminate sections. HTML comments
+// are hidden, except marker-shaped text inside inline code or behind a backslash.
+// A problem is data, not an exception: validate can report malformed Markdown while
+// digest readers fail closed.
+export function markdownStructureLines (text) {
   const lines = splitLines(text)
-  if (!lines.length || !isFence(lines[0])) return ''
+  const visible = []
+  let inComment = false
+  let fence = null
+  let inlineTicks = 0
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i]
+    if (fence !== null) {
+      const close = raw.match(/^ {0,3}(\x60+|~+)[ \t]*$/)
+      if (close && close[1][0] === fence.char && close[1].length >= fence.length) {
+        fence = null
+        visible.push({ line: '', n: i + 1, headingEligible: false, fenced: true, fenceBoundary: 'close', fenceText: raw })
+      } else {
+        visible.push({ line: raw, n: i + 1, headingEligible: false, fenced: true, fenceBoundary: 'body', fenceText: raw })
+      }
+      continue
+    }
+
+    // Block structure wins before inline parsing. Fence info strings and indented
+    // examples are literal code, so marker-shaped bytes there never open comments.
+    if (!inComment && inlineTicks === 0) {
+      const rawOpening = raw.match(/^ {0,3}(\x60{3,}|~{3,}).*$/)
+      if (rawOpening) {
+        fence = { char: rawOpening[1][0], length: rawOpening[1].length }
+        visible.push({ line: '', n: i + 1, headingEligible: false, fenced: true, fenceBoundary: 'open', fenceText: raw })
+        continue
+      }
+      if (/^(?: {4}|\t)/.test(raw)) {
+        visible.push({ line: raw, n: i + 1, headingEligible: false, fenced: false, indentedCode: true })
+        continue
+      }
+    }
+
+    const codeAtLineStart = inlineTicks !== 0
+    let kept = ''
+    for (let at = 0; at < raw.length;) {
+      if (inComment) {
+        const end = raw.indexOf('-->', at)
+        if (end === -1) break
+        kept += ' '
+        at = end + 3
+        inComment = false
+        continue
+      }
+      if (raw[at] === '\x60') {
+        let n = 1
+        while (raw[at + n] === '\x60') n++
+        if (inlineTicks !== 0) {
+          kept += raw.slice(at, at + n)
+          if (n === inlineTicks) inlineTicks = 0
+          at += n
+          continue
+        }
+        if (!escapedAt(raw, at) && hasCodeSpanClose(lines, i, at + n, n)) inlineTicks = n
+        kept += raw.slice(at, at + n)
+        at += n
+        continue
+      }
+      if (inlineTicks === 0 && raw.startsWith('<!--', at) && !escapedAt(raw, at)) {
+        kept += ' '
+        at += 4
+        inComment = true
+        continue
+      }
+      kept += raw[at]
+      at++
+    }
+    visible.push({ line: kept, n: i + 1, headingEligible: !codeAtLineStart, fenced: false })
+  }
+  const problem = inComment
+    ? 'unterminated HTML comment'
+    : fence !== null ? 'unterminated Markdown fence' : null
+  return { lines: visible, problem }
+}
+
+export function frontmatterLines (text) {
+  const lines = splitLines(text)
+  if (!lines.length || !isFence(lines[0])) return null
+  const end = lines.findIndex((line, i) => i > 0 && isFence(line))
+  return end === -1 ? null : lines.slice(1, end)
+}
+
+export function frontmatterBoundaryProblem (text) {
+  const lines = splitLines(text)
+  if (!lines.length || !isFence(lines[0])) return 'opening frontmatter fence is missing'
+  return lines.findIndex((line, i) => i > 0 && isFence(line)) === -1
+    ? 'closing frontmatter fence is missing'
+    : null
+}
+
+export function fmValue (text, key) {
+  const lines = frontmatterLines(text)
+  if (lines === null) return ''
   const re = new RegExp(`^${reEscape(key)}${SP}*:`)
-  for (let i = 1; i < lines.length; i++) {
-    if (isFence(lines[i])) return ''
-    if (re.test(lines[i])) {
-      let v = lines[i].replace(new RegExp(`^${reEscape(key)}${SP}*:${SP}*`), '')
+  for (const line of lines) {
+    if (re.test(line)) {
+      let v = line.replace(new RegExp(`^${reEscape(key)}${SP}*:${SP}*`), '')
       v = v.replace(new RegExp(`${SP}*$`), '')
       v = v.replace(/^"/, '').replace(/"$/, '')
       return v
@@ -60,12 +184,69 @@ export function fmValue (text, key) {
   return ''
 }
 
+// YAML permits duplicate mapping keys in some parsers and rejects them in others.
+// GroveSpec's deliberately small readers take the first spelling, so an agent-written
+// duplicate would otherwise make routing depend on which reader touched the file.
+// Return each duplicated top-level key once, in the order its second spelling appears.
+function duplicateKeys (lines) {
+  const seen = new Set(); const duplicated = new Set(); const out = []
+  for (const line of lines) {
+    const m = line.match(/^([A-Za-z_][A-Za-z0-9_.-]*)[ \t]*:/)
+    if (!m) continue
+    if (seen.has(m[1]) && !duplicated.has(m[1])) { duplicated.add(m[1]); out.push(m[1]) }
+    seen.add(m[1])
+  }
+  return out
+}
+
+export function duplicateFrontmatterKeys (text) {
+  const lines = frontmatterLines(text)
+  return lines === null ? [] : duplicateKeys(lines)
+}
+
+export function duplicateTopKeys (text) {
+  return duplicateKeys(splitLines(text))
+}
+
 // `## <name>` section headers, in file order (a header needs a space after ##).
+function directMappingEntries (text, parent) {
+  const lines = splitLines(text)
+  const parentRe = new RegExp('^' + reEscape(parent) + SP + '*:')
+  const parents = lines.map((line, index) => parentRe.test(line) ? index : -1).filter(index => index !== -1)
+  if (parents.length !== 1) return []
+  const start = parents[0]
+  if (stripComment(lines[start].replace(parentRe, '')).trim() !== '') return []
+  const candidates = []
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (new RegExp('^' + SP + '*(?:#.*)?$').test(line)) continue
+    const indent = line.match(new RegExp('^' + SP + '*'))[0].length
+    if (indent === 0) break
+    const body = line.slice(indent)
+    const match = body.match(/^([A-Za-z_][A-Za-z0-9_.-]*)[ \t]*:[ \t]*(.*)$/)
+    if (match) candidates.push({ key: match[1], value: stripComment(match[2]), indent })
+  }
+  if (!candidates.length) return []
+  const directIndent = Math.min(...candidates.map(entry => entry.indent))
+  return candidates.filter(entry => entry.indent === directIndent)
+}
+
+export function nestedValue (text, parent, key) {
+  const found = directMappingEntries(text, parent).filter(entry => entry.key === key)
+  return found.length === 1 ? found[0].value : ''
+}
+
+export function duplicateNestedKeys (text, parent) {
+  return duplicateKeys(directMappingEntries(text, parent).map(entry => entry.key + ':'))
+}
+
 export function sectionsOf (text) {
+  const scanned = markdownStructureLines(text)
+  if (scanned.problem !== null) return []
   const out = []
-  for (const l of splitLines(text)) {
-    if (new RegExp(`^##${SP}`).test(l)) {
-      out.push(l.replace(new RegExp(`^##${SP}+`), '').replace(new RegExp(`${SP}*$`), ''))
+  for (const entry of scanned.lines) {
+    if (entry.headingEligible && new RegExp(`^##${SP}`).test(entry.line)) {
+      out.push(entry.line.replace(new RegExp(`^##${SP}+`), '').replace(new RegExp(`${SP}*$`), ''))
     }
   }
   return out
@@ -160,11 +341,13 @@ export const pipes = s => s.split('|').map(t => t.trim()).filter(t => t !== '')
 // splitLines, joined with '\n'. Returns null when the span can't be found
 // (malformed sections — validate flags those separately).
 export function specSpanText (text) {
-  const lines = splitLines(text)
-  const start = lines.findIndex(l => new RegExp(`^##${SP}+Overview${SP}*$`).test(l))
-  const end = lines.findIndex(l => new RegExp(`^##${SP}+Subtasks${SP}*$`).test(l))
-  if (start === -1 || end === -1 || end <= start) return null
-  return lines.slice(start, end).join('\n')
+  const raw = splitLines(text)
+  const scanned = markdownStructureLines(text)
+  if (scanned.problem !== null) return null
+  const start = scanned.lines.find(entry => entry.headingEligible && new RegExp(`^##${SP}+Overview${SP}*$`).test(entry.line))
+  const end = scanned.lines.find(entry => entry.headingEligible && new RegExp(`^##${SP}+Subtasks${SP}*$`).test(entry.line))
+  if (!start || !end || end.n <= start.n) return null
+  return raw.slice(start.n - 1, end.n - 1).join('\n')
 }
 
 // Rewrite ONE frontmatter field in place. Works on the raw text — every other line keeps
@@ -180,9 +363,10 @@ export function setFmValue (text, key, value) {
   const lines = text.split('\n')
   const bare = l => l.replace(/\r$/, '')
   if (!lines.length || !isFence(bare(lines[0]))) return null
+  const end = lines.findIndex((line, i) => i > 0 && isFence(bare(line)))
+  if (end === -1) return null
   const re = new RegExp(`^${reEscape(key)}${SP}*:`)
-  for (let i = 1; i < lines.length; i++) {
-    if (isFence(bare(lines[i]))) return null
+  for (let i = 1; i < end; i++) {
     if (re.test(bare(lines[i]))) {
       lines[i] = `${key}: ${value}${lines[i].endsWith('\r') ? '\r' : ''}`
       return bom + lines.join('\n')
@@ -210,8 +394,9 @@ export function listItemCount (text, key) {
   const re = new RegExp(`^${reEscape(key)}${SP}*:`)
   for (let i = 0; i < lines.length; i++) {
     if (!re.test(lines[i])) continue
-    const rest = lines[i].replace(re, '').trim()
+    const rest = stripComment(lines[i].replace(re, '')).trim()
     if (rest.startsWith('[]')) return 0
+    if (rest.startsWith('[')) return 1
     let n = 0
     for (let j = i + 1; j < lines.length; j++) {
       const l = lines[j]
@@ -267,12 +452,43 @@ export function listItems (text, key) {
 }
 
 // One field of such an item. The first line carries `- key: value`, the rest `key: value`.
-export function itemValue (item, key) {
-  const re = new RegExp(`^${SP}*(-${SP}+)?${reEscape(key)}${SP}*:`)
-  for (const l of splitLines(item)) {
-    if (re.test(l)) return stripComment(l.replace(re, '')).trim()
+function directItemFields (item) {
+  const lines = splitLines(item).filter(line =>
+    !new RegExp('^' + SP + '*$').test(line) && !new RegExp('^' + SP + '*#').test(line))
+  if (!lines.length) return []
+  const dash = lines[0].search(/\S/)
+  if (dash === -1 || lines[0][dash] !== '-') return []
+  const after = lines[0].slice(dash + 1).search(/\S/)
+  const indent = after === -1
+    ? (lines.length > 1 ? lines[1].search(/\S/) : -1)
+    : dash + 1 + after
+  if (indent === -1) return []
+  const out = []
+  for (let i = 0; i < lines.length; i++) {
+    if (i === 0 && after === -1) continue
+    const column = i === 0 ? indent : lines[i].search(/\S/)
+    if (column !== indent) continue
+    const match = lines[i].slice(column).match(/^([A-Za-z_][A-Za-z0-9_-]*)[ \t]*:[ \t]*(.*)$/)
+    if (match) out.push({ key: match[1], value: stripComment(match[2]).trim() })
   }
-  return ''
+  return out
+}
+
+export function itemValue (item, key) {
+  const found = directItemFields(item).filter(field => field.key === key)
+  return found.length === 1 ? found[0].value : ''
+}
+
+export function duplicateListItemKeys (text, keys) {
+  const out = []
+  for (const list of keys) {
+    listItems(text, list).forEach((item, index) => {
+      for (const key of duplicateKeys(directItemFields(item).map(field => field.key + ':'))) {
+        out.push({ list, index: index + 1, key })
+      }
+    })
+  }
+  return out
 }
 
 // The severity gates, as arithmetic. THIS is the rule — the prose in reviewers.md
@@ -314,22 +530,11 @@ export function severityCap (proposed, gate1, gate2, gate3) {
 
 // config value: an INDENTED `key: value` line (first hit anywhere — the flat paths:
 // entries are the only indented keys the callers ask for), inline #comment stripped.
-export function cfgValue (text, key) {
-  const re = new RegExp(`^${SP}+${reEscape(key)}:${SP}`)
-  for (const l of splitLines(text)) {
-    if (re.test(l)) {
-      return stripComment(l.replace(new RegExp(`^${SP}+${reEscape(key)}:${SP}*`), ''))
-    }
-  }
-  return ''
+export function cfgValue (text, parent, key) {
+  return nestedValue(text, parent, key)
 }
 
 // top-level `language:` (indent allowed, no space required after the colon).
 export function langValue (text) {
-  for (const l of splitLines(text)) {
-    if (new RegExp(`^${SP}*language:`).test(l)) {
-      return stripComment(l.replace(new RegExp(`^${SP}*language:${SP}*`), ''))
-    }
-  }
-  return ''
+  return topValue(text, 'language')
 }

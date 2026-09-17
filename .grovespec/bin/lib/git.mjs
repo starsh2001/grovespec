@@ -165,6 +165,136 @@ export function ignoredState (root) {
   return 'broken'
 }
 
+// One shared path domain for result pin and result approval. Git reports paths from
+// the repository root while GroveSpec config is project-rooted; nested projects must
+// pass through this conversion before src/tests comparisons.
+function pathsUnderProject (P, dirs) {
+  const rel = p => p.startsWith(`${P.root}/`) ? p.slice(P.root.length + 1) : null
+  const areas = dirs.map(rel).filter(x => x !== null)
+  const prefix = showPrefix(P.root)
+  if (prefix === null) return null
+  return file => {
+    if (!file.startsWith(prefix)) return false
+    const projectPath = file.slice(prefix.length)
+    return areas.some(area => projectPath === area || projectPath.startsWith(`${area}/`))
+  }
+}
+
+// null means git could not establish the answer; [] means clean. Every porcelain
+// path flows through porcelainPaths so quoted names and both sides of renames share
+// exactly the same semantics at pin and approve.
+export function dirtyUnder (P) {
+  const inCode = pathsUnderProject(P, [P.srcDir, P.testsDir])
+  if (inCode === null) return null
+  const r = git(P.root, ['status', '--porcelain', '--untracked-files=all'])
+  if (!r.ok) return null
+  return r.out.split('\n').filter(Boolean).filter(line => porcelainPaths(line).some(inCode))
+}
+
+// A result verdict is allowed to leave only its own gate artifacts mutable between
+// pin and approval.  `grovespec diff` can review executable inputs outside the
+// configured src/tests pair (package.json, a lockfile, build config, migrations at
+// the project root, ...).  Limiting the pending seal to src/tests let one of those
+// reviewed files change after the cold pass while approve still stamped `done`.
+//
+// The Task itself is excluded from Git cleanliness because its status and mutable
+// bookkeeping are gate state; Contract/AC and frontmatter are bound separately by
+// spec_digest + task_evidence_digest during the pending decision window.  The
+// review directory is excluded because test logs and the pending verdict live there.
+// Everything else inside THIS project is held still for the short pending window.
+// A containing monorepo's siblings enter only when this Task's commit history touched
+// them, matching the wider subject that `grovespec diff` may have shown reviewers.
+function resultSubjectPath (P, target) {
+  const prefix = showPrefix(P.root)
+  if (prefix === null) return null
+  // A node may intentionally touch a shared monorepo sibling. `grovespec diff`
+  // includes that path, so the hand-off seal must include it too.  The all-cycle
+  // footprint is a safe superset of the current cycle and, unlike a stored path
+  // roster, cannot be truncated or miss a new post-pin TASK commit.
+  if (shallowState(P.root) !== 'full') return null
+  const history = log(P.root)
+  if (history === null) return null
+  const footprint = new Set()
+  for (const c of history) {
+    if (!c.s.startsWith(`${target}: `)) continue
+    const paths = touched(P.root, c.h)
+    if (paths === null) return null
+    for (const path of paths) footprint.add(path)
+  }
+  const rel = p => p.startsWith(`${P.root}/`) ? p.slice(P.root.length + 1) : null
+  const task = rel(P.taskPath(target))
+  const review = rel(P.reviewDir)
+  if (task === null || review === null) return null
+  const taskPath = `${prefix}${task}`
+  const reviewPath = `${prefix}${review}`
+  const runLockPath = `${prefix}.grovespec/run.lock`
+  return file => {
+    if (file === taskPath) return false
+    if (file === reviewPath || file.startsWith(`${reviewPath}/`)) return false
+    // The dispatcher creates this owner file before invoking every mutating command
+    // and removes it afterward; it is runtime coordination, never reviewer input.
+    if (file === runLockPath || file.startsWith(`${runLockPath}/`)) return false
+    if (footprint.has(file)) return true
+    if (!file.startsWith(prefix)) return false
+    return file.slice(prefix.length) !== ''
+  }
+}
+
+// null means git could not establish the answer; [] means the whole pending result
+// subject is clean.  Keep the original porcelain line for a useful refusal message.
+export function dirtyResultSubject (P, target) {
+  const inSubject = resultSubjectPath(P, target)
+  if (inSubject === null) return null
+  const r = git(P.root, ['status', '--porcelain', '--untracked-files=all'])
+  if (!r.ok) return null
+  return r.out.split('\n').filter(Boolean).filter(line => porcelainPaths(line).some(inSubject))
+}
+
+// Does an immutable commit still cover the code at HEAD? Evidence-only descendant
+// commits are allowed; a non-canonical/unrelated id or committed src/tests movement
+// is a breach. null means covered, otherwise the returned text names the failure.
+export function sealBreach (P, commit) {
+  const oid = canonicalOidState(P.root, commit)
+  if (oid === 'broken') return `${commit.slice(0, 7)} cannot be resolved (unknown commit, or git failed) — an unread check is not a passed one`
+  if (oid === 'no') return `'${commit}' is not a canonical full commit id — a seal names immutable bytes, never a moving name (re-run the gate so pin seals a real commit)`
+  const anc = ancestorState(P.root, commit)
+  if (anc === 'broken') return `${commit.slice(0, 7)} cannot be checked (git merge-base failed) — an unread check is not a passed one`
+  if (anc === 'no') return `${commit.slice(0, 7)} is not an ancestor of HEAD — a seal from another line of history binds nothing here`
+  const inCode = pathsUnderProject(P, [P.srcDir, P.testsDir])
+  if (inCode === null) return `whether the code moved since ${commit.slice(0, 7)} is unread (git rev-parse --show-prefix failed) — an unread check is not a passed one`
+  // Disable rename detection so a move across the configured boundary is exposed as
+  // both deletion and addition. `--name-only` with rename detection reports only the
+  // destination, which let `src/a.js -> docs/a.js` hide the reviewed source path.
+  // NUL framing also keeps newline-bearing path names from changing the answer.
+  const r = git(P.root, ['diff', '--name-only', '--no-renames', '-z', `${commit}..HEAD`])
+  if (!r.ok) return `whether the code moved since ${commit.slice(0, 7)} is unread (git diff failed) — an unread check is not a passed one`
+  const moved = r.out.split('\0').filter(Boolean).filter(inCode)
+  if (!moved.length) return null
+  const shown = moved.slice(0, 5).join(', ')
+  return `code moved since ${commit.slice(0, 7)}: ${shown}${moved.length > 5 ? ` (+${moved.length - 5} more)` : ''}`
+}
+
+// Pending result decisions use a wider domain than the legacy src/tests code seal:
+// every project path except this gate's own Task + review evidence.  The commit OID
+// already binds the bytes at pin time; this check proves no descendant commit changed
+// any of those bytes before approval.  --no-renames exposes both sides of a move.
+export function resultSealBreach (P, target, commit) {
+  const oid = canonicalOidState(P.root, commit)
+  if (oid === 'broken') return `${commit.slice(0, 7)} cannot be resolved (unknown commit, or git failed) -- an unread check is not a passed one`
+  if (oid === 'no') return `'${commit}' is not a canonical full commit id -- a seal names immutable bytes, never a moving name (re-run the gate so pin seals a real commit)`
+  const anc = ancestorState(P.root, commit)
+  if (anc === 'broken') return `${commit.slice(0, 7)} cannot be checked (git merge-base failed) -- an unread check is not a passed one`
+  if (anc === 'no') return `${commit.slice(0, 7)} is not an ancestor of HEAD -- a seal from another line of history binds nothing here`
+  const inSubject = resultSubjectPath(P, target)
+  if (inSubject === null) return `whether the reviewed project moved since ${commit.slice(0, 7)} is unread (git rev-parse --show-prefix failed) -- an unread check is not a passed one`
+  const r = git(P.root, ['diff', '--name-only', '--no-renames', '-z', `${commit}..HEAD`])
+  if (!r.ok) return `whether the reviewed project moved since ${commit.slice(0, 7)} is unread (git diff failed) -- an unread check is not a passed one`
+  const moved = r.out.split('\0').filter(Boolean).filter(inSubject)
+  if (!moved.length) return null
+  const shown = moved.slice(0, 5).join(', ')
+  return `reviewed project input moved since ${commit.slice(0, 7)}: ${shown}${moved.length > 5 ? ` (+${moved.length - 5} more)` : ''}`
+}
+
 // (Why the ignore-state matters at all: git walks UP from the project, so a project
 // dropped inside an ignored subtree of a bigger repo still answers 'repo' — while no
 // commit of this code can ever exist there. Then `reviewed_commit` records that foreign

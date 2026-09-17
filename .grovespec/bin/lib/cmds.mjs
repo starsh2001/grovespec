@@ -3,14 +3,17 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createHash } from 'node:crypto'
-import { sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, severityCap, SEVERITY_RANK } from './core.mjs'
+import { sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, severityCap, SEVERITY_RANK, frontmatterBoundaryProblem } from './core.mjs'
 import { Project, treeGateMsg, scriptDir, FORMAT } from './project.mjs'
-import { specDigest } from './cmd-pin.mjs'
+import { taskEvidenceDigest, specDigest, treeDigest } from './cmd-pin.mjs'
 import { lastTest } from './cmd-approve.mjs'
-import { git, repoState, ignoredState, shallowState, showPrefix, ancestorState, canonicalOidState, log, touched, trackedPaths, allSubjects, allTouchedPaths } from './git.mjs'
+import { git, repoState, ignoredState, shallowState, showPrefix, ancestorState, canonicalOidState, dirtyResultSubject, resultSealBreach, log, touched, trackedPaths, allSubjects, allTouchedPaths } from './git.mjs'
+import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDigest, validateCompletedPacket, validateTaskRefsSyntax } from './source-evidence.mjs'
+import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 const pad = (s, n) => s.length >= n ? s : s + ' '.repeat(n - s.length)
+const hasTop = (text, key) => splitLines(text).some(line => new RegExp(`^${key}[ \\t]*:`).test(line))
 
 // ===================== validate =====================
 // Every schema key this validator reads, as a roster — checked BEFORE any artifact is
@@ -55,10 +58,21 @@ export function cmdValidate (P) {
     prob(`${P.configPath}  no version: line — pre-versioning install; add 'version: ${FORMAT}' (the format this runtime reads)`)
   }
   for (const m of P.pathProblems) prob(`${P.configPath}  ${m}`)
+  for (const m of P.duplicateKeyProblems()) prob(m)
+  for (const m of P.frontmatterProblems()) prob(m)
 
   // --- per task file ---
   for (const f of P.taskFiles()) {
     const tid = P.tidOf(f)
+    const taskText = P.read(f) ?? ''
+    // One boundary diagnostic is enough. Without a closing fence every body field
+    // could masquerade as frontmatter, so none of the field/section verdicts below
+    // are meaningful until the boundary is repaired.
+    if (frontmatterBoundaryProblem(taskText) !== null) continue
+    try { validateTaskRefsSyntax(taskText, f) } catch (e) {
+      if (!(e instanceof SourceEvidenceError)) throw e
+      prob(e.message)
+    }
     for (const k of schList('task.fm.required')) {
       if (P.fm(f, k) === '') prob(`${f}  frontmatter '${k}' missing`)
     }
@@ -185,6 +199,129 @@ export function cmdValidate (P) {
     v = topValue(text, 'approved_by')
     if (v !== '' && !schList('review.enum.approved_by').includes(v)) prob(`${rf}  approved_by '${v}' invalid → use ${P.sch('review.enum.approved_by')}`)
 
+    // A source-evidence seal is optional only as a PAIR for legacy compatibility.
+    // Once present, validate continuously re-opens the exact find round pin named and
+    // proves that packet against today's Task, ref bytes and ref/index.md roster.
+    const sourceSeal = topValue(text, 'source_evidence_digest')
+    const sourceRound = topValue(text, 'source_evidence_round')
+    const hasSourceSeal = hasTop(text, 'source_evidence_digest')
+    const hasSourceRound = hasTop(text, 'source_evidence_round')
+    if (hasSourceSeal || hasSourceRound) {
+      if (!hasSourceSeal || !hasSourceRound || sourceSeal === '' || sourceRound === '') {
+        prob(`${rf}  source evidence seal is partial — source_evidence_digest and source_evidence_round must appear together with non-empty values`)
+      } else if (expType !== 'spec' || !m) {
+        prob(`${rf}  source evidence fields belong only to TASK-N.verify.yaml spec records`)
+      } else if (!/^[0-9a-f]{64}$/.test(sourceSeal)) {
+        prob(`${rf}  source_evidence_digest '${sourceSeal}' is not a canonical sha256`)
+      } else if (!/^[1-9][0-9]*$/.test(sourceRound) || !Number.isSafeInteger(Number(sourceRound))) {
+        prob(`${rf}  source_evidence_round '${sourceRound}' is not a positive safe integer`)
+      } else {
+        try {
+          const n = Number(sourceRound)
+          assertFindRound(m[1], text, n)
+          const briefPath = P.verifyRoundBriefPath(m[1], n)
+          const brief = P.read(briefPath)
+          if (brief === null) throw new SourceEvidenceError(`${briefPath} missing`)
+          const packet = parseSourcePacket(brief, briefPath)
+          const current = validateCompletedPacket(P, m[1], packet, text)
+          if (current !== sourceSeal) prob(`${rf}  completed source-evidence packet changed after pin — digest mismatch; re-run the spec gate`)
+        } catch (e) {
+          if (!(e instanceof SourceEvidenceError)) throw e
+          prob(`${rf}  source evidence no longer validates: ${e.message}`)
+        }
+      }
+    }
+
+    const scopeSeal = topValue(text, 'source_scope_digest')
+    if (hasTop(text, 'source_scope_digest')) {
+      if (expType !== 'tree') {
+        prob(`${rf}  source_scope_digest belongs only to tree.verify.yaml`)
+      } else if (!/^[0-9a-f]{64}$/.test(scopeSeal)) {
+        prob(`${rf}  source_scope_digest '${scopeSeal}' is not a canonical sha256`)
+      } else {
+        try {
+          if (scopeSeal !== sourceScopeDigest(P)) {
+            prob(`${rf}  Task ref assignments changed after the tree pin — source_scope_digest mismatch; re-run the tree gate`)
+          }
+        } catch (e) {
+          if (!(e instanceof SourceEvidenceError)) throw e
+          prob(`${rf}  source scope no longer validates: ${e.message}`)
+        }
+      }
+    }
+
+    const structureSeal = topValue(text, 'tree_digest')
+    if (hasTop(text, 'tree_digest')) {
+      if (expType !== 'tree') {
+        prob(`${rf}  tree_digest belongs only to tree.verify.yaml`)
+      } else if (!/^[0-9a-f]{64}$/.test(structureSeal)) {
+        prob(`${rf}  tree_digest '${structureSeal}' is not a canonical sha256`)
+      } else if (structureSeal !== treeDigest(P.treeText())) {
+        prob(`${rf}  tree structure changed after its pin — tree_digest mismatch; run grovespec reopen tree decomposition and re-run the tree gate`)
+      }
+    }
+
+    // The tree verdict is taken over a mode-specific input projection, not merely
+    // tree.md.  Keep checking it while the sealed verdict awaits its human decision;
+    // after approval it is historical evidence, because fidelity's code/backlogs and
+    // decomposition's brief legitimately evolve during later node cycles.
+    const evidenceMode = topValue(text, 'tree_evidence_mode')
+    const evidenceSeal = topValue(text, 'tree_evidence_digest')
+    const hasEvidenceMode = hasTop(text, 'tree_evidence_mode')
+    const hasEvidenceSeal = hasTop(text, 'tree_evidence_digest')
+    if (expType === 'tree' && topValue(text, 'approved_by') === 'pending' &&
+        (hasTop(text, 'tree_digest') || hasTop(text, 'source_scope_digest')) &&
+        !hasEvidenceMode && !hasEvidenceSeal) {
+      prob(`${rf}  pending legacy tree seal has no tree evidence for the reviewed brief/Tasks/code — restart the tree gate`)
+    }
+    if (hasEvidenceMode || hasEvidenceSeal) {
+      const unsealedCycleMarker = expType === 'tree' && hasEvidenceMode && !hasEvidenceSeal &&
+        !hasTop(text, 'tree_digest') && !hasTop(text, 'source_scope_digest')
+      if (unsealedCycleMarker) {
+        if (!TREE_EVIDENCE_MODES.includes(evidenceMode)) {
+          prob(`${rf}  tree_evidence_mode '${evidenceMode}' invalid → use ${TREE_EVIDENCE_MODES.join('|')}`)
+        }
+      } else if (!hasEvidenceMode || !hasEvidenceSeal || evidenceMode === '' || evidenceSeal === '') {
+        prob(`${rf}  tree evidence seal is partial — tree_evidence_mode and tree_evidence_digest must appear together with non-empty values`)
+      } else if (expType !== 'tree') {
+        prob(`${rf}  tree evidence fields belong only to tree.verify.yaml`)
+      } else if (!TREE_EVIDENCE_MODES.includes(evidenceMode)) {
+        prob(`${rf}  tree_evidence_mode '${evidenceMode}' invalid → use ${TREE_EVIDENCE_MODES.join('|')}`)
+      } else if (!/^[0-9a-f]{64}$/.test(evidenceSeal)) {
+        prob(`${rf}  tree_evidence_digest '${evidenceSeal}' is not a canonical sha256`)
+      } else if (topValue(text, 'approved_by') === 'pending') {
+        try {
+          if (evidenceSeal !== treeEvidenceDigest(P, evidenceMode)) {
+            prob(`${rf}  a reviewed tree input changed after pin — tree_evidence_digest mismatch; re-run the tree gate`)
+          }
+        } catch (e) {
+          if (!(e instanceof TreeEvidenceError)) throw e
+          prob(`${rf}  reviewed tree evidence no longer validates: ${e.message}`)
+        }
+      }
+    }
+
+    const taskSeal = topValue(text, 'task_evidence_digest')
+    const hasTaskSeal = hasTop(text, 'task_evidence_digest')
+    if (hasTaskSeal) {
+      if (expType !== 'spec' && expType !== 'result') {
+        prob(`${rf}  task_evidence_digest belongs only to TASK-N.verify.yaml or TASK-N.review.yaml`)
+      } else if (!/^[0-9a-f]{64}$/.test(taskSeal)) {
+        prob(`${rf}  task_evidence_digest '${taskSeal}' is not a canonical sha256`)
+      } else if (!hasTop(text, 'spec_digest') || (expType === 'result' && !hasTop(text, 'reviewed_commit'))) {
+        prob(`${rf}  task_evidence_digest is part of a complete Task seal — its spec_digest${expType === 'result' ? ' and reviewed_commit' : ''} must be present too`)
+      // This is a TOCTOU seal for the decision window, not a permanent metadata
+      // freeze. After a spec decision, implement may confirm a different role. After
+      // a result decision, a later tree-only merge may legitimately rewrite another
+      // done node's blocked_by without re-reviewing its unchanged product bytes.
+      } else if (m && topValue(text, 'approved_by') === 'pending') {
+        const taskText = P.read(P.taskPath(m[1]))
+        if (taskText !== null && taskEvidenceDigest(taskText) !== taskSeal) {
+          prob(`${rf}  Task evidence changed after pin — task_evidence_digest mismatch; re-run the ${expType} gate`)
+        }
+      }
+    }
+
     // --- the severity gates, enforced ---
     // Every confirmed finding states its gate answers, and the grade must not exceed what
     // they compute. This is the one rule a round cannot talk its way past: the loop that
@@ -230,6 +367,17 @@ export function cmdValidate (P) {
         }
         if (kind === 'concern' && sev !== '' && sev !== 'nice-to-have') {
           prob(`${at}  kind 'concern' must grade as 'nice-to-have' → concerns are notes, never blockers`)
+        }
+        // The followups entry bar: a parked pool is a future planning pass's mandatory
+        // reading list, and a measured 87-item pool lost 76 at disposition — what dies
+        // there should die at entry. contrived/story is recorded (adjudications), not queued.
+        // Scope: undecided records only (in-progress · escalated · passed-pending). A record
+        // whose gate is already decided was written under the rules of its own cycle — the
+        // same grandfather that keeps historical tree records readable; its parked items
+        // still surface in `followups` and dry out at the next plan disposition.
+        if (key === 'followups' && (g.gate1 === 'contrived' || g.gate1 === 'story')
+            && !(topValue(text, 'status') === 'passed' && topValue(text, 'approved_by') !== 'pending')) {
+          prob(`${at}  followups take gate1 'behavior' or 'mechanism' only — a '${g.gate1}' finding is recorded, not queued: move it to adjudications (accepted-gap, reason included); it re-enters only with live measurement`)
         }
         if (g.gate1 === 'mechanism' && field(it, 'trigger') === '') prob(`${at}  gate1: mechanism needs 'trigger' — name the ONE ordinary step (a natural future edit, an in-scope consumer doing the documented thing) that turns the hole into wrong behavior; if naming it takes deliberate rule-breaking or a coincidence of edits, the honest answer is 'contrived'`)
         if (g.gate2 === 'yes' && field(it, 'clause') === '') prob(`${at}  gate2: yes needs 'clause' — name the Contract/AC line it breaks`)
@@ -429,6 +577,7 @@ export function cmdValidate (P) {
       // tomorrow — a HEAD seal hid the whole live cycle behind an empty window), and
       // must be an ancestor of THIS history (a sibling-branch commit exists while
       // bounding nothing here). Canonical first, then ancestry; three answers each.
+      let currentAncestor = false
       const oid = canonicalOidState(P.root, rc)
       if (oid === 'broken') prob(`${t} reviewed_commit ${rc.slice(0, 7)} cannot be resolved (unknown commit, or git failed) — an unread check is not a passed one`)
       else if (oid === 'no') prob(`${t} reviewed_commit '${rc}' is not a canonical full commit id — a seal names immutable bytes, never a moving name (re-run the gate so pin seals a real commit)`)
@@ -436,6 +585,26 @@ export function cmdValidate (P) {
         const anc = ancestorState(P.root, rc)
         if (anc === 'broken') prob(`${t} reviewed_commit ${rc.slice(0, 7)} cannot be checked (git merge-base failed) — an unread check is not a passed one`)
         else if (anc === 'no') prob(`${t} reviewed_commit ${rc.slice(0, 7)} is not an ancestor of HEAD — a seal from another line of history binds nothing here (re-run the gate)`)
+        else currentAncestor = true
+      }
+
+      // A pending result is a short hand-off window between cold review and the
+      // decision.  Hold the whole project still there (except this gate's Task and
+      // review evidence), because the reviewed diff may include package/build inputs
+      // outside src/tests.  After approval the commit remains historical evidence;
+      // later node work must not make every old record a permanent project freeze.
+      // `reopen ... approved` deliberately keeps the prior reviewed_commit as the
+      // next cycle's diff base while resetting the record to in-progress.  That is
+      // not a pending decision seal: only the terminal pass + pin supplies the two
+      // digests that make this wider input binding current again.
+      if (P.reviewStatus(P.reviewYamlPath(t)) === 'passed' &&
+          P.approvedBy(P.reviewYamlPath(t)) === 'pending' &&
+          P.resultSealReady(t) && currentAncestor) {
+        const breach = resultSealBreach(P, t, rc)
+        if (breach !== null) prob(`${t} pending result seal no longer covers the reviewed project input — ${breach}`)
+        const dirty = dirtyResultSubject(P, t)
+        if (dirty === null) prob(`${t} pending result working-tree state is unreadable — an unread check is not a passed one`)
+        else if (dirty.length) prob(`${t} pending result has uncommitted project changes outside its Task/review evidence — re-run the result gate`)
       }
     }
   }

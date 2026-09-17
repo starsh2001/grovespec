@@ -8,7 +8,8 @@
 //   approve <ID|tree> [--human]  decide a sealed pass: verifies the seal covers the
 //              CURRENT bytes (digest · commit · bound green tests for a machine result),
 //              then flips the state. Writes no evidence. `approve tree` is human-only
-//   reopen ID draft|approved  revise's transition: fresh gate cycles, a past `passed`
+//   reopen ID draft|approved | tree decomposition|fidelity
+//                             revise's transition: fresh gate cycles, a past `passed`
 //              never doubles as current evidence (reviewed_commit kept as the diff base)
 //   ratify ID… the human coming back: stamps machine-taken gates as theirs
 //   diff ID    the node's cycle diff, mechanically (TASK-N: commits + working tree)
@@ -17,6 +18,7 @@
 //   fresh      out-of-band signals: src/tests changes that skipped the skills (report)
 //   followups  every parked non-blocking finding across all gate records + the brownfield
 //              backlogs — the aggregate surface grovespec-plan structures into a next pass
+//   source ID [coordinates…]  emit the assigned canonical ref-clause packet for a spec find round
 //   pin ID     bind the gate to the bytes: spec digest at approve, commit+digest at done
 //   id         the next node id, derived (highest ever seen + 1 — ids are never reused:
 //              a merged-away node's number would hand its commits to the new node)
@@ -37,7 +39,7 @@
 // CLI black box; this runtime was graded against the bash implementation it replaced
 // on those goldens, case for case.
 // Format SoT: .grovespec/schema   Paths: .grovespec/config.yaml
-import { Project, findRoot, versionRefusal } from './lib/project.mjs'
+import { Project, findRoot, languageRefusal, versionRefusal } from './lib/project.mjs'
 import { acquire, release, lockPath } from './lib/lock.mjs'
 import { cmdValidate, cmdStatus, cmdCheck, cmdFollowups, cmdLang, cmdLocale, cmdInterview, cmdId, cmdImpact, cmdTree, cmdVersion } from './lib/cmds.mjs'
 import { cmdDiff } from './lib/cmd-diff.mjs'
@@ -46,6 +48,7 @@ import { cmdNext } from './lib/cmd-next.mjs'
 import { cmdTest } from './lib/cmd-test.mjs'
 import { cmdFresh } from './lib/cmd-fresh.mjs'
 import { cmdPin } from './lib/cmd-pin.mjs'
+import { cmdSource } from './lib/cmd-source.mjs'
 import { cmdApprove, cmdRatify } from './lib/cmd-approve.mjs'
 import { cmdReopen } from './lib/cmd-reopen.mjs'
 
@@ -54,7 +57,7 @@ const rest = process.argv.slice(3)
 
 // The one spelling of the command surface (tests/doccheck.sh pins it against the
 // dispatch table, the header comment and README — edit them together).
-const USAGE = 'grovespec — validate | status | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | ratify TASK-N… | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups | pin <TASK-N|tree> | id | lang | locale | interview | impact TASK-N | tree | version\n'
+const USAGE = 'grovespec — validate | status | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups | source TASK-N [file.md@4…] | pin <TASK-N|tree> | id | lang | locale | interview | impact TASK-N | tree | version\n'
 
 // The argv gate: an unknown flag or a surplus argument is a typo'd INTENTION and exits 2 —
 // `approve TASK-1 --humman` used to be silently accepted and recorded a MACHINE decision
@@ -63,7 +66,7 @@ const USAGE = 'grovespec — validate | status | check [TASK-N] | next [--auto] 
 const AV = {
   validate: [0], status: [0], check: [1], next: [0, ['--auto', 'auto']],
   approve: [1, ['--human']], reopen: [2], ratify: [Infinity], diff: [1], files: [1],
-  test: [1], fresh: [0], followups: [0], pin: [1], id: [0], lang: [0], locale: [0],
+  test: [1], fresh: [0], followups: [0], source: [Infinity], pin: [1], id: [0], lang: [0], locale: [0],
   interview: [0], impact: [1], tree: [0], version: [0]
 }
 // No command takes two flags, and none takes the same one twice — `next --auto --auto`
@@ -87,6 +90,7 @@ const MUTATES = { approve: () => true, ratify: () => true, reopen: () => true, p
 // still needs to be told which runtime it is looking at, and in which language).
 const VERSION_EXEMPT = ['version', 'lang', 'locale', 'interview']
 const refusal = (cmd !== '' && !VERSION_EXEMPT.includes(cmd)) ? versionRefusal(findRoot()) : null
+const langRefusal = cmd === 'lang' ? languageRefusal(findRoot()) : null
 
 // Config paths that cannot be resolved inside the project are a dispatcher-level
 // refusal too — a per-command check reached only `validate`, `fresh` and the machine
@@ -96,9 +100,19 @@ const refusal = (cmd !== '' && !VERSION_EXEMPT.includes(cmd)) ? versionRefusal(f
 // problem (the informational four never touch project paths at all).
 const PATHS_EXEMPT = [...VERSION_EXEMPT, 'validate']
 let pathRefusal = null
+let duplicateKeyRefusal = null
+let frontmatterRefusal = null
 if (refusal === null && cmd !== '' && !PATHS_EXEMPT.includes(cmd)) {
-  const probs = new Project().pathProblems
-  if (probs.length) pathRefusal = probs
+  const probe = new Project()
+  if (probe.pathProblems.length) pathRefusal = probe.pathProblems
+  else {
+    const probs = probe.duplicateKeyProblems()
+    if (probs.length) duplicateKeyRefusal = probs
+    else {
+      const boundaries = probe.frontmatterProblems()
+      if (boundaries.length) frontmatterRefusal = boundaries
+    }
+  }
 }
 
 let ec
@@ -110,9 +124,20 @@ if (badArg !== null) {
 } else if (refusal !== null) {
   process.stdout.write(refusal + '\n')
   ec = 2
+} else if (langRefusal !== null) {
+  process.stdout.write(langRefusal + '\n')
+  ec = 2
 } else if (pathRefusal !== null) {
   for (const m of pathRefusal) process.stdout.write(`${findRoot()}/.grovespec/config.yaml  ${m}\n`)
   process.stdout.write('this command works in the configured paths, and one of them cannot be used as configured — nothing was read or written (grovespec validate explains; fix config.yaml, then re-run)\n')
+  ec = 2
+} else if (duplicateKeyRefusal !== null) {
+  for (const m of duplicateKeyRefusal) process.stdout.write(`${m}\n`)
+  process.stdout.write('duplicate YAML keys make project routing or gate state ambiguous — nothing was read as a verdict and nothing was written (grovespec validate explains; keep each field once, then re-run)\n')
+  ec = 2
+} else if (frontmatterRefusal !== null) {
+  for (const m of frontmatterRefusal) process.stdout.write(`${m}\n`)
+  process.stdout.write('malformed Task frontmatter makes lifecycle state ambiguous — nothing was read as a verdict and nothing was written (grovespec validate explains; restore both --- fences, then re-run)\n')
   ec = 2
 } else if (MUTATES[cmd] !== undefined && MUTATES[cmd]() && (held = acquire(findRoot())) === null) {
   process.stdout.write(`another grovespec run holds the write lock: ${lockPath(findRoot())}\n`)
@@ -133,6 +158,7 @@ if (badArg !== null) {
       case 'test': ec = cmdTest(new Project(), arg); break
       case 'fresh': ec = cmdFresh(new Project()); break
       case 'followups': ec = cmdFollowups(new Project()); break
+      case 'source': ec = cmdSource(new Project(), rest); break
       case 'pin': ec = cmdPin(new Project(), arg); break
       case 'lang': ec = cmdLang(new Project()); break
       case 'locale': ec = cmdLocale(); break

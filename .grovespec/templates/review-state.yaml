@@ -121,19 +121,27 @@ open_issues:
 # Real issues that do NOT block this lane.
 # Use this for spec/contract revision work found during code review, or for concerns you
 # want carried forward without pretending the current code gate is still open.
+# ENTRY BAR: gate1 must be behavior or mechanism (validate enforces). A contrived/story
+# keep is recorded, not queued — write it to `adjudications` (accepted-gap, with reason);
+# it re-enters only as live measurement. A parked pool is a future planning pass's
+# mandatory reading list; what would die at disposition should die at entry.
 followups:
   - id: F2
     kind: contract-gap       # contract-gap | concern  (`defect` must not live here)
     family: output-contract-unspecified
     severity: nice-to-have
     proposed: should-fix
-    gate1: story
+    gate1: mechanism
+    trigger: "a second exporter is added and sorts differently — the documented consumer diff breaks"
     gate2: no
     gate3: no
     where: "docs/tasks/TASK-0.md # Contract"
     what: "the current code works, but the contract does not say whether the exported rows are stable-ordered"
 
-# Triage adjudications - do NOT re-raise these. A later cold review reads them to avoid re-litigating.
+# Triage adjudications - do NOT re-raise these. A later cold review reads them to avoid
+# re-litigating: the caller hands them to every wave ITEMIZED (claim + verdict + reason) —
+# a verdict record settles one claim, never the area around it. contrived/story keeps that
+# fail the followups entry bar are recorded here as accepted-gap.
 adjudications:
   - issue: ""                # short description
     verdict: dropped         # dropped (nitpick) | accepted-gap

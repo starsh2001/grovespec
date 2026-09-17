@@ -12,8 +12,9 @@
 
 ## Steps
 1. **Keep the originals in ref/ as-is.** **Default: copy** the incoming docs into the config's ref path (default `docs/ref/`) *untouched*. Point at a doc in place instead *only* if it's actively maintained elsewhere (so two copies don't drift). When unsure, copy.
-2. **Make a location map (ref-index).** A map of "what's where." Kept so you don't re-read the whole thing each time. Format is the `ref-index.md` template (Topic | File | Location). ref doesn't change, so this table doesn't go stale.
-3. **Reflect into the tree/contract per Task.** The planning pass doesn't unfold the docs. Later, as grow/implement build a node, they reference the relevant part of ref to *stay true to the intended implementation*.
+2. **Make a location map (ref-index).** A map of "what's where." Kept so you don't re-read the whole thing each time. Format is the `ref-index.md` template (Topic | File | Location). Frozen records don't change; when a later record supersedes one, the index moves to the current coordinate.
+3. **Assign current headings to Tasks before the tree gate.** Each sketch frontmatter carries its exact source scope as a canonical flow list such as `refs: [spec.md@4, spec.md@5.4]`, with paths relative to `paths.ref`. `ref/index.md` says which record is current; `refs` says which of those current headings this node owns. Use `refs: []` only for an intentional no-ref node. A heading containing only `(gap)` text is still assigned: its scope exists even though its behavior is deliberately undefined.
+4. **Reflect into the contract from that assignment.** `grow` preserves and reads the Task's `refs`; spec `verify` runs `grovespec source TASK-N` so the runtime resolves the same headings without a model-written hand-off.
    - **Watch the nouns the doc leans on but never defines.** A spec/regulation freely names actors·entities it assumes already exist (employee · hire-date · team · auth identity) with no "create employee" section of its own. When you reflect its rules into the tree, make sure *some node owns each such noun* — a rule must not depend on an entity no node creates. (verify's C1 catches this, but spotting it here saves a round.)
 
 ## When it drifts

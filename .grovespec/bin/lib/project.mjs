@@ -4,7 +4,11 @@
 import { existsSync, statSync, readFileSync, readdirSync, writeFileSync, renameSync, chmodSync, rmSync } from 'node:fs'
 import { dirname, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { fmValue, treeRows, blockedIds, schValue, cfgValue, topValue, listItemCount, listItems, itemValue, splitLines } from './core.mjs'
+import {
+  fmValue, treeRows, blockedIds, schValue, cfgValue, topValue, listItemCount,
+  listItems, itemValue, splitLines, duplicateFrontmatterKeys, duplicateTopKeys,
+  duplicateNestedKeys, duplicateListItemKeys, frontmatterBoundaryProblem
+} from './core.mjs'
 
 // Status order — how far a node has advanced; evidence requirements key off this.
 export const LIFECYCLE = ['sketch', 'draft', 'approved', 'implemented', 'reviewed', 'fixed', 'done']
@@ -59,9 +63,22 @@ export const FORMAT = '1'
 export function versionRefusal (root) {
   let text
   try { text = readFileSync(`${root}/.grovespec/config.yaml`, 'utf8') } catch { return null }
+  if (duplicateTopKeys(text).includes('version')) {
+    return `${root}/.grovespec/config.yaml  top-level field 'version' appears more than once — the format boundary is ambiguous; keep it once, then re-run`
+  }
   const v = topValue(text, 'version')
   if (v === '' || v === FORMAT) return null                // '' = pre-versioning: validate advises, nothing refuses
   return `${root}/.grovespec/config.yaml  version '${v}' — this runtime reads format ${FORMAT} and answers nothing across that boundary: upgrade the runtime (or fix the stamp), then re-run`
+}
+
+// `lang` deliberately remains reachable across an unreadable version/path boundary,
+// but it still must not pick the first of two conflicting language declarations.
+export function languageRefusal (root) {
+  let text
+  try { text = readFileSync(`${root}/.grovespec/config.yaml`, 'utf8') } catch { return null }
+  return duplicateTopKeys(text).includes('language')
+    ? `${root}/.grovespec/config.yaml  top-level field 'language' appears more than once — config.language is ambiguous; keep it once, then re-run`
+    : null
 }
 
 export class Project {
@@ -87,7 +104,7 @@ export class Project {
     // names. One logical separator first, then one canonical form.
     this.pathProblems = []
     const cfg = (key, dflt) => {
-      const raw = cfgValue(this.configText, key)
+      const raw = cfgValue(this.configText, 'paths', key)
       let v = raw === '' ? dflt : raw
       // Absolute in either dialect, plus drive-relative (`C:src` — no separator after
       // the colon, so a slash test misses it while Windows resolves it per-drive).
@@ -152,6 +169,17 @@ export class Project {
         this.pathProblems.push(`paths.review: '${r}' overlaps paths.${key}: '${o}' — everything under the review dir is held out of the cycle diff, so an overlap would hide ${key === 'src' || key === 'tests' ? 'real code' : `the ${key} artifact`} from the cold reviewers under a "gate record" count; give the review dir a region of its own`)
       }
     }
+    // Gate records may live below .grovespec, but never in or around the runtime's
+    // own control files. `review: .grovespec/` made config/bin/schema changes look like
+    // gate evidence and therefore disappear from resultSubjectPath/cmd-diff.
+    const reviewRel = asRel(this.reviewDir)
+    const controls = ['.grovespec/config.yaml', '.grovespec/bin', '.grovespec/schema', '.grovespec/templates', '.grovespec/VERSION']
+    for (const control of controls) {
+      if (inside(control, reviewRel) || inside(reviewRel, control)) {
+        this.pathProblems.push(`paths.review: '${reviewRel}' overlaps GroveSpec control path '${control}' — gate records cannot contain, or sit inside, runtime/config/schema paths because review filtering would hide control changes`)
+        break
+      }
+    }
     this.#cache = new Map()
   }
 
@@ -201,8 +229,51 @@ export class Project {
     try { names = readdirSync(this.reviewDir) } catch { return [] }
     return names.filter(n => n.endsWith('.yaml')).sort().map(n => `${this.reviewDir}/${n}`)
   }
+  duplicateKeyProblems () {
+    const out = []
+    for (const key of duplicateTopKeys(this.configText)) {
+      out.push(`${this.configPath}  top-level field '${key}' appears more than once — config routing would be ambiguous`)
+    }
+    for (const parent of ['paths', 'review']) {
+      for (const key of duplicateNestedKeys(this.configText, parent)) {
+        out.push(`${this.configPath}  ${parent} field '${key}' appears more than once — config routing would be ambiguous`)
+      }
+    }
+    for (const key of duplicateTopKeys(this.schemaText)) {
+      out.push(`schema  field '${key}' appears more than once — validation rules would be ambiguous`)
+    }
+    for (const file of this.taskFiles()) {
+      for (const key of duplicateFrontmatterKeys(this.read(file) ?? '')) {
+        out.push(`${file}  frontmatter field '${key}' appears more than once — routing would be ambiguous`)
+      }
+    }
+    for (const file of this.reviewFiles()) {
+      const text = this.read(file) ?? ''
+      for (const key of duplicateTopKeys(text)) {
+        out.push(`${file}  top-level field '${key}' appears more than once — gate state would be ambiguous`)
+      }
+      for (const key of duplicateNestedKeys(text, 'last_test')) {
+        out.push(`${file}  last_test field '${key}' appears more than once — test evidence would be ambiguous`)
+      }
+      for (const { list, index, key } of duplicateListItemKeys(text,
+        ['strategies', 'checks', 'found', 'rounds', 'open_issues', 'followups', 'adjudications'])) {
+        out.push(`${file}  ${list}[${index}] field '${key}' appears more than once — gate evidence would be ambiguous`)
+      }
+    }
+    return out
+  }
+  frontmatterProblems () {
+    const out = []
+    for (const file of this.taskFiles()) {
+      const problem = frontmatterBoundaryProblem(this.read(file) ?? '')
+      if (problem !== null) out.push(`${file}  ${problem} — Task state and routing cannot be read safely`)
+    }
+    return out
+  }
   verifyYamlPath (tid) { return `${this.reviewDir}/${tid}.verify.yaml` }
   reviewYamlPath (tid) { return `${this.reviewDir}/${tid}.review.yaml` }
+  verifyRoundBriefPath (tid, round) { return `${this.reviewDir}/${tid}.round${round}.brief.md` }
+  refIndexPath () { return `${this.refDir}/index.md` }
   reviewStatus (path) {                                  // '' when the file is missing
     const t = this.read(path)
     return t === null ? '' : topValue(t, 'status')
@@ -216,6 +287,23 @@ export class Project {
     return t === null ? '' : topValue(t, 'approved_by')
   }
 
+  specSealReady (tid) {
+    const text = this.read(this.verifyYamlPath(tid))
+    return text !== null && topValue(text, 'spec_digest') !== '' &&
+      topValue(text, 'task_evidence_digest') !== ''
+  }
+  resultSealReady (tid) {
+    const text = this.read(this.reviewYamlPath(tid))
+    return text !== null && topValue(text, 'spec_digest') !== '' &&
+      topValue(text, 'reviewed_commit') !== '' && topValue(text, 'task_evidence_digest') !== ''
+  }
+  treeSealReady () {
+    const text = this.read(this.treeYamlPath())
+    return text !== null && topValue(text, 'tree_digest') !== '' &&
+      topValue(text, 'source_scope_digest') !== '' &&
+      topValue(text, 'tree_evidence_mode') !== '' && topValue(text, 'tree_evidence_digest') !== ''
+  }
+
   // Each entry: { kind, text }. A gate WAITS on the human only while its verdict is
   // `passed` AND `approved_by: pending` — a record someone already decided (human/machine)
   // is a closed past gate, and a legacy record (no field) binds nothing: neither may be
@@ -226,11 +314,11 @@ export class Project {
     const vp = this.verifyYamlPath(tid); const rp = this.reviewYamlPath(tid)
     const vst = this.reviewStatus(vp); const rst = this.reviewStatus(rp)
     const out = []
-    if (st === 'draft' && vst === 'passed' && this.approvedBy(vp) === 'pending') {
+    if (st === 'draft' && vst === 'passed' && this.approvedBy(vp) === 'pending' && this.specSealReady(tid)) {
       out.push({ kind: 'approve', text: 'spec verify passed — awaiting your approval (grovespec approve TASK --human)'.replace('TASK', tid) })
     }
     if (vst === 'escalated') out.push({ kind: 'escalated', text: `spec verify escalated — needs a human ruling (${vp})` })
-    if (st === 'reviewed' && rst === 'passed' && this.approvedBy(rp) === 'pending') {
+    if (st === 'reviewed' && rst === 'passed' && this.approvedBy(rp) === 'pending' && this.resultSealReady(tid)) {
       out.push({ kind: 'confirm', text: 'review passed — awaiting your confirm (grovespec approve TASK --human)'.replace('TASK', tid) })
     }
     if (rst === 'escalated') out.push({ kind: 'escalated', text: `review escalated — needs a human ruling (${rp})` })
@@ -317,9 +405,29 @@ export class Project {
   //   'decomposition' — sketch nodes exist: is this the right decomposition? (D1–D5)
   //   'fidelity'      — a pristine mapped (brownfield) tree: is it an accurate survey
   //                     of the code? (the map is an agent's claim too — never self-vouched)
+  //   A fresh, undecided tree record also arms decomposition on an already-built tree:
+  //   plan/revise may change only shape/refs, so no sketch status exists to carry that
+  //   fact across the normal one-step/session boundary.
   //   ''              — no tree gate armed.
   treeGateKind () {
     if (this.hasSketch()) return 'decomposition'
+    const treeRecord = this.read(this.treeYamlPath())
+    if (treeRecord !== null) {
+      const status = topValue(treeRecord, 'status')
+      const approvedBy = topValue(treeRecord, 'approved_by')
+      const undecided = (status === 'in-progress' || status === 'escalated') &&
+        approvedBy !== 'human' && approvedBy !== 'machine'
+      const awaitingDecision = status === 'passed' && approvedBy === 'pending'
+      if (undecided || awaitingDecision) {
+        const explicit = topValue(treeRecord, 'tree_evidence_mode')
+        if (explicit === 'fidelity' || explicit === 'decomposition') return explicit
+        // Legacy initial brownfield records predate the explicit cycle marker. Only
+        // that pristine state falls back to fidelity; every explicitly reopened tree
+        // writes its mode before the first cold round.
+        if (this.hasMapped() && !this.nodeGateEvidence()) return 'fidelity'
+        return 'decomposition'
+      }
+    }
     if (this.hasMapped() && !this.nodeGateEvidence()) return 'fidelity'
     return ''
   }
@@ -339,7 +447,8 @@ export class Project {
   treeAwaitingHuman () {
     return this.treeGateKind() !== '' &&
       this.reviewStatus(this.treeYamlPath()) === 'passed' &&
-      this.approvedBy(this.treeYamlPath()) === 'pending'
+      this.approvedBy(this.treeYamlPath()) === 'pending' &&
+      this.treeSealReady()
   }
 
   // ---- readiness ----

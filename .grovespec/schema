@@ -3,7 +3,7 @@
 # Kept flat with |-separated lists - one line per rule, no YAML parser needed.
 
 task.fm.required: id|name|role|status|blocked_by|tdd
-task.fm.optional: tdd_skip_reason|origin
+task.fm.optional: tdd_skip_reason|origin|refs
 task.fm.enum.role: skeleton|feature
 task.fm.enum.status: sketch|draft|approved|implemented|reviewed|fixed|done
 task.fm.enum.origin: mapped
@@ -13,7 +13,7 @@ brief.sections: Direction|Scope|Risks
 conventions.sections: Glossary|Common Rules
 lifecycle: sketch|draft|approved|implemented|reviewed|fixed|done
 review.fm.required: target|target_type|level|strength|repeat|max_rounds|round|consecutive_passes|status
-review.fm.optional: spec_digest|reviewed_commit|last_test|approved_by|tree_digest|phase
+review.fm.optional: spec_digest|task_evidence_digest|source_evidence_digest|source_evidence_round|source_scope_digest|tree_evidence_mode|tree_evidence_digest|reviewed_commit|last_test|approved_by|tree_digest|phase
 review.enum.status: in-progress|passed|escalated
 review.enum.level: skip|light|standard|full
 review.enum.target_type: tree|spec|result

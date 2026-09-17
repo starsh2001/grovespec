@@ -6,7 +6,7 @@
 //
 //   approve TASK-N            machine takes the gate (auto mode). Result gates also
 //                             demand machine-verifiable test evidence bound to the code
-//                             HEAD holds — bytes, not the commit's name (sealBreach).
+//                             HEAD holds — bytes, not the commit's name.
 //   approve TASK-N --human    the human takes it — judgment allowed, evidence not
 //                             required beyond the seal itself.
 //   approve tree --human      the human opens the decomposition gate.
@@ -16,22 +16,24 @@
 // Every check runs BEFORE any write. The two writes (task status, then record) are not
 // one atomic operation, so an interrupted approval leaves task=advanced + record=pending
 // — validate names that state, and re-running approve completes it (the repair path).
-import { splitLines, topValue, listItemCount, setFmValue } from './core.mjs'
+import { duplicateNestedKeys, nestedValue, splitLines, topValue, listItemCount, setFmValue } from './core.mjs'
 import { writeAtomic } from './project.mjs'
-import { specDigest, treeDigest } from './cmd-pin.mjs'
-import { git, porcelainPaths, repoState, ignoredState, canonicalOidState, ancestorState } from './git.mjs'
+import { taskEvidenceDigest, specDigest, treeDigest } from './cmd-pin.mjs'
+import { dirtyResultSubject, git, repoState, ignoredState, resultSealBreach } from './git.mjs'
+import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDigest, validateCompletedPacket } from './source-evidence.mjs'
+import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
 
 const say = s => process.stdout.write(s + '\n')
+const hasTop = (text, key) => splitLines(text).some(line => new RegExp(`^${key}[ \\t]*:`).test(line))
 
 // The last_test block, parsed: { command, exit, when, commit } — or null if none recorded.
 export function lastTest (text) {
-  const lines = splitLines(text)
-  const i = lines.findIndex(l => /^last_test[ \t]*:/.test(l))
-  if (i === -1) return null
+  if (!hasTop(text, 'last_test')) return null
+  if (duplicateNestedKeys(text, 'last_test').length) return null
   const out = {}
-  for (let j = i + 1; j < lines.length && /^[ \t]/.test(lines[j]); j++) {
-    const m = lines[j].match(/^[ \t]+(command|exit|when|commit)[ \t]*:[ \t]*(.*)$/)
-    if (m) out[m[1]] = m[2].replace(/[ \t]*$/, '').replace(/^"/, '').replace(/"$/, '')
+  for (const key of ['command', 'exit', 'when', 'commit']) {
+    const value = nestedValue(text, 'last_test', key)
+    if (value !== '') out[key] = value.replace(/^"/, '').replace(/"$/, '')
   }
   return out
 }
@@ -43,6 +45,35 @@ function upsertTop (text, key, value) {
   if (i === -1) return `${text.replace(/\n*$/, '')}\n${key}: ${value}\n`
   lines[i] = `${key}: ${value}${lines[i].endsWith('\r') ? '\r' : ''}`
   return lines.join('\n')
+}
+
+// New spec seals bind the completed source packet as well as the Task span.  Both
+// fields are absent on legacy seals; when either is present, both are mandatory and
+// the exact stored find round is re-opened.  Formatting/key-order edits do not matter,
+// but every semantic packet field and every currently resolvable basis does.
+function sourceEvidenceRefusal (P, target, recordText) {
+  const digest = topValue(recordText, 'source_evidence_digest')
+  const rawRound = topValue(recordText, 'source_evidence_round')
+  const hasDigest = hasTop(recordText, 'source_evidence_digest')
+  const hasRound = hasTop(recordText, 'source_evidence_round')
+  if (!hasDigest && !hasRound) return null
+  if (!hasDigest || !hasRound || digest === '' || rawRound === '') return 'source evidence seal is partial — source_evidence_digest and source_evidence_round must appear together with non-empty values'
+  if (!/^[0-9a-f]{64}$/.test(digest)) return `source_evidence_digest '${digest}' is not a canonical sha256`
+  if (!/^[1-9][0-9]*$/.test(rawRound) || !Number.isSafeInteger(Number(rawRound))) return `source_evidence_round '${rawRound}' is not a positive safe integer`
+  const round = Number(rawRound)
+  try {
+    assertFindRound(target, recordText, round)
+    const briefPath = P.verifyRoundBriefPath(target, round)
+    const brief = P.read(briefPath)
+    if (brief === null) throw new SourceEvidenceError(`${briefPath} missing`)
+    const packet = parseSourcePacket(brief, briefPath)
+    const current = validateCompletedPacket(P, target, packet, recordText)
+    if (current !== digest) return 'completed source-evidence packet changed after pin — digest mismatch; re-run the spec gate'
+  } catch (e) {
+    if (!(e instanceof SourceEvidenceError)) throw e
+    return `source evidence no longer validates: ${e.message}`
+  }
+  return null
 }
 
 // The decision gate on a record: passed, still pending, nothing left open.
@@ -57,78 +88,6 @@ function recordUndecidable (P, path, label) {
   if (ab === '') return `its ${label} record is legacy (no approved_by) — it binds nothing; re-run the gate to seal a fresh cycle`
   if (ab !== 'pending') return `its ${label} gate is already decided (approved_by: ${ab}) — a new decision needs a new cycle (grovespec-verify/-review, or reopen)`
   return null
-}
-
-// "Is this git path inside these project directories?" — the one predicate both the
-// working-tree check and the history check ask. git speaks REPO-root relative paths; a
-// project nested in a monorepo sees its own files behind that prefix, so comparing them
-// to project-relative areas matched nothing — a dirty nested src/ read as clean and the
-// machine gate passed over it. null when git cannot say where we are.
-function pathsUnder (P, dirs) {
-  const rel = p => p.startsWith(`${P.root}/`) ? p.slice(P.root.length + 1) : null
-  const areas = dirs.map(rel).filter(x => x !== null)
-  const pr = git(P.root, ['rev-parse', '--show-prefix'])
-  if (!pr.ok) return null
-  const pfx = pr.out.trim()                                // '' exactly at the toplevel
-  return f => {
-    if (!f.startsWith(pfx)) return false
-    const g = f.slice(pfx.length)
-    return areas.some(a => g === a || g.startsWith(`${a}/`))
-  }
-}
-
-// null when git itself failed — "could not look" must not pass as "clean":
-// this list is the machine result gate's clean-tree requirement.
-function dirtyUnder (P) {
-  const inCode = pathsUnder(P, [P.srcDir, P.testsDir])
-  if (inCode === null) return null
-  // -uall: by default porcelain FOLDS an untracked directory to one `?? dir/` line —
-  // a wholly-untracked nested project collapsed to `?? inner/`, the prefix-stripped
-  // remainder was '', and the machine gate read a never-committed tree as clean.
-  const r = git(P.root, ['status', '--porcelain', '--untracked-files=all'])
-  if (!r.ok) return null
-  return r.out.split('\n').filter(Boolean).filter(l => porcelainPaths(l).some(inCode))
-}
-
-// Does a sealed commit still cover the code at HEAD? — null when it does, else the
-// reason it does not (a fragment the caller prefixes with WHICH binding broke).
-//
-// A verdict is about the project's CODE, and this asks about the code — the same
-// src/tests coordinates dirtyUnder asks the working tree about, so the two halves of one
-// question ("is the tested code the current code?") measure the same paths.
-//
-// It used to compare commit IDS, and everything GroveSpec itself writes into the repo
-// after a cycle passes broke the seal: the gate record, its round briefs and test log,
-// the Change Log line, a runtime sync. That evidence belongs in history, so it gets
-// committed — and the commit destroyed the very seal it was recording, leaving no path
-// to `done` at all. Machine and human were refused alike, and the remedy the refusal
-// named (re-run the gate) lands in the same state unless nothing whatever is committed
-// between pin and approve — a window that, in the default flow, spans the human's look.
-// Identity is still tried first, so the common case costs no git calls.
-//
-// What this deliberately does NOT catch is a non-code commit that changes what the
-// recorded test run means — a dependency bump, a CI or build-config edit. The working
-// tree check has the same bound, and widening only this half would make one question
-// answer differently depending on whether the change happened to be committed yet.
-//
-// A seal that is a moving name ('HEAD', a branch, a short sha) can never equal the
-// resolved HEAD, so it arrives here and is refused by name rather than by an id
-// mismatch that happened to also be true.
-function sealBreach (P, commit) {
-  const oid = canonicalOidState(P.root, commit)
-  if (oid === 'broken') return `${commit.slice(0, 7)} cannot be resolved (unknown commit, or git failed) — an unread check is not a passed one`
-  if (oid === 'no') return `'${commit}' is not a canonical full commit id — a seal names immutable bytes, never a moving name (re-run the gate so pin seals a real commit)`
-  const anc = ancestorState(P.root, commit)
-  if (anc === 'broken') return `${commit.slice(0, 7)} cannot be checked (git merge-base failed) — an unread check is not a passed one`
-  if (anc === 'no') return `${commit.slice(0, 7)} is not an ancestor of HEAD — a seal from another line of history binds nothing here`
-  const inCode = pathsUnder(P, [P.srcDir, P.testsDir])
-  if (inCode === null) return `whether the code moved since ${commit.slice(0, 7)} is unread (git rev-parse --show-prefix failed) — an unread check is not a passed one`
-  const r = git(P.root, ['diff', '--name-only', `${commit}..HEAD`])
-  if (!r.ok) return `whether the code moved since ${commit.slice(0, 7)} is unread (git diff failed) — an unread check is not a passed one`
-  const moved = r.out.split('\n').filter(Boolean).filter(inCode)
-  if (!moved.length) return null
-  const shown = moved.slice(0, 5).join(', ')
-  return `code moved since ${commit.slice(0, 7)}: ${shown}${moved.length > 5 ? ` (+${moved.length - 5} more)` : ''}`
 }
 
 function approveTree (P, human) {
@@ -146,6 +105,55 @@ function approveTree (P, human) {
   if (sealed !== treeDigest(P.treeText())) {
     say('tree: the structure changed after its cold verify — digest mismatch; re-run grovespec-verify on the tree (the reviewers did not see this shape)')
     return 2
+  }
+  if (hasTop(text, 'source_scope_digest')) {
+    const scopeSeal = topValue(text, 'source_scope_digest')
+    if (!/^[0-9a-f]{64}$/.test(scopeSeal)) {
+      say(`tree: source_scope_digest '${scopeSeal}' is not a canonical sha256`)
+      return 2
+    }
+    try {
+      if (scopeSeal !== sourceScopeDigest(P)) {
+        say('tree: Task ref assignments changed after the cold tree verify — source_scope_digest mismatch; re-run grovespec-verify on the tree')
+        return 2
+      }
+    } catch (e) {
+      if (!(e instanceof SourceEvidenceError)) throw e
+      say(`tree: source scope no longer validates — ${e.message}`)
+      return 2
+    }
+  }
+  const hasEvidenceMode = hasTop(text, 'tree_evidence_mode')
+  const hasEvidenceSeal = hasTop(text, 'tree_evidence_digest')
+  if (!hasEvidenceMode && !hasEvidenceSeal) {
+    say('tree: this pending legacy verdict has no tree evidence for the reviewed brief/Tasks/code — re-run grovespec-verify on the tree before approving it')
+    return 2
+  }
+  if (hasEvidenceMode || hasEvidenceSeal) {
+    const mode = topValue(text, 'tree_evidence_mode')
+    const evidenceSeal = topValue(text, 'tree_evidence_digest')
+    if (!hasEvidenceMode || !hasEvidenceSeal || mode === '' || evidenceSeal === '') {
+      say('tree: tree evidence seal is partial — tree_evidence_mode and tree_evidence_digest must appear together with non-empty values')
+      return 2
+    }
+    if (!TREE_EVIDENCE_MODES.includes(mode)) {
+      say(`tree: tree_evidence_mode '${mode}' is invalid — use ${TREE_EVIDENCE_MODES.join('|')}`)
+      return 2
+    }
+    if (!/^[0-9a-f]{64}$/.test(evidenceSeal)) {
+      say(`tree: tree_evidence_digest '${evidenceSeal}' is not a canonical sha256`)
+      return 2
+    }
+    try {
+      if (evidenceSeal !== treeEvidenceDigest(P, mode)) {
+        say('tree: a reviewed tree input changed after the cold verify — tree_evidence_digest mismatch; re-run grovespec-verify on the tree')
+        return 2
+      }
+    } catch (e) {
+      if (!(e instanceof TreeEvidenceError)) throw e
+      say(`tree: reviewed evidence no longer validates — ${e.message}`)
+      return 2
+    }
   }
   writeAtomic(tp, upsertTop(text, 'approved_by', 'human'))
   P.forget()
@@ -183,6 +191,24 @@ export function cmdApprove (P, n, human) {
     say(`${n}: the spec changed after its ${label} cycle passed — digest mismatch; the verdict does not cover these bytes (re-run the gate; grovespec-revise if the change was deliberate)`)
     return 2
   }
+  const taskSeal = topValue(text, 'task_evidence_digest')
+  if (taskSeal === '') {
+    say(`${n}: this pending legacy ${label} verdict has no task_evidence_digest — re-run grovespec-${label === 'spec' ? 'verify' : 'review'} before approving it`)
+    return 2
+  }
+  if (!/^[0-9a-f]{64}$/.test(taskSeal)) {
+    say(`${n}: task_evidence_digest '${taskSeal}' is not a canonical sha256`)
+    return 2
+  }
+  if (taskSeal !== taskEvidenceDigest(taskText)) {
+    say(`${n}: Task evidence changed after the ${label} pass — task_evidence_digest mismatch; re-run grovespec-${label === 'spec' ? 'verify' : 'review'}`)
+    return 2
+  }
+
+  if (label === 'spec') {
+    const sourceErr = sourceEvidenceRefusal(P, n, text)
+    if (sourceErr !== null) { say(`${n}: ${sourceErr}`); return 2 }
+  }
 
   if (label === 'result') {
     const rs = repoState(P.root)
@@ -199,8 +225,17 @@ export function cmdApprove (P, n, human) {
     const rc = topValue(text, 'reviewed_commit')
     if (rc === '') { say(`${n}: its result record is unsealed (no reviewed_commit) — run grovespec pin ${n} at the cycle's pass`); return 2 }
     if (rc !== head.out.trim()) {
-      const breach = sealBreach(P, rc)
+      const breach = resultSealBreach(P, n, rc)
       if (breach !== null) { say(`${n}: the review verdict no longer covers HEAD — ${breach}; re-run grovespec-review`); return 2 }
+    }
+    // Human judgment can decide a clean reviewed result, but it cannot make a commit
+    // seal cover uncommitted bytes. Pin and both approval modes share this exact check.
+    const dirty = dirtyResultSubject(P, n)
+    if (dirty === null) { say(`${n}: cannot verify the tree is clean (git status failed) — an unverified tree is not a clean one`); return 2 }
+    if (dirty.length) {
+      say(`${n}: uncommitted project changes outside this gate's Task/review evidence — the reviewed input is not the current input:`)
+      for (const d of dirty) say(`  ${d}`)
+      return 2
     }
     if (!human) {
       // The machine may only take a gate on machine-verifiable evidence: a recorded
@@ -210,15 +245,8 @@ export function cmdApprove (P, n, human) {
       if (lt.exit !== '0') { say(`${n}: the recorded test run did not pass (exit ${lt.exit ?? 'unknown'}) — fix and re-run grovespec test ${n}`); return 2 }
       if (!lt.commit) { say(`${n}: the recorded test run is not bound to a commit (legacy record) — re-run grovespec test ${n}`); return 2 }
       if (lt.commit !== head.out.trim()) {
-        const breach = sealBreach(P, lt.commit)
+        const breach = resultSealBreach(P, n, lt.commit)
         if (breach !== null) { say(`${n}: the recorded test run no longer covers HEAD — ${breach}; re-run grovespec test ${n}`); return 2 }
-      }
-      const dirty = dirtyUnder(P)
-      if (dirty === null) { say(`${n}: cannot verify the tree is clean (git status failed) — an unverified tree is not a clean one`); return 2 }
-      if (dirty.length) {
-        say(`${n}: uncommitted changes under src/tests — the tested code is not the current code:`)
-        for (const d of dirty) say(`  ${d}`)
-        return 2
       }
     }
   }

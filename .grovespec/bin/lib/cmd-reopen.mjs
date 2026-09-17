@@ -12,7 +12,10 @@
 //     draft reopen the contract changed: the next cycle's caller prunes entries whose
 //     written reason leaned on the old contract (reviewers.md) — kept here, judged there.
 //   · the record's own config header (target · level · strength · repeat · max_rounds).
-// Everything else — rounds, open_issues, followups, narrative — lives on in git history;
+// Everything else — rounds, open_issues, followups, narrative — lives on in git history.
+// A draft reopen drops spec_digest + task_evidence_digest +
+// source_evidence_digest/source_evidence_round as one old seal: neither the old Task
+// binding nor the old source packet enters the fresh cycle;
 // prose (why it reopened) is the revise skill's job — this command owns only the state.
 import { topValue, setFmValue } from './core.mjs'
 import { writeAtomic } from './project.mjs'
@@ -53,8 +56,41 @@ function freshCycle (text, keep = {}) {
 }
 
 export function cmdReopen (P, n, target) {
+  if (n === 'tree') {
+    if (target !== 'decomposition' && target !== 'fidelity') {
+      say('usage: grovespec reopen tree decomposition|fidelity')
+      return 2
+    }
+    const path = P.treeYamlPath()
+    const text = P.read(path)
+    if (text === null) {
+      say(`tree: no prior tree gate record (${path} missing) — create the initial ${target} record in grovespec-verify`)
+      return 2
+    }
+    const status = topValue(text, 'status')
+    const approvedBy = topValue(text, 'approved_by')
+    const mode = topValue(text, 'tree_evidence_mode')
+    const unsealed = topValue(text, 'tree_digest') === '' && topValue(text, 'source_scope_digest') === '' &&
+      topValue(text, 'tree_evidence_digest') === ''
+    if (status === 'in-progress' && approvedBy === 'pending' && mode === target && unsealed) {
+      say(`already reopened: tree ${target} cycle is in progress — no evidence was reset`)
+      return 0
+    }
+    // Before approved_by existed, `status: passed` was the open-tree state. Project
+    // routing still honors that compatibility rule, so the migration command must be
+    // able to start its first explicit cycle too; otherwise validate can name a stale
+    // legacy tree seal while no legal command can clear it.
+    if (status !== 'passed' || (approvedBy !== 'human' && approvedBy !== '')) {
+      say(`tree: reopen starts after a human-approved tree gate (or its pre-approved_by legacy equivalent) — current record is status '${status || 'unset'}', approved_by '${approvedBy || 'unset'}'; finish or repair that cycle first`)
+      return 2
+    }
+    writeAtomic(path, freshCycle(text, { tree_evidence_mode: target }))
+    P.forget()
+    say(`reopened: tree → fresh ${target} cycle (adjudications kept; mode persisted before round 1)`)
+    return 0
+  }
   if (n === '' || (target !== 'draft' && target !== 'approved')) {
-    say('usage: grovespec reopen TASK-N draft|approved   (draft = the spec changes; approved = only the code does)')
+    say('usage: grovespec reopen TASK-N draft|approved | reopen tree decomposition|fidelity   (draft = the spec changes; approved = only the code does)')
     return 2
   }
   const taskText = P.read(P.taskPath(n))

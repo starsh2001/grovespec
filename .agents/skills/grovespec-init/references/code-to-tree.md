@@ -46,6 +46,7 @@ So that another node can use this one *without seeing the internals*:
 - `origin: mapped` — this node was mapped, not gated; `validate`'s status↔evidence checks exempt it (until a later revise sends it through a real gate).
 - `role`: skeleton if it holds children, feature if it's actual behavior.
 - `blocked_by`: the number of a shared node it uses.
+- `refs: []` — a brownfield survey is grounded in code, not an intent record. Write the explicit empty list even when brought-in docs exist; doc↔code disagreements belong in `findings.md`, not in the mapped node's source criteria.
 - `tdd`: existing code is usually `false` + `tdd_skip_reason` ("existing code, documenting the contract after the fact; tests to follow"). Validation·test gaps go unchecked in the AC·Subtasks.
 
 ### 6. Write the tree·Tasks
@@ -64,4 +65,4 @@ Everything the mapping turned up that's *wrong with* the code — gathered from 
 The tree stays all-`done` (reality); these hold the work to make it *right*, and `grovespec-revise` works them off later.
 
 ## When done
-Return to `grovespec-init`'s last step — the **survey fidelity gate**: `grovespec-verify` on the tree (F1–F4, criteria = the code) → fix → the human approves the *vetted* survey (`grovespec approve tree --human`). Show the brief·tree **+ any `findings.md`/`restructuring.md`** in that closing message; the runtime blocks node work until the gate opens.
+Return to `grovespec-init`'s last step — the **survey fidelity gate**: `grovespec-verify` on the tree (`tree_evidence_mode: fidelity` written in the initial record before round 1; F1–F4, criteria = the code) → fix → the human approves the *vetted* survey (`grovespec approve tree --human`). Show the brief·tree **+ any `findings.md`/`restructuring.md`** in that closing message; the runtime blocks node work until the gate opens.

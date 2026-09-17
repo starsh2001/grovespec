@@ -33,6 +33,7 @@ Run the **fixed** interview in `references/setup.md` — **language** (confirm t
 ### 3. Brownfield survey (existing code only)
 Read and follow `references/code-to-tree.md` — read the code first and map it into the tree (even with docs present, code comes first: docs drift from code).
 - **The survey is a photograph, not a design**: the whole existing structure as an all-`done` tree, `origin: mapped`, **honest even if ugly** — a tangled module maps to a tangled node; inventing a clean structure the code doesn't have is falsifying the survey.
+- **Every mapped Task gets `refs: []`.** Its criterion is the code, even when the user brought reference docs. The explicit empty list records that this is intentionally no-ref; a doc↔code mismatch is parked in `findings.md` instead of turning the intent doc into the survey's truth.
 - **What's *wrong* goes beside the tree, not into it**: `findings.md` (node-level bugs · duplications · doc↔code mismatches) and `restructuring.md` (tree-level structural debt) — only if non-empty. `grovespec-plan` structures them into the next round; the tree itself stays what *is*.
 - **Set `paths` in `.grovespec/config.yaml` to the existing layout** (e.g. `src`, `tasks`) so later searches hit the real dirs.
 - **Detect the test command** (`package.json` `scripts.test` / pytest config / `Makefile` / `cargo`·`go` layout / …) and write `review.test`. Leave it empty only if nothing is clearly detectable.
@@ -42,12 +43,12 @@ Read and follow `references/code-to-tree.md` — read the code first and map it 
 
 ### 4. Make the files
 - *Greenfield*: the empty scaffolding only — `docs/tasks/` dir, empty `tree.md`, empty `conventions.md` (headers per template). **No brief, no ref record, no Tasks** — those are plan #0's outputs. (`validate` treats the no-tree state as valid: the pre-plan state.)
-- *Brownfield*: `tree.md` + one `done` Task per node (per `code-to-tree.md`), `conventions.md` filled, backlogs if non-empty.
+- *Brownfield*: `tree.md` + one `done`, `origin: mapped`, `refs: []` Task per node (per `code-to-tree.md`), `conventions.md` filled, backlogs if non-empty.
 - Both: `.grovespec/config.yaml` from the template + the §2 answers.
 
 ### 5. Hand off
 - *Greenfield* → **next is `grovespec-plan`** (plan #0: explore → intent record + brief → the all-`sketch` tree → the decomposition gate). Init ends after config + scaffolding — deliberately small: adopting GroveSpec and designing the product are different acts.
-- *Brownfield* → **next is the survey fidelity gate**: `grovespec-verify` on the tree (`target_type: tree`, the fidelity checklist F1–F4 — reviewers.md): the survey is an agent's claim too, so cold reviewers check it *against the code* (coverage · contract↔behavior · no beautification · backlog honesty) → fix → **human approves the vetted survey** (`grovespec approve tree --human`). The runtime blocks node work until then. After the gate, `grovespec-plan` (plan #1) structures the backlog into the first round; `grovespec-revise`/`grovespec-grow` execute it.
+- *Brownfield* → **next is the survey fidelity gate**: `grovespec-verify` on the tree (`target_type: tree`, write `tree_evidence_mode: fidelity` when the initial record is created, before round 1; fidelity checklist F1–F4 — reviewers.md): the survey is an agent's claim too, so cold reviewers check it *against the code* (coverage · contract↔behavior · no beautification · backlog honesty) → fix → `pin tree` seals the structure plus every mapped node's explicit no-ref assignment → **human approves the vetted survey** (`grovespec approve tree --human`). The runtime blocks node work until then. After the gate, `grovespec-plan` (plan #1) structures the backlog into the first round; `grovespec-revise`/`grovespec-grow` execute it.
 
 > **Open and close in the step-report shape** (`FORMATS.md` "The step report" — fixed `starting` opening; `Result · Open · Your turn · Next` closing, warm full sentences). Here, *Open / Your turn* typically carry: the survey awaiting the fidelity verify · backlog items · unanswered setup questions.
 
@@ -59,7 +60,7 @@ greenfield                          brownfield
 docs/                               docs/
   tree.md          (empty)            tree.md          the whole existing tree, all done (ids only)
   conventions.md   (empty headers)    conventions.md   facts the code guarantees
-  tasks/           (empty dir)        tasks/           one Task per existing node (done, origin: mapped)
+  tasks/           (empty dir)        tasks/           one Task per existing node (done, origin: mapped, refs: [])
                                       brief.md         from the survey (Scope = observed behavior)
                                       findings.md      backlog: bugs·duplications·mismatches (only if non-empty)
                                       restructuring.md backlog: structural debt (only if non-empty)

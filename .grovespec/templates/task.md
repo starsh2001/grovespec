@@ -4,6 +4,7 @@ name: "{node name}"
 role: feature              # skeleton (has children) | feature (leaf) — confirmed at implement
 status: draft              # sketch | draft | approved | implemented | reviewed | fixed | done  (greenfield is born sketch; grow → draft)
 blocked_by: []             # [TASK-2, ...] / [] if none
+refs: []                   # canonical sorted [spec.md@4, spec.md@5.4] / [] = intentionally no ref source
 tdd: true                  # true | false
 tdd_skip_reason: ""        # required when tdd: false
 ---
