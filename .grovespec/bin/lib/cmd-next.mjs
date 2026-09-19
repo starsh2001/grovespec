@@ -50,7 +50,7 @@ export function cmdNext (P, auto) {
       say(`nothing runnable — waiting on you${auto ? ' (auto mode cannot take the tree gate)' : ''}:`)
       say(kind === 'fidelity'
         ? '  tree     survey passed its cold fidelity verify — look at the mapped tree, then: grovespec approve tree --human'
-        : '  tree     decomposition passed its cold verify — look at the tree, then: grovespec approve tree --human')
+        : '  tree     decomposition passed its cold verify — first cycle: look at the tree; re-verify: look at the delta since your last approval (the verify record and step report name it), then: grovespec approve tree --human')
       return 1
     }
     say(`next: tree → grovespec-verify (the ${kind === 'fidelity' ? 'survey fidelity' : 'decomposition'} gate)`)
