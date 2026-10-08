@@ -11,13 +11,13 @@
 //     every prior verdict to the reader whose blankness it existed to protect. On a
 //     draft reopen the contract changed: the next cycle's caller prunes entries whose
 //     written reason leaned on the old contract (reviewers.md) — kept here, judged there.
-//   · the record's own config header (target · level · strength · repeat · max_rounds).
+//   · the record's own config header (target · level · find_streak · plan_streak · max_rounds).
 // Everything else — rounds, open_issues, followups, narrative — lives on in git history.
 // A draft reopen drops spec_digest + task_evidence_digest +
 // source_evidence_digest/source_evidence_round as one old seal: neither the old Task
 // binding nor the old source packet enters the fresh cycle;
 // prose (why it reopened) is the revise skill's job — this command owns only the state.
-import { topValue, setFmValue } from './core.mjs'
+import { topValue, setFmValue, cfgValue } from './core.mjs'
 import { writeAtomic } from './project.mjs'
 
 const say = s => process.stdout.write(s + '\n')
@@ -34,25 +34,50 @@ function blockOf (text, key) {
   return lines.slice(start, end).join('\n')
 }
 
-function freshCycle (text, keep = {}) {
-  const head = ['target', 'target_type', 'level', 'strength', 'repeat', 'max_rounds']
+// A fresh cycle runs under the CURRENT rules: the 0.13 counters replace whatever a
+// legacy record carried (strength/repeat are not copied forward — nothing reads them,
+// and a fresh cycle wearing dead knobs would look configured by them). An explicit
+// per-node counter in the old record carries over; a gap is filled from the PROJECT
+// CONFIG for this gate (verify: for spec/tree · review: for result), template default
+// last — a runtime-invented 2 must never masquerade as the user's setting. Returns
+// { text, counters } so the caller can NAME what it wrote.
+function freshCycle (P, text, keep = {}) {
+  const targetType = topValue(text, 'target_type')
+  const block = targetType === 'result' ? 'review' : 'verify'
+  const cfgInt = key => {
+    const v = cfgValue(P.configText, block, key)
+    return /^[0-9]+$/.test(v) ? v : null
+  }
+  const head = ['target', 'target_type', 'level', 'find_streak', 'plan_streak', 'max_rounds']
     .map(k => [k, topValue(text, k)])
     .filter(([, v]) => v !== '')
     .map(([k, v]) => `${k}: ${v}`)
+  const ensure = (k, dflt) => {
+    if (!head.some(l => l.startsWith(`${k}:`))) head.push(`${k}: ${cfgInt(k) ?? dflt}`)
+  }
+  ensure('find_streak', 2)
+  if (block === 'review') ensure('plan_streak', 2)   // spec/tree fixes take no M by design
+  ensure('max_rounds', 30)
+  const counters = ['find_streak', 'plan_streak']
+    .map(k => head.find(l => l.startsWith(`${k}:`)))
+    .filter(l => l !== undefined)
+    .map(l => l.replace(':', ''))
+    .join(' · ')
   const kept = Object.entries(keep)
     .filter(([, v]) => v !== '')
     .map(([k, v]) => `${k}: ${v}`)
   const adjudications = blockOf(text, 'adjudications') ?? 'adjudications: []'
-  // Some cycles keep the condensed category list under its own `do_not_raise:` key —
+  // Some cycles keep the condensed shape list under its own `do_not_raise:` key —
   // same substance (a boundary, not evidence), so it survives the same way.
   const doNotRaise = blockOf(text, 'do_not_raise')
-  return head.concat([
-    '', 'round: 0', 'consecutive_passes: 0', 'status: in-progress', 'approved_by: pending',
+  const out = head.concat([
+    '', 'round: 0', 'no_new_streak: 0', 'status: in-progress', 'approved_by: pending',
     ...kept.length ? kept : [],
     '', 'rounds: []', '', 'open_issues: []', '', 'followups: []', '', adjudications,
     ...doNotRaise ? ['', doNotRaise] : [],
     ''
   ]).join('\n')
+  return { text: out, counters }
 }
 
 export function cmdReopen (P, n, target) {
@@ -84,9 +109,10 @@ export function cmdReopen (P, n, target) {
       say(`tree: reopen starts after a human-approved tree gate (or its pre-approved_by legacy equivalent) — current record is status '${status || 'unset'}', approved_by '${approvedBy || 'unset'}'; finish or repair that cycle first`)
       return 2
     }
-    writeAtomic(path, freshCycle(text, { tree_evidence_mode: target }))
+    const fresh = freshCycle(P, text, { tree_evidence_mode: target })
+    writeAtomic(path, fresh.text)
     P.forget()
-    say(`reopened: tree → fresh ${target} cycle (adjudications kept; mode persisted before round 1)`)
+    say(`reopened: tree → fresh ${target} cycle (adjudications kept; mode persisted before round 1; ${fresh.counters})`)
     return 0
   }
   if (n === '' || (target !== 'draft' && target !== 'approved')) {
@@ -120,13 +146,15 @@ export function cmdReopen (P, n, target) {
   const resets = []
   const vt = P.read(P.verifyYamlPath(n))
   if (target === 'draft' && vt !== null) {
-    writeAtomic(P.verifyYamlPath(n), freshCycle(vt))
-    resets.push('verify cycle reset (adjudications kept)')
+    const fresh = freshCycle(P, vt)
+    writeAtomic(P.verifyYamlPath(n), fresh.text)
+    resets.push(`verify cycle reset (adjudications kept; ${fresh.counters})`)
   }
   const rt = P.read(P.reviewYamlPath(n))
   if (rt !== null) {
-    writeAtomic(P.reviewYamlPath(n), freshCycle(rt, { reviewed_commit: topValue(rt, 'reviewed_commit') }))
-    resets.push('review cycle reset (reviewed_commit + adjudications kept)')
+    const fresh = freshCycle(P, rt, { reviewed_commit: topValue(rt, 'reviewed_commit') })
+    writeAtomic(P.reviewYamlPath(n), fresh.text)
+    resets.push(`review cycle reset (reviewed_commit + adjudications kept; ${fresh.counters})`)
   }
   writeAtomic(P.taskPath(n), flipped)
   P.forget()

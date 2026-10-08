@@ -17,13 +17,31 @@ function testCommand (P) {
   return v.length >= 2 && v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v
 }
 
+// A configured counter, or the template default when the config is silent/garbled —
+// the user's N·M must reach the record the runtime itself creates (a hardcoded 2·2·30
+// shipped in 0.13.0 and the record disagreed with config from birth).
+function cfgInt (P, block, key, dflt) {
+  const v = cfgValue(P.configText, block, key)
+  return /^[0-9]+$/.test(v) ? Number(v) : dflt
+}
+
 // Minimal valid review-state skeleton — created when test runs before the first review
 // round (the review skill's round 1 reuses the file; validate accepts it as-is).
+// Counters come from config `review:`; the caller prints them so the birth values are
+// observable (and golden-pinnable), never silent.
+export function reviewSkeletonCounters (P) {
+  return {
+    find: cfgInt(P, 'review', 'find_streak', 2),
+    plan: cfgInt(P, 'review', 'plan_streak', 2),
+    max: cfgInt(P, 'review', 'max_rounds', 30)
+  }
+}
 function skeleton (P, tid) {
   const rel = P.tasksDir.startsWith(`${P.root}/`) ? P.tasksDir.slice(P.root.length + 1) : P.tasksDir
+  const c = reviewSkeletonCounters(P)
   return [
-    `target: ${rel}/${tid}.md`, 'target_type: result', 'level: standard', 'strength: 2',
-    'repeat: 1', 'max_rounds: 15', '', 'round: 0', 'consecutive_passes: 0',
+    `target: ${rel}/${tid}.md`, 'target_type: result', 'level: standard', `find_streak: ${c.find}`,
+    `plan_streak: ${c.plan}`, `max_rounds: ${c.max}`, '', 'round: 0', 'no_new_streak: 0',
     'status: in-progress', '', 'rounds: []', '', 'open_issues: []', '', 'followups: []', '', 'adjudications: []', ''
   ].join('\n')
 }
@@ -72,6 +90,10 @@ export function cmdTest (P, tid) {
     writeAtomic(yamlPath, upsertLastTest(existing ?? skeleton(P, tid), cmd, exit, commit))
     writeAtomic(`${P.reviewDir}/${tid}.test.log`, out)
     say(`recorded → ${yamlPath} (last_test) + ${tid}.test.log`)
+    if (existing === null) {
+      const c = reviewSkeletonCounters(P)
+      say(`new record: find_streak ${c.find} · plan_streak ${c.plan} · max_rounds ${c.max} (config review:)`)
+    }
   }
   return exit === 0 ? 0 : 1
 }

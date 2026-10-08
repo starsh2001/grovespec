@@ -304,22 +304,24 @@ export class Project {
       topValue(text, 'tree_evidence_mode') !== '' && topValue(text, 'tree_evidence_digest') !== ''
   }
 
-  // Each entry: { kind, text }. A gate WAITS on the human only while its verdict is
-  // `passed` AND `approved_by: pending` — a record someone already decided (human/machine)
-  // is a closed past gate, and a legacy record (no field) binds nothing: neither may be
-  // presented as "awaiting your decision" (that is how a reopened node's stale pass used
-  // to masquerade as fresh verification). `escalated` always waits — for a ruling.
+  // Each entry: { kind, text }. A gate is PENDING only while its verdict is `passed` AND
+  // `approved_by: pending` — a record someone already decided (human/machine) is a closed
+  // past gate, and a legacy record (no field) binds nothing: neither may be presented as
+  // pending (that is how a reopened node's stale pass used to masquerade as fresh
+  // verification). `approve`/`confirm` = a sealed clean verdict with nothing to decide —
+  // the driver's approve step in every mode (v0.18.0), not a human wait. `escalated`
+  // always waits — for a ruling only a human can make.
   humanWaits (tid) {
     const st = this.statusOf(tid)
     const vp = this.verifyYamlPath(tid); const rp = this.reviewYamlPath(tid)
     const vst = this.reviewStatus(vp); const rst = this.reviewStatus(rp)
     const out = []
     if (st === 'draft' && vst === 'passed' && this.approvedBy(vp) === 'pending' && this.specSealReady(tid)) {
-      out.push({ kind: 'approve', text: 'spec verify passed — awaiting your approval (grovespec approve TASK --human)'.replace('TASK', tid) })
+      out.push({ kind: 'approve', text: 'spec verify passed and sealed — nothing to decide; the next turn takes it (grovespec approve TASK)'.replace('TASK', tid) })
     }
     if (vst === 'escalated') out.push({ kind: 'escalated', text: `spec verify escalated — needs a human ruling (${vp})` })
     if (st === 'reviewed' && rst === 'passed' && this.approvedBy(rp) === 'pending' && this.resultSealReady(tid)) {
-      out.push({ kind: 'confirm', text: 'review passed — awaiting your confirm (grovespec approve TASK --human)'.replace('TASK', tid) })
+      out.push({ kind: 'confirm', text: 'review passed and sealed — nothing to decide; the next turn takes it (grovespec approve TASK)'.replace('TASK', tid) })
     }
     if (rst === 'escalated') out.push({ kind: 'escalated', text: `review escalated — needs a human ruling (${rp})` })
     return out
@@ -359,9 +361,10 @@ export class Project {
           lane,
           kind: itemValue(it, 'kind'),
           family: itemValue(it, 'family'),
-          severity: itemValue(it, 'severity'),
-          // What this item can REACH today — the axis a planning pass reads first.
-          gate1: itemValue(it, 'gate1')
+          // The fixed-handling class a planning pass groups by; legacy records carry
+          // severity instead, shown as-is until the node next reopens.
+          category: itemValue(it, 'category'),
+          severity: itemValue(it, 'severity')
         })
       }
     }
@@ -466,7 +469,7 @@ export class Project {
       case 'draft': return 'verify'
       case 'approved': return 'implement'
       case 'implemented': return 'review'
-      case 'reviewed': return 'fix (if issues) else confirm → done'
+      case 'reviewed': return 'fix (if issues) else review → seal → done'
       case 'fixed': return 'review (re-run)'
       case 'done': return this.roleOf(tid) === 'skeleton'
         ? '— (children already sketched; grow to add beyond the spec)'

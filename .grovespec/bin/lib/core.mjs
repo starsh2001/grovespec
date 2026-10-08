@@ -252,6 +252,129 @@ export function sectionsOf (text) {
   return out
 }
 
+// ---- readability: what the RENDERER shows as one thing ----------------------
+// A person's eye measures rendered blocks, not source lines. A list item is its
+// marker line plus every continuation line under it (its nested children are their
+// own blocks); a paragraph is a run of non-blank lines. Both collapse their internal
+// line breaks when rendered — so a limit applied per SOURCE line would be satisfied
+// by re-wrapping the file without changing the page by one pixel. Measure the block.
+//
+// kind: 'heading' | 'item' | 'quote' | 'para'. `section` is the enclosing `## name`
+// ('' before the first one). `text` is the block's content with the list marker,
+// checkbox and blockquote angle stripped — the limit is about words, not syntax.
+const LIST_MARKER = new RegExp(`^(${SP}*)(?:[-*+]|[0-9]+[.)])${SP}+(?:\\[[ xX]\\]${SP}+)?`)
+
+export function logicalBlocks (text, fromLine = 1) {
+  const scanned = markdownStructureLines(text)
+  const out = []
+  let open = null
+  const close = () => {
+    if (open) {
+      open.text = open.parts.join(' ').trim()
+      delete open.parts
+      out.push(open)
+    }
+    open = null
+  }
+  let section = ''
+  for (const entry of scanned.lines) {
+    if (entry.n < fromLine || entry.fenced || entry.indentedCode) { close(); continue }
+    const line = entry.line
+    if (line.trim() === '') { close(); continue }
+    if (entry.headingEligible && new RegExp(`^#{1,6}${SP}`).test(line)) {
+      close()
+      const depth = line.match(/^#+/)[0].length
+      const title = line.replace(new RegExp(`^#+${SP}+`), '').replace(new RegExp(`${SP}*$`), '')
+      if (depth === 2) section = title
+      out.push({ kind: 'heading', depth, section, n: entry.n, indent: 0, text: title })
+      continue
+    }
+    const marker = line.match(LIST_MARKER)
+    if (marker) {                                   // a marker always starts a new block
+      close()
+      open = { kind: 'item', section, n: entry.n, indent: marker[1].length, parts: [line.slice(marker[0].length)] }
+      continue
+    }
+    // A table is already the structured form these limits are asking for — measuring
+    // its rows as one run-on paragraph would fail the tidiest thing a Contract can do.
+    if (/^\s*\|/.test(line)) {
+      if (!open || open.kind !== 'table') { close(); open = { kind: 'table', section, n: entry.n, indent: 0, parts: [] } }
+      open.parts.push(line.trim())
+      continue
+    }
+    const quote = line.match(new RegExp(`^(${SP}*)>${SP}?`))
+    if (quote && (!open || open.kind !== 'quote')) {
+      close()
+      open = { kind: 'quote', section, n: entry.n, indent: quote[1].length, parts: [line.slice(quote[0].length)] }
+      continue
+    }
+    if (open) { open.parts.push(quote ? line.slice(quote[0].length) : line.trim()); continue }
+    open = { kind: 'para', section, n: entry.n, indent: line.match(new RegExp(`^${SP}*`))[0].length, parts: [line.trim()] }
+  }
+  close()
+  return out
+}
+
+// `X<n>` in a read.jargon list means that letter followed by digits (C4, R11); every
+// other token is a literal word. Matched whole, and never inside a code span — a
+// backticked identifier is the machine lane being QUOTED, which is what code spans
+// are for. Returns the distinct offending spellings, in the order they first appear.
+export function jargonHits (text, tokens) {
+  const bare = text.replace(/`[^`]*`/g, ' ')
+  const hits = []
+  for (const tok of tokens) {
+    const shaped = tok.match(/^([A-Za-z])<n>$/)
+    const re = shaped
+      ? new RegExp(`(?<![A-Za-z0-9_-])${shaped[1]}[0-9]+(?![A-Za-z0-9_-])`, 'g')
+      : new RegExp(`(?<![A-Za-z0-9_-])${reEscape(tok)}(?![A-Za-z0-9_-])`, 'g')
+    for (const m of bare.matchAll(re)) hits.push({ at: m.index, spelling: m[0] })
+  }
+  hits.sort((a, b) => a.at - b.at)
+  return [...new Set(hits.map(h => h.spelling))]
+}
+
+// Everything FORMATS.md "How it reads when rendered" states, measured. One short
+// phrase per fault, already aggregated — the caller prints them as one line per file,
+// because a wall-of-text Task would otherwise answer with a wall of text.
+export function readabilityFindings (text, limits) {
+  const { id = '', name = '', itemMax, paraMax, ledeMax, jargon = [] } = limits
+  const raw = splitLines(text)
+  const out = []
+  if (!raw.length || !isFence(raw[0])) return out
+  const end = raw.findIndex((line, i) => i > 0 && isFence(line))
+  if (end === -1) return out
+
+  // The blank line is the whole fix: without it CommonMark reads the closing fence as
+  // a setext underline and the frontmatter BECOMES the document's largest heading.
+  if (raw[end - 1].trim() !== '') out.push('frontmatter renders as this document\'s title — leave a blank line before the closing ---')
+
+  const blocks = logicalBlocks(text, end + 2)
+  const body = blocks.filter(b => b.kind !== 'heading' || b.depth !== 1)
+  const title = blocks.find(b => b.kind === 'heading' && b.depth === 1)
+  const firstSectionAt = blocks.find(b => b.kind === 'heading' && b.depth === 2)?.n ?? Infinity
+  const want = name === '' ? `# ${id}` : `# ${id} · ${name}`
+  if (!title || title.n > firstSectionAt) out.push(`no title line — open the body with '${want}'`)
+  else {
+    const missing = [id, name].filter(part => part !== '' && !title.text.includes(part))
+    if (missing.length) out.push(`title '${title.text}' does not match the frontmatter (${missing.join(' · ')})`)
+    const lede = blocks.find(b => b.n > title.n && b.n < firstSectionAt && b.kind !== 'heading')
+    if (!lede || lede.kind !== 'quote') out.push('no lede — one \'> \' line under the title saying what this node is responsible for')
+    else if ([...lede.text].length > ledeMax) out.push(`lede is ${[...lede.text].length} chars (max ${ledeMax})`)
+  }
+
+  for (const [kind, max, label] of [['item', itemMax, 'list item'], ['para', paraMax, 'paragraph']]) {
+    const bad = body.filter(b => b.kind === kind && [...b.text].length > max)
+    if (!bad.length) continue
+    const worst = bad.reduce((a, b) => ([...b.text].length > [...a.text].length ? b : a))
+    out.push(`${bad.length} over-long ${label}${bad.length > 1 ? 's' : ''} (max ${max}; worst ${[...worst.text].length} chars at line ${worst.n}, in ${worst.section || 'the body'})`)
+  }
+
+  const words = body.map(b => b.text).join('\n')
+  const hits = jargonHits(words, jargon)
+  if (hits.length) out.push(`machine-lane vocabulary a reader cannot act on: ${hits.slice(0, 6).join(', ')}${hits.length > 6 ? ` (+${hits.length - 6})` : ''} — that belongs in the gate record`)
+  return out
+}
+
 // tree.md → rows {tid, parent, depth}. Comment lines (#) skipped; an item is
 // `- TASK-N` alone on its line; depth = floor(leading SPACES / 2) (tabs count zero,
 // as in the bash original); parent = the last row seen one level up.
@@ -430,6 +553,130 @@ export function flowListKeys (text, keys) {
   return out
 }
 
+// ---- what a strict YAML reader makes of these records -----------------------
+// The readers HERE are line-based: they strip one surrounding quote pair without
+// interpreting escapes, and they end a list at the first non-indented line. Both
+// choices open the same silent gap the other way around — bytes grovespec reads
+// fine that strict YAML refuses ("…\Projects…" — \P is no escape; '…the
+// 'quoted' phrase…' — closed at the inner '), and bytes grovespec silently LOSES
+// that YAML may even accept (a list item fallen to column 0 ends the list for
+// every reader here — the items below vanish from every per-item check, so a
+// settled adjudication can re-fire; a block scalar's body is depth the readers
+// skip). Measured: 6/39 records unreadable to js-yaml in one project, 3 files ·
+// 4 items unread by grovespec in another — and validate said nothing for either.
+// One pass per file over the format's own single-line shapes; returns
+// [{ line, msg }] for the caller to report (as a notice — history is written).
+const DQ_SIMPLE_ESCAPES = '0abtnvfre "/\\N_LP\t'
+const DQ_HEX_ESCAPES = { x: 2, u: 4, U: 8 }
+
+function quotedScalarProblem (s) {
+  const q = s[0]
+  let close = -1
+  if (q === '"') {
+    for (let i = 1; i < s.length; i++) {
+      const c = s[i]
+      if (c === '"') { close = i; break }
+      if (c !== '\\') continue
+      const e = s[i + 1]
+      const hex = DQ_HEX_ESCAPES[e]
+      if (hex !== undefined) {
+        const digits = s.slice(i + 2, i + 2 + hex)
+        if (digits.length !== hex || !/^[0-9a-fA-F]+$/.test(digits)) {
+          return `\\${e} needs ${hex} hex digit(s) — a literal backslash in a "…" value is written \\\\`
+        }
+        i += 1 + hex
+      } else if (e === undefined || !DQ_SIMPLE_ESCAPES.includes(e)) {
+        return `\\${e ?? ''} is not a YAML escape — a literal backslash in a "…" value is written \\\\`
+      } else i++
+    }
+  } else {
+    for (let i = 1; i < s.length; i++) {
+      if (s[i] !== '\'') continue
+      if (s[i + 1] === '\'') { i++; continue }
+      close = i
+      break
+    }
+  }
+  if (close === -1) return `the ${q}…${q} value never closes on its line — a strict YAML reader runs on into the next line`
+  if (!new RegExp(`^${SP}*(?:#.*)?$`).test(s.slice(close + 1))) {
+    return q === '"'
+      ? 'the "…" value closes early — a literal " inside it is written \\"'
+      : "the '…' value closes early — a literal ' inside it is doubled ('')"
+  }
+  return null
+}
+
+export function strictYamlProblems (text) {
+  const out = []
+  const push = (idx, msg) => out.push({ line: idx + 1, msg })
+  let topKey = null                       // the current top-level key + whether its own line carries a value
+  splitLines(text).forEach((raw, idx) => {
+    if (new RegExp(`^${SP}*$`).test(raw)) return
+    if (new RegExp(`^${SP}*#`).test(raw)) return
+    const indent = raw.match(/^[ \t]*/)[0]
+    if (indent.includes('\t')) push(idx, 'indentation contains a tab — YAML forbids tabs in indentation; use spaces')
+    // A list item fallen to column 0: every reader here ends the enclosing list on
+    // it, so it AND everything below leave grovespec's sight — and a YAML mapping
+    // refuses a top-level sequence entry, so outside readers fail on the same line.
+    if (/^-([ \t]|$)/.test(raw)) {
+      push(idx, 'a list item at column 0 — every grovespec reader ends the enclosing list here (this item and everything below are invisible to per-item checks, so a settled finding can re-fire), and a YAML mapping refuses a top-level sequence entry; indent it under its key')
+      topKey = null
+      return
+    }
+    const top = indent.length === 0 ? raw.match(/^([A-Za-z_][A-Za-z0-9_.-]*)[ \t]*:(.*)$/) : null
+    if (top) topKey = { key: top[1], hasValue: stripComment(top[2]).trim() !== '', flagged: false }
+    else if (topKey && topKey.hasValue && !topKey.flagged && new RegExp(`^${SP}+-(${SP}|$)`).test(raw)) {
+      // Items under a key that already has a value: strict YAML refuses the block,
+      // and no grovespec reader will ever return them (listItems asks only list keys).
+      topKey.flagged = true
+      push(idx, `list item(s) under '${topKey.key}', whose own line already carries a value — strict YAML refuses this block, and no grovespec reader returns these items; move them under their list key`)
+    }
+    const kv = raw.match(/^[ \t]*(?:-[ \t]+)?[A-Za-z_][A-Za-z0-9_-]*[ \t]*:[ \t]*(.*)$/)
+    if (!kv || kv[1] === '') return
+    const v = kv[1]
+    const c0 = v[0]
+    if (c0 === '"' || c0 === '\'') {
+      const msg = quotedScalarProblem(v)
+      if (msg !== null) push(idx, msg)
+      return
+    }
+    // A block scalar header is VALID YAML — and exactly the depth these line-based
+    // records refuse: the indented body is invisible to every per-item check here.
+    if (/^[|>][+-]?[0-9]*[ \t]*(#.*)?$/.test(v)) {
+      push(idx, 'a block scalar — its indented body is invisible to every grovespec check (these records are read line by line); write the value on one line, quoted if it needs escaping')
+      return
+    }
+    // Plain values that YAML reads as syntax, not text.
+    if (c0 === '*' || c0 === '&' || c0 === '!') {
+      push(idx, `value begins with '${c0}' — strict YAML reads it as ${c0 === '*' ? 'an alias' : c0 === '&' ? 'an anchor' : 'a tag'}, not text; quote the value`)
+      return
+    }
+    if (c0 === '@' || c0 === '\x60') {
+      push(idx, `value begins with '${c0}' — a reserved YAML indicator; quote the value`)
+      return
+    }
+    if (c0 === '{' || c0 === '[') {
+      // The one-line flow forms the format does use must CLOSE on their line.
+      let depth = 0; let q = ''
+      for (let i = 0; i < v.length; i++) {
+        const c = v[i]
+        if (q !== '') { if (c === q) q = ''; continue }
+        if (c === '"' || c === '\'') q = c
+        else if (c === '{' || c === '[') depth++
+        else if (c === '}' || c === ']') depth--
+      }
+      if (depth > 0 || q !== '') push(idx, `the ${c0 === '{' ? '{ … }' : '[ … ]'} value never closes on its line — a strict YAML reader runs on into the next lines`)
+      return
+    }
+    // A plain value containing ': ' is a mapping key to strict YAML, not prose.
+    const plain = stripComment(v)
+    if (/:([ \t]|$)/.test(plain)) {
+      push(idx, "the plain value contains ': ' — strict YAML reads a second mapping key there and refuses the line; quote the whole value")
+    }
+  })
+  return out
+}
+
 // The `- ` items of a top-level list key, each returned as its own raw block.
 // Same shape assumption as listItemCount: a nested list under a fixed-shape record.
 export function listItems (text, key) {
@@ -491,41 +738,49 @@ export function duplicateListItemKeys (text, keys) {
   return out
 }
 
-// The severity gates, as arithmetic. THIS is the rule — the prose in reviewers.md
-// describes it, and `validate` enforces what it computes. Levels: nice 1 · should-fix 2 · critical 3.
-//
-// gate1 — what can you exhibit TODAY, by running committed code?
-//   behavior  — the wrong behavior itself runs today                     → no cap
-//   mechanism — the defect is verified (a probe/mutation shows the hole)
-//               AND the step that turns it into wrong behavior is ONE
-//               ORDINARY act (a natural future edit, an in-scope consumer
-//               doing the documented thing) — named in `trigger`         → caps at should-fix
-//   contrived — the hole is shown, but reaching wrong behavior needs
-//               abnormal action relative to the product's stated reality:
-//               deliberately violating a documented rule, two independent
-//               edits coinciding, input/scale outside the brief           → caps at nice-to-have
-//   story     — no verified hole: the victim is predicted, not shown      → caps at nice-to-have
-// gate2 yes — a SHOWN break of an explicitly promised clause lifts the cap for
-//             mechanism/story — NOT for contrived: a promise that only breaks under
-//             deliberate abnormal action is not a promise the product breaks.
-// gate3 yes — a documented workaround / an existing signal already catches it → one level down
-//
-// The boundary this guards is should-fix ↔ nice: at strength 2, critical and should-fix
-// block identically, so demoting between THEM ends nothing — what ends a loop is a
-// should-fix dying to nice. Two shapes feed a loop forever and both cap at nice here:
-// a story surviving as should-fix, and a CONTRIVED mechanism re-shown through ever more
-// elaborate probes, each patched case by case. Neither can block on its own.
-export const SEVERITY_RANK = { 'nice-to-have': 1, 'should-fix': 2, critical: 3 }
-export function severityCap (proposed, gate1, gate2, gate3) {
-  let cap = SEVERITY_RANK[proposed]
-  if (cap === undefined) return null
-  if (gate1 === 'contrived') cap = Math.min(cap, 1)
-  else if (gate2 !== 'yes') {
-    if (gate1 === 'mechanism') cap = Math.min(cap, 2)
-    else if (gate1 === 'story') cap = Math.min(cap, 1)
+// Finding categories, with FIXED handling. THIS is the rule — reviewers.md describes
+// it, and `validate` enforces the lanes: a must-fix category blocks (open_issues), a
+// record category never does (followups), and no per-finding severity argument exists
+// to re-run. The five/two split is the 2026-09-21 user decision that replaced the
+// severity ladder + gate arithmetic — "how serious" drifted per round; "which of these
+// seven" is a definition (METHODOLOGY §6).
+export const MUST_FIX_CATEGORIES = ['crash', 'requirement-unmet', 'normal-use-bug', 'easy-abuse', 'security-hole']
+export const RECORD_CATEGORIES = ['improvement', 'harmless-bug']
+// Legacy (pre-0.13) grade fields, recognized only to tell a legacy-shaped finding from
+// a malformed new one: decided records stay readable, in-progress ones must reclassify.
+export const LEGACY_GRADE_FIELDS = ['severity', 'proposed', 'gate1', 'gate2', 'gate3']
+
+// The 0.13 cycle's close conditions, checked as INVARIANTS on a passed record — one
+// function, so `validate` (the floor) and `approve` (the decision) can never disagree
+// about what a completed cycle looks like. A synthetic record that skipped the streak
+// used to walk test → pin → approve to done; the skills prescribed the conditions but
+// nothing recomputed them. Scope: NEW-FORMAT records only (find_streak present) — a
+// decided legacy record was written under its own cycle's rules and stays readable.
+// `round == max_rounds` passes when everything else holds (the budget is spent exactly);
+// only round PAST the budget is refused — reaching a cap is never itself a pass.
+export function completionProblems (text) {
+  const has = key => splitLines(text).some(line => new RegExp(`^${key}[ \\t]*:`).test(line))
+  if (!has('find_streak') || topValue(text, 'status') !== 'passed') return []
+  const unq = s => s.replace(/^(['"])(.*)\1$/, '$2').trim()
+  const out = []
+  const n = Number(topValue(text, 'find_streak'))
+  const streak = Number(topValue(text, 'no_new_streak') || '0')
+  if (topValue(text, 'level') !== 'skip' && Number.isFinite(n) && Number.isFinite(streak) && streak < n) {
+    out.push(`no_new_streak ${streak} has not reached find_streak ${n} — the find phase never met its close condition ('skip' is the one level that collapses the cycle)`)
   }
-  if (gate3 === 'yes') cap -= 1
-  return Math.max(cap, 1)
+  const cur = unq(topValue(text, 'current_item'))
+  if (cur !== '') out.push(`current_item '${cur}' is still open — a passed cycle has no item mid-fix`)
+  listItems(text, 'found').forEach((it, i) => {
+    if (unq(itemValue(it, 'judged')) === 'pending') {
+      const id = unq(itemValue(it, 'id'))
+      out.push(`found[${i + 1}]${id === '' ? '' : ` (${id})`} is still pending classification — an unresolved candidate cannot be part of a pass`)
+    }
+  })
+  const r = Number(topValue(text, 'round')); const mx = Number(topValue(text, 'max_rounds'))
+  if (Number.isFinite(r) && Number.isFinite(mx) && mx > 0 && r > mx) {
+    out.push(`round ${r} is past max_rounds ${mx} — beyond the budget a cycle escalates, it does not pass`)
+  }
+  return out
 }
 
 // config value: an INDENTED `key: value` line (first hit anywhere — the flat paths:

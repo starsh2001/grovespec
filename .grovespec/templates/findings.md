@@ -3,7 +3,7 @@ GroveSpec findings — brownfield backlog of NODE-LEVEL work spotted while mappi
 The tree itself stays all-`done` (it maps what exists); these are parked, draft items that do NOT go in the tree.
 Resolve each via the named step, then check it off (or delete it). Created only when there's something to record.
 Optional leading severity tag is fine (e.g. `[high]`) so a board can sort. Content in config.language.
-A board (e.g. Hammoc) can read this file and show each line as a draft issue. TREE-SHAPE problems go in restructuring.md.
+A board can read this file and show each line as a draft issue. TREE-SHAPE problems go in restructuring.md.
 -->
 
 ## Bugs

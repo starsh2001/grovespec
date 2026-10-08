@@ -12,6 +12,9 @@
 //                             revise's transition: fresh gate cycles, a past `passed`
 //              never doubles as current evidence (reviewed_commit kept as the diff base)
 //   ratify ID… the human coming back: stamps machine-taken gates as theirs
+//   wait [resolve] TASK-A TASK-B <text…>  the sideways-dependency ledger: A freezes until
+//              B answers (declare), A closes its wait saying what answered it (resolve);
+//              bare `wait` lists what is live and whose turn the newest declaration gives
 //   diff ID    the node's cycle diff, mechanically (TASK-N: commits + working tree)
 //   files ID   which code belongs to the node, across every cycle (derived, never stored)
 //   test [ID]  run config review.test; with ID, record exit+log as the node's evidence
@@ -21,13 +24,28 @@
 //   source ID [coordinates…]  emit the assigned canonical ref-clause packet for a spec find round
 //   pin ID     bind the gate to the bytes: spec digest at approve, commit+digest at done
 //   id         the next node id, derived (highest ever seen + 1 — ids are never reused:
-//              a merged-away node's number would hand its commits to the new node)
+//              a merged-away node's number would hand its commits to the new node), and
+//              never below what this repository already issued (its worktrees share that)
+//   claim [list|<TASK-N|tree> [step]|release <TASK-N|tree>]  which worktree of this
+//              repository works which node, or the tree: every node step and every
+//              tree-wide step claims first; next skips what another worktree holds, or
+//              finished on a branch not merged here
 //   impact ID  who a contract change on ID reaches (the consumer set / blast radius)
 //   tree       the id-only tree.md rendered with names + status
 //   lang       the project's reply/artifact language (config.language)
 //   locale     detect the OS language (for init); prints nothing if undetectable
-//   interview  the fixed setup questions (init Q2·Q3) as a paste-ready payload,
+//   interview  the fixed setup questions (init Q2–Q4) as a paste-ready payload,
 //              pre-escaped to pure ASCII — re-typing them is how they got corrupted
+//   hooks install|remove|status  the advisory edit-routing hook's registration in
+//              .claude/settings.json — the merge is runtime code, surgical + idempotent
+//   uninstall [--purge]  remove the tool (runtime + skills + hook registration); the
+//              ledger (gate records · waits · config · docs/) stays unless --purge
+//   amend TASK-N  absorb a documentation-only edit to a sealed node: Contract·AC
+//              byte-identical (proven vs HEAD) → re-seal in place, no reopen
+//   recheck [declare|close|open]  the candidate ledger: a contract change makes
+//              dependents candidates, and ONE armed step judges reach for them all
+//   retro      the round's closing look: is a retrospective owed (TASK- work since the
+//              last retro record), plus the round measured — grovespec-retro's floor
 //   version    the installed runtime's version (.grovespec/VERSION)
 //
 // Runtime: Node 18+, node builtins only — no package.json, no npm install.
@@ -51,13 +69,20 @@ import { cmdPin } from './lib/cmd-pin.mjs'
 import { cmdSource } from './lib/cmd-source.mjs'
 import { cmdApprove, cmdRatify } from './lib/cmd-approve.mjs'
 import { cmdReopen } from './lib/cmd-reopen.mjs'
+import { cmdWait } from './lib/cmd-wait.mjs'
+import { cmdHooks } from './lib/cmd-hooks.mjs'
+import { cmdUninstall } from './lib/cmd-uninstall.mjs'
+import { cmdRetro } from './lib/cmd-retro.mjs'
+import { cmdAmend } from './lib/cmd-amend.mjs'
+import { cmdRecheck } from './lib/cmd-recheck.mjs'
+import { cmdClaim } from './lib/cmd-claim.mjs'
 
 const [cmd = '', arg = ''] = process.argv.slice(2)
 const rest = process.argv.slice(3)
 
 // The one spelling of the command surface (tests/doccheck.sh pins it against the
 // dispatch table, the header comment and README — edit them together).
-const USAGE = 'grovespec — validate | status | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups | source TASK-N [file.md@4…] | pin <TASK-N|tree> | id | lang | locale | interview | impact TASK-N | tree | version\n'
+const USAGE = 'grovespec — validate | status | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups | source TASK-N [file.md@4…] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|release <TASK-N|tree>] | lang | locale | interview | hooks install|remove|status | uninstall [--purge] | amend TASK-N | recheck [declare|close|open …] | retro | impact TASK-N | tree | version\n'
 
 // The argv gate: an unknown flag or a surplus argument is a typo'd INTENTION and exits 2 —
 // `approve TASK-1 --humman` used to be silently accepted and recorded a MACHINE decision
@@ -65,9 +90,9 @@ const USAGE = 'grovespec — validate | status | check [TASK-N] | next [--auto] 
 // usage line (those messages are pinned contracts). Table: cmd → [max positionals, flags].
 const AV = {
   validate: [0], status: [0], check: [1], next: [0, ['--auto', 'auto']],
-  approve: [1, ['--human']], reopen: [2], ratify: [Infinity], diff: [1], files: [1],
-  test: [1], fresh: [0], followups: [0], source: [Infinity], pin: [1], id: [0], lang: [0], locale: [0],
-  interview: [0], impact: [1], tree: [0], version: [0]
+  approve: [1, ['--human']], reopen: [2], ratify: [Infinity], wait: [Infinity], diff: [1], files: [1],
+  test: [1], fresh: [0], followups: [0], source: [Infinity], pin: [1], id: [0], claim: [2], lang: [0], locale: [0],
+  interview: [0], hooks: [1], uninstall: [0, ['--purge']], retro: [0], amend: [1], recheck: [Infinity], impact: [1], tree: [0], version: [0]
 }
 // No command takes two flags, and none takes the same one twice — `next --auto --auto`
 // and `next --auto auto` (aliases of one flag) are both a surplus token, not emphasis.
@@ -83,7 +108,9 @@ if (AV[cmd] !== undefined) {
 // The single-writer gate — only the commands that WRITE project state take the lock
 // (test only when it records, i.e. with an id); reads never queue behind anything.
 // A refusal is exit 2 with the path: no wait, no automatic reclaim (lib/lock.mjs).
-const MUTATES = { approve: () => true, ratify: () => true, reopen: () => true, pin: () => true, test: () => arg !== '' }
+// (id and claim write only the repository-shared state, under that state's own short
+// lock — lib/shared.mjs — so they are not in this table: run.lock is one checkout's.)
+const MUTATES = { approve: () => true, ratify: () => true, reopen: () => true, pin: () => true, test: () => arg !== '', wait: () => arg !== '', hooks: () => arg !== 'status', uninstall: () => true, amend: () => true, recheck: () => arg !== '' }
 
 // Commands that answer ABOUT the runtime or the environment, never about the project's
 // content — the four that stay reachable across a format boundary (a skewed project
@@ -153,6 +180,7 @@ if (badArg !== null) {
       case 'approve': ec = cmdApprove(new Project(), arg, rest.includes('--human')); break
       case 'reopen': ec = cmdReopen(new Project(), arg, rest[1] ?? ''); break
       case 'ratify': ec = cmdRatify(new Project(), rest); break
+      case 'wait': ec = cmdWait(new Project(), process.argv.slice(3)); break
       case 'diff': ec = cmdDiff(new Project(), arg); break
       case 'files': ec = cmdFiles(new Project(), arg); break
       case 'test': ec = cmdTest(new Project(), arg); break
@@ -163,7 +191,17 @@ if (badArg !== null) {
       case 'lang': ec = cmdLang(new Project()); break
       case 'locale': ec = cmdLocale(); break
       case 'interview': ec = cmdInterview(); break
+      case 'hooks': ec = cmdHooks(new Project(), arg); break
+      case 'uninstall': {
+        const P = new Project()
+        ec = cmdUninstall(P, rest, () => cmdHooks(P, 'remove'))
+        break
+      }
+      case 'retro': ec = cmdRetro(new Project()); break
+      case 'amend': ec = cmdAmend(new Project(), arg); break
+      case 'recheck': ec = cmdRecheck(new Project(), rest); break
       case 'id': ec = cmdId(new Project()); break
+      case 'claim': ec = cmdClaim(new Project(), rest); break
       case 'impact': ec = cmdImpact(new Project(), arg); break
       case 'tree': ec = cmdTree(new Project()); break
       case 'version': ec = cmdVersion(new Project()); break

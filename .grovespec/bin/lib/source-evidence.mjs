@@ -716,7 +716,9 @@ function parseStrictJson (raw, at) {
   return result
 }
 
-export function parseSourcePacket (briefText, at = 'round brief') {
+// The single packet fence's position in a brief — shared by the parser and by
+// amend's consistent re-seal, so the fence grammar lives in exactly one place.
+function packetFence (briefText, at = 'round brief') {
   const lines = splitLines(briefText)
   const marker = `\`\`\`${SOURCE_PROTOCOL}`
   const starts = []
@@ -729,6 +731,21 @@ export function parseSourcePacket (briefText, at = 'round brief') {
     if (lines[i] === '```') { end = i; break }
   }
   if (end === -1) fail(`${at} source-evidence fence is not closed`)
+  return { lines, start, end }
+}
+
+// amend's one legitimate packet mutation: a documentation-only Task edit moves the
+// spec digest and nothing else, so the packet is rewritten with that field updated
+// (fence body re-serialized; the prose lines around the fence are kept, written
+// back LF-terminated).
+export function briefWithPacketSpecDigest (briefText, packet, next, at = 'round brief') {
+  const { lines, start, end } = packetFence(briefText, at)
+  const body = JSON.stringify({ ...packet, spec_digest: next }, null, 2).split('\n')
+  return lines.slice(0, start + 1).concat(body, lines.slice(end)).join('\n') + '\n'
+}
+
+export function parseSourcePacket (briefText, at = 'round brief') {
+  const { lines, start, end } = packetFence(briefText, at)
   let packet
   try { packet = parseStrictJson(lines.slice(start + 1, end).join('\n'), at) } catch (e) {
     if (e instanceof SourceEvidenceError) throw e
@@ -883,6 +900,14 @@ export function validateCompletedPacket (P, target, packet, verifyText) {
     }
   }
 
+  return completedPacketDigest(packet, resolvePacketBases(P, target, packet, verifyText))
+}
+
+// Resolve every clause's C1/C3 basis anchors against the CURRENT Task and verify
+// record — the evidence half of the continuous binding, separated from the roster
+// half above because amend legitimately moves the spec digest while owing exactly
+// this proof: the anchors still resolve to the sealed content.
+export function resolvePacketBases (P, target, packet, verifyText) {
   const taskPath = P.taskPath(target)
   const taskText = P.read(taskPath)
   if (taskText === null) fail(`Task missing: ${taskPath}`)
@@ -901,7 +926,7 @@ export function validateCompletedPacket (P, target, packet, verifyText) {
       c3: { basis: clause.c3_basis, kind: c3Anchor.kind, content: c3Anchor.content }
     })
   }
-  return completedPacketDigest(packet, resolvedBases)
+  return resolvedBases
 }
 
 // The continuous binding ignores JSON whitespace/key order but nothing semantic.  Build

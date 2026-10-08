@@ -1,6 +1,9 @@
 # GroveSpec format schema - the single source of truth for artifact formats.
 # Both bin/grovespec.mjs (the checker) and FORMATS.md (human prose) defer to THIS file.
 # Kept flat with |-separated lists - one line per rule, no YAML parser needed.
+# These lists describe ONE format version, declared per project as config.yaml
+# top-level `version:` - the reader gate (missing/duplicate/unknown value, what
+# bumps the number, additive tolerance) is FORMATS.md "The format version".
 
 task.fm.required: id|name|role|status|blocked_by|tdd
 task.fm.optional: tdd_skip_reason|origin|refs
@@ -12,32 +15,50 @@ brief.fm.required: name
 brief.sections: Direction|Scope|Risks
 conventions.sections: Glossary|Common Rules
 lifecycle: sketch|draft|approved|implemented|reviewed|fixed|done
-review.fm.required: target|target_type|level|strength|repeat|max_rounds|round|consecutive_passes|status
-review.fm.optional: spec_digest|task_evidence_digest|source_evidence_digest|source_evidence_round|source_scope_digest|tree_evidence_mode|tree_evidence_digest|reviewed_commit|last_test|approved_by|tree_digest|phase
+review.fm.required: target|target_type|level|max_rounds|round|status
+review.fm.optional: strength|repeat|consecutive_passes|find_streak|plan_streak|no_new_streak|plan_clear_streak|current_item|item_phase|spec_digest|task_evidence_digest|source_evidence_digest|source_evidence_round|source_scope_digest|tree_evidence_mode|tree_evidence_digest|reviewed_commit|last_test|approved_by|tree_digest|phase
 review.enum.status: in-progress|passed|escalated
 review.enum.level: skip|light|standard|full
 review.enum.target_type: tree|spec|result
 review.enum.approved_by: pending|human|machine
+review.enum.item_phase: plan|confirm
 
-# A confirmed finding in `open_issues` or `followups`. `kind` chooses the lane first:
-# result reviews may block only on `defect`; spec/tree may also block on `contract-gap`;
-# `concern` never blocks. `family` dedupes "the same hole, new path". The three gates are
-# FIELDS, not prose, because `validate` recomputes the severity from them - a grade can't
-# be argued past its gates.
+# A confirmed finding in `open_issues` or `followups`. `kind` names WHERE the flaw
+# lives; `category` alone decides blocking: a must-fix category blocks, a record
+# category never does (a defect in a record category parks in followups), and nobody
+# re-argues that per finding. Result reviews may block only on `defect`; spec/tree may
+# also block on `contract-gap`; `concern` never blocks. `family` dedupes "the same
+# hole, new path". `category` is a FIELD, not prose - the handling is fixed per class.
+# (strength|repeat|consecutive_passes and the severity/gate fields are pre-0.13 legacy:
+# readable on decided records, refused on in-progress ones - reclassify those.)
 # One entry of `rounds` — a pass's COUNTABLE result, never the story of it. The round's
 # reasoning has its own home (<id>.round<N>.brief.md · .judge.md · .confirm.md); `note` is
 # the one-line pointer to it. Unbounded, `note` became where the narrative actually lived:
 # one node's `rounds` reached 394 lines of block-scalar prose, and every later cold round
 # had to carry it. An entry is FLAT — every field on ONE line at the entry's own indent,
-# `found` written as a one-line flow map ({ critical: 0, should_fix: 0, nice: 0 }). Depth
+# `found` written as a one-line flow map ({ must_fix: 0, recorded: 0 }). Depth
 # is what validate reads, because a marker check ('note: >-') only catches one of the four
 # spellings the same prose walks back in through.
 round.fm.required: n|outcome
-round.fm.optional: phase|found|note
+round.fm.optional: phase|found|note|item
 
-finding.fm.required: kind|family|severity|proposed|gate1|gate2|gate3|where|what
-finding.fm.optional: id|trigger|clause|workaround|harm|measured|closer|gates_note
+finding.fm.required: kind|family|category|where|what|condition|impact
+finding.fm.optional: id|requirement|measured|closer
 finding.enum.kind: defect|contract-gap|concern
-finding.enum.severity: critical|should-fix|nice-to-have
-finding.enum.gate1: behavior|mechanism|contrived|story
-finding.enum.gate: yes|no
+finding.enum.category: crash|requirement-unmet|normal-use-bug|easy-abuse|security-hole|improvement|harmless-bug
+
+# --- Readability: the artifact is read by a PERSON in a Markdown renderer ---
+# These are the checkable part of FORMATS.md "How it reads when rendered". A rule with
+# no number is a rule nothing measures - and the measurement that forced these: one real
+# project's Change Log held 402 of its Task's 762 body lines, with a single entry of
+# 2466 characters. The limits below are per LOGICAL BLOCK (one list item including its
+# own continuation lines but not its nested children; one paragraph) - counted in
+# characters, never in source lines, so hard-wrapping the source cannot game them.
+read.item.max: 200
+read.paragraph.max: 400
+read.lede.max: 120
+# Machine-lane vocabulary: the cold cycle's own bookkeeping. It belongs in the review
+# record under paths.review, never in a file a person opens. `X<n>` = that letter
+# followed by digits (C4, R11); everything else is a literal word, matched whole,
+# outside code spans and fences.
+read.jargon: PASS|FAIL|PARTIAL|UNSET|C<n>|D<n>|F<n>|R<n>|open_issues|followups|approved_by|no_new_streak|plan_clear_streak|max_rounds

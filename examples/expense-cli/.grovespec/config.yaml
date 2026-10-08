@@ -9,10 +9,11 @@ paths:
   ref: docs/ref/
 
 review:
-  strength: 2
-  max_rounds: 5
+  find_streak: 2
+  plan_streak: 2
+  max_rounds: 30
   scale:
-    skip:     { reviewers: 0, repeat: 0 }
-    light:    { reviewers: 2, repeat: 1 }
-    standard: { reviewers: 3, repeat: 1 }
-    full:     { reviewers: 5, repeat: 2 }
+    skip:     { reviewers: 0 }
+    light:    { reviewers: 2 }
+    standard: { reviewers: 3 }
+    full:     { reviewers: 5 }

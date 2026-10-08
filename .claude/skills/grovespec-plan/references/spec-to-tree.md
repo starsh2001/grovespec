@@ -33,7 +33,7 @@ Walk the spec top-down. Each distinct capability with its own eventual contract 
 
 ### 3. Write each node as a sketch (not a full contract)
 For each node, fill the Task **thinly**, `status: sketch`:
-- **name** + a **one-line responsibility** (Overview).
+- **name** + a **one-line responsibility** — it is the title line and the lede (`# TASK-N · <name>`, then one `>` line), and the Overview restates it in two or three sentences. A sketch is mostly lede: that one line is what the tree gate reads.
 - **Rough I/O** in the Contract section — a sentence on what it roughly takes / gives. **Not** the full takes·gives·guarantees; that's grow's job. A `[→ detail at grow]` marker is fine.
 - **Note the spec's gaps** — where the spec is silent, say so (it becomes an unchecked `(gap)` AC when grow details it — `FORMATS.md`). Don't invent.
 - Leave AC/Subtasks mostly empty (grow writes them from the spec when it details the node).

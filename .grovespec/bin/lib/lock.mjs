@@ -11,12 +11,16 @@
 //
 // A second writer is REFUSED (exit 2), not queued: concurrent grovespec writers are
 // unsupported, and a bounded wait would tell a comforting lie about what is supported.
+// (The repository-shared state of lib/shared.mjs takes the same lock shape at its own
+// path — and DOES wait, briefly: writers in different worktrees are the supported case
+// there, and its critical section is a file read and a rename.)
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 
 export const lockPath = root => `${root}/.grovespec/run.lock`
 
-export function acquire (root) {
-  const dir = lockPath(root)
+export function acquire (root) { return acquireAt(lockPath(root)) }
+
+export function acquireAt (dir) {
   try {
     mkdirSync(dir)                       // atomic: held → EEXIST, never half-made
   } catch (e) {

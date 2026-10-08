@@ -17,8 +17,9 @@ Thin — read only this node's Task and the *relevant* code. Don't pile up a lon
 ## Flow
 
 ### 0. Confirm it's this node's turn (the gate)
-The node must be **`approved`** (cold-verified + human-approved) and unblocked. Run `grovespec check <node>`.
+The node must be **`approved`** (cold-verified, its gate taken on the record) and unblocked. Run `grovespec check <node>`.
 - ✗ (blocked) or not yet `approved` → **STOP**: `grovespec-verify` it first, or implement the node `grovespec check` reports ready. **Never implement a node whose parent isn't `done`** (bottom-up drift), or whose spec isn't `approved`.
+- **Claim it:** `node .grovespec/bin/grovespec.mjs claim TASK-N implement` — non-zero = **stop** and report what it printed.
 - **Start from a clean working tree** — uncommitted unrelated changes would blur this node's diff (the boundary `grovespec-review` reads — `FORMATS.md`); have the user commit/stash them first.
 
 ### 1. Pre-check (before writing)
@@ -40,6 +41,7 @@ Write code until the tests pass. **Reversibility gate — before committing a de
   - **The root** stands up the **base environment + an empty runnable shell**: the stack is chosen here **with the human** (recommend + rationale — the least reversible decision in the project), the project is wired to build/run, and it *runs while doing nothing* (app boots / blank page loads / CLI prints help) — smoke-tested, with **zero feature logic** (features arrive as children, already sketched, detailed later).
   - A root whose implement produces **no runnable base is wrong**: that setup work belongs to no single child, so it can't be deferred to one.
 - **Write-scope (blast radius):** write only *this node's* code (`src/`), its tests (`tests/`), and *this node's* Task — plus `tree.md` if you extract/split (next bullet), and **`conventions.md` when you establish a new cross-cutting rule/term** (the "Record conventions" bullet below). **Don't edit another existing node's code or Task** to make yours pass; if a *shared* node you depend on must change, stop and `grovespec-revise` it.
+- **A value another OPEN node must define, and hasn't yet, is a WAIT — not a stub, not a sideways note.** `node .grovespec/bin/grovespec.mjs wait TASK-N TASK-M <need>`, the same fact as a Change-Log line, commit what stands (`TASK-N: implement — waiting on TASK-M …`, the ledger rides along), and **stop — this node freezes**; `next` returns the turn. On resume read the counterpart's entry first (`grovespec wait`) and `wait resolve` what got answered; your own question coming back means the answer exists nowhere yet — decide it (yours) · ask the human · or `grovespec-revise` (tangled boundary). A value missing from a `done` node is a revise from the start — the runtime refuses that wait. (Why: METHODOLOGY §6.)
 - If you find a chunk 2+ nodes will use, extract it as a shared node (or split this one): add its id to `tree.md` so structure stays in sync with the code.
 - **If the code must diverge from the spec:**
   - *A detail* → default to **conform the code to the spec** (the cheap, reversible direction).

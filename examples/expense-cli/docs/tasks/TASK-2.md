@@ -7,7 +7,12 @@ origin: mapped
 blocked_by: []
 tdd: false
 tdd_skip_reason: "existing code, documented after the fact (brownfield); tests to follow"
+
 ---
+
+# TASK-2 · storage (shared store)
+
+> The one place expense records are read from and written to.
 
 ## Overview
 Reads and writes expense records to one JSON file (`expenses.json`). add/list/report reach the data only through this module. Defines the record shape and the storage rules in one place.

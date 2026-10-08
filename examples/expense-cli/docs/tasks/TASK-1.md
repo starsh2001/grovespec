@@ -7,7 +7,12 @@ origin: mapped
 blocked_by: []
 tdd: false
 tdd_skip_reason: "thin dispatcher; behavior is covered by the command tasks' tests"
+
 ---
+
+# TASK-1 · expense-cli (CLI dispatcher)
+
+> Reads the first argument and hands the rest to the matching command.
 
 ## Overview
 The entry point. `python src/cli.py <command> ...` reads the first arg and routes the rest to the matching command (add/list/report). Its own logic is just dispatch; the real work is in the child nodes. *Skeleton — but it still has code: the command table + dispatch.*

@@ -7,7 +7,12 @@ origin: mapped
 blocked_by: [TASK-2]
 tdd: false
 tdd_skip_reason: "existing code, documented after the fact (brownfield); tests to follow"
+
 ---
+
+# TASK-3 · add command
+
+> Records one new expense.
 
 ## Overview
 Records one new expense. `add <YYYY-MM-DD> <category> <amount> [note]` → builds a record and appends it via storage.

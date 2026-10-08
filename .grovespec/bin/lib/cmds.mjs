@@ -3,13 +3,17 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createHash } from 'node:crypto'
-import { sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, severityCap, SEVERITY_RANK, frontmatterBoundaryProblem } from './core.mjs'
+import { sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, strictYamlProblems, MUST_FIX_CATEGORIES, RECORD_CATEGORIES, LEGACY_GRADE_FIELDS, completionProblems, frontmatterBoundaryProblem, readabilityFindings } from './core.mjs'
 import { Project, treeGateMsg, scriptDir, FORMAT } from './project.mjs'
 import { taskEvidenceDigest, specDigest, treeDigest } from './cmd-pin.mjs'
 import { lastTest } from './cmd-approve.mjs'
 import { git, repoState, ignoredState, shallowState, showPrefix, ancestorState, canonicalOidState, dirtyResultSubject, resultSealBreach, log, touched, trackedPaths, allSubjects, allTouchedPaths } from './git.mjs'
 import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDigest, validateCompletedPacket, validateTaskRefsSyntax } from './source-evidence.mjs'
 import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
+import { readWaits, waitState, waitsPath } from './cmd-wait.mjs'
+import { hooksState, HOOK_MARK } from './cmd-hooks.mjs'
+import { readCands, candsPath } from './cmd-recheck.mjs'
+import { sharedContext, readState, writeState, withSharedLock, STATE_REMEDY } from './shared.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 const pad = (s, n) => s.length >= n ? s : s + ' '.repeat(n - s.length)
@@ -25,16 +29,31 @@ const hasTop = (text, key) => splitLines(text).some(line => new RegExp(`^${key}[
 export const SCHEMA_KEYS = [
   'task.fm.required', 'task.fm.enum.role', 'task.fm.enum.status', 'task.fm.enum.origin',
   'task.sections', 'review.fm.required', 'review.enum.status', 'review.enum.target_type',
-  'review.enum.level', 'review.enum.approved_by', 'round.fm.required', 'round.fm.optional',
+  'review.enum.level', 'review.enum.approved_by', 'review.enum.item_phase',
+  'round.fm.required', 'round.fm.optional',
   'finding.fm.required',
-  'finding.enum.kind', 'finding.enum.severity', 'finding.enum.gate1', 'finding.enum.gate',
-  'brief.fm.required', 'brief.sections', 'conventions.sections'
+  'finding.enum.kind', 'finding.enum.category',
+  'brief.fm.required', 'brief.sections', 'conventions.sections',
+  'read.item.max', 'read.paragraph.max', 'read.lede.max', 'read.jargon'
 ]
+
+// A number the schema does not carry is a limit nobody agreed to — refuse to invent
+// one, and let the preflight's own "key missing" problem be the single report. The
+// key is spelled at the CALL site, never passed in: doccheck pins the roster above
+// against the literal key strings in the schema-reading calls, and a key reached
+// through a variable is a key that roster can no longer see.
+const readLimit = raw => {
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
 
 export function cmdValidate (P) {
   let problems = 0
   const prob = m => { say(`  ${m}`); problems++ }
   const untrackedGates = []          // a notice, printed at the end — never a problem
+  const readNotices = []             // readability of sealed (approved+) or done nodes — same
+  const yamlNotices = []             // gate-record spots strict YAML can't read (or grovespec can't see) — same
+  const markerNotices = []           // sideways deferral markers on sealed (approved+) nodes — same
 
   // A schema key that resolves to nothing turns its checks OFF, not green — the
   // `for` loop it feeds runs zero times and the run stays clean. A renamed or lost
@@ -90,6 +109,35 @@ export function cmdValidate (P) {
     const want = schList('task.sections').join('\n')
     const got = sectionsOf(P.read(f) ?? '').join('\n')
     if (want !== got) prob(`${f}  sections mismatch → need (in order): ${P.sch('task.sections')}`)
+
+    // How it reads to a PERSON in a renderer (FORMATS.md "How it reads when rendered").
+    // A `done` node's bytes are historical — its gates are decided and nothing is going
+    // to rewrite them — so those report as a notice; anything still being written must
+    // come out readable, and blocks. That line is what lets a project in flight take
+    // this runtime without every already-shipped node failing on upgrade day.
+    const itemMax = readLimit(P.sch('read.item.max'))
+    const paraMax = readLimit(P.sch('read.paragraph.max'))
+    const ledeMax = readLimit(P.sch('read.lede.max'))
+    if (itemMax && paraMax && ledeMax) {
+      // Compare the title against the FRONTMATTER id, not the filename: an id that
+      // disagrees with its filename is already one problem, and reporting it a second
+      // time as a title fault sends the reader to fix the wrong line.
+      const found = readabilityFindings(taskText, {
+        id: P.fm(f, 'id') || tid, name: P.fm(f, 'name'), itemMax, paraMax, ledeMax, jargon: schList('read.jargon')
+      })
+      if (found.length) {
+        const line = `${f}  hard to read rendered: ${found.join(' · ')}`
+        // Same commitment line as the deferral markers below: readability BLOCKS only
+        // where the text is free to edit — sketch/draft. From `approved` on the spec
+        // span is sealed (spec_digest): demanding the tidy would demand breaking a
+        // seal validate itself defends, so it reports as a notice until the node next
+        // opens at draft (measured on the first external-review revise: four approved
+        // propagation reopens were blocked by long lines their seals forbade fixing).
+        const st = P.fm(f, 'status')
+        if (st === 'sketch' || st === 'draft') prob(line)
+        else readNotices.push(line)
+      }
+    }
     v = P.fm(f, 'blocked_by')
     if (v !== '') {
       // The lenient parser quietly drops a malformed dependency — a dropped dependency
@@ -104,6 +152,24 @@ export function cmdValidate (P) {
     for (const b of P.blockedIdsOf(f)) {
       if (b === tid) prob(`${f}  blocked_by includes itself (${b})`)
       if (P.read(P.taskPath(b)) === null) prob(`${f}  blocked_by '${b}' has no task file`)
+    }
+    // A deferral marker may only point DOWN — this node's own child (grow re-enters it)
+    // or its own implement. One naming a non-child node is a sideways IOU nobody ever
+    // re-reads (the launcher incident). It BLOCKS only where the text
+    // is free to edit — sketch/draft, pre-commitment: declare a wait instead. From
+    // `approved` on, the spec is sealed (spec_digest): demanding the edit would demand
+    // breaking a seal validate itself defends, so a sealed node reports as a notice
+    // until the node next opens at draft (measured on the first live sync: two
+    // approved specs mid-round would have needed a reopen just to reword a note).
+    for (const m of taskText.matchAll(/\[[ \t]*→[ \t]*child\/deferred[ \t]*:([^\]]*)\]/g)) {
+      for (const idm of m[1].matchAll(/TASK-[0-9]+/g)) {
+        const named = idm[0]
+        if (named === tid || P.childrenOf(tid).includes(named)) continue
+        const line = `${f}  deferral marker names ${named}, which is not a child of ${tid} — a sideways obligation is a wait (grovespec wait ${tid} ${named} <need…>), never a deferral`
+        const st = P.fm(f, 'status')
+        if (st === 'sketch' || st === 'draft') prob(line)
+        else markerNotices.push(line)
+      }
     }
   }
 
@@ -121,12 +187,40 @@ export function cmdValidate (P) {
   }
 
   // --- impossible states ---
+  // A done node above an OPEN dependency used to be a problem unconditionally, and
+  // satisfying it meant reopening the whole closure — the launcher measured 48
+  // commits for a two-item revise, eleven nodes closing with "unaffected" (v0.17.0).
+  // The lanes split it: a candidate entry EXPLAINS the
+  // state (the node keeps done until the recheck step judges reach), an AC/doc-lane
+  // reopen owes its dependents nothing, and only a `sketch` dependency below a done
+  // node remains impossible (done was reached before the dependency was even
+  // specified). An open dependency with no entry stays visible as a notice — the
+  // contract lane should have declared candidates, and silence here is how a wrong
+  // "unaffected" would hide.
+  const cl = readCands(P)
+  if (cl.broken !== null) prob(cl.broken)
+  const explained = (node, from) => cl.broken === null && cl.entries.some(e => e.node === node && e.from === from)
+  const candNotices = []
   for (const t of ids) {
     if (P.statusOf(t) !== 'done') continue
+    const above = []
     const p = P.parentOf(t)
-    if (p !== '' && P.statusOf(p) !== 'done') prob(`${t} is done but parent ${p} is ${P.statusOf(p)}`)
-    for (const b of P.blockedIdsOf(P.taskPath(t))) {
-      if (P.statusOf(b) !== 'done') prob(`${t} is done but blocked_by ${b} is ${P.statusOf(b)}`)
+    if (p !== '') above.push(['parent', p])
+    for (const b of P.blockedIdsOf(P.taskPath(t))) above.push(['blocked_by', b])
+    for (const [kind, b] of above) {
+      const st = P.statusOf(b)
+      if (st === 'done') continue
+      if (st === 'sketch') { prob(`${t} is done but ${kind} ${b} is sketch — done cannot predate its dependency's specification`); continue }
+      if (explained(t, b)) continue
+      candNotices.push(`${t} is done while ${kind} ${b} is ${st || 'missing'} and no candidate entry explains it — a contract-changing reopen declares its dependents (grovespec recheck declare ${b} ${t} <need>); an AC/doc-lane reopen owes nothing here`)
+    }
+  }
+  if (cl.broken === null) {
+    for (const e of cl.entries) {
+      if (e.closed !== '') continue // settled entries naming gone nodes are history
+      if (P.read(P.taskPath(e.node)) === null) prob(`${candsPath(P)}  open candidate names ${e.node}, which has no task file — settle or repair the entry`)
+      else if (P.read(P.taskPath(e.from)) === null) prob(`${candsPath(P)}  open candidate of ${e.from}, which has no task file — settle or repair the entry`)
+      else if (P.statusOf(e.node) !== 'done') candNotices.push(`${e.node} is ${P.statusOf(e.node)} but still holds an open candidate entry from ${e.from} — settle it first (grovespec recheck open|close ${e.node} <verdict>), the ledger must not trail the state`)
     }
   }
 
@@ -172,12 +266,22 @@ export function cmdValidate (P) {
     if (v !== '' && expTarget !== null && v !== expTarget) prob(`${rf}  target '${v}' ≠ '${expTarget}' (what this filename names)`)
     v = topValue(text, 'level')
     if (v !== '' && !schList('review.enum.level').includes(v)) prob(`${rf}  level '${v}' invalid → use ${P.sch('review.enum.level')}`)
-    for (const [k, lo] of [['strength', 1], ['repeat', 0], ['max_rounds', 1], ['round', 0], ['consecutive_passes', 0]]) {
+    for (const [k, lo] of [['find_streak', 1], ['plan_streak', 1], ['no_new_streak', 0], ['plan_clear_streak', 0], ['max_rounds', 1], ['round', 0], ['strength', 1], ['repeat', 0], ['consecutive_passes', 0]]) {
       v = topValue(text, k)
       if (v === '') continue
       if (!/^[0-9]+$/.test(v) || Number(v) < lo || (k === 'strength' && Number(v) > 3)) {
         prob(`${rf}  ${k} '${v}' out of range (${k === 'strength' ? '1–3' : `≥ ${lo}`})`)
       }
+    }
+    v = topValue(text, 'item_phase')
+    if (v !== '' && !schList('review.enum.item_phase').includes(v)) prob(`${rf}  item_phase '${v}' invalid → use ${P.sch('review.enum.item_phase')}`)
+    // Migration marker: `find_streak` is what says a record runs under the 0.13 cycle
+    // (streak-terminated find + per-item fix). An IN-PROGRESS record without it would be
+    // driven by rules nothing reads anymore — name it once, here, instead of letting the
+    // cycle run under whichever rulebook the session happens to remember. Decided records
+    // (passed/escalated) are history and stay readable as written.
+    if (topValue(text, 'status') === 'in-progress' && !hasTop(text, 'find_streak')) {
+      prob(`${rf}  in-progress record has no find_streak — a pre-0.13 cycle: add find_streak/plan_streak (template review-state.yaml), reclassify its open findings by category, and re-enter find at no_new_streak 0 — the streak is earned under the new rules, never transplanted from the old cycle's closure; the reclassified list rides along as the found list (README Status, migration)`)
     }
     if (topValue(text, 'status') === 'passed' && listItemCount(text, 'open_issues') > 0) {
       prob(`${rf}  status: passed but open_issues is not empty`)
@@ -322,80 +426,98 @@ export function cmdValidate (P) {
       }
     }
 
-    // --- the severity gates, enforced ---
-    // Every confirmed finding states its gate answers, and the grade must not exceed what
-    // they compute. This is the one rule a round cannot talk its way past: the loop that
-    // made this necessary ran sixteen rounds writing gate answers it then didn't follow.
-    const sevs = schList('finding.enum.severity')
+    // --- the category lanes, enforced ---
+    // Every confirmed finding states its category, and the lane follows it mechanically:
+    // a must-fix category blocks (open_issues), a record category never does (followups).
+    // This replaced the severity ladder + gate arithmetic (2026-09-21 user decision):
+    // "how serious does this look?" was re-answered every round and drifted — a test gap
+    // rode a mechanism ruling into mandatory fixes for rounds; "which of these seven is
+    // it?" is a definition, and there is no per-finding grade left to argue past.
+    const cats = schList('finding.enum.category')
     const kinds = schList('finding.enum.kind')
-    const g1s = schList('finding.enum.gate1')
-    const yn = schList('finding.enum.gate')
-    // An empty quoted string is an empty field — `clause: ""` must not satisfy "name the clause".
+    // An empty quoted string is an empty field — `requirement: ""` must not satisfy "cite it".
     const field = (it, k) => itemValue(it, k).replace(/^(['"])(.*)\1$/, '$2').trim()
     const seenFamilies = new Map()
+    // Decided records (passed · escalated) were written under their own cycle's rules —
+    // the same grandfather that keeps historical tree records readable. An in-progress
+    // record must speak the current rules: its open items get worked next session.
+    const undecided = topValue(text, 'status') === 'in-progress'
     const validateFindingList = key => {
       const items = listItems(text, key)
       items.forEach((it, i) => {
         const tag = `${key}[${i + 1}]${field(it, 'id') === '' ? '' : ` (${field(it, 'id')})`}`
         const at = `${rf}  ${tag}`
-        for (const k of schList('finding.fm.required')) {
-          if (field(it, k) === '') prob(`${at}  field '${k}' missing or empty — a grade with no stated gates is an opinion`)
-        }
         const kind = field(it, 'kind')
         const family = field(it, 'family')
-        const sev = field(it, 'severity'); const prop = field(it, 'proposed')
+        const cat = field(it, 'category')
         if (kind !== '' && !kinds.includes(kind)) prob(`${at}  kind '${kind}' invalid → use ${P.sch('finding.enum.kind')}`)
         if (family !== '') {
           const seen = seenFamilies.get(family)
           if (seen) prob(`${at}  family '${family}' duplicates ${seen} — the same hole re-shown through a new path is one finding; merge it`)
           else seenFamilies.set(family, tag)
         }
-        for (const [k, val] of [['severity', sev], ['proposed', prop]]) {
-          if (val !== '' && !sevs.includes(val)) prob(`${at}  ${k} '${val}' invalid → use ${P.sch('finding.enum.severity')}`)
-        }
-        const g = { gate1: field(it, 'gate1'), gate2: field(it, 'gate2'), gate3: field(it, 'gate3') }
-        if (g.gate1 !== '' && !g1s.includes(g.gate1)) prob(`${at}  gate1 '${g.gate1}' invalid → use ${P.sch('finding.enum.gate1')} (what can you exhibit TODAY by running committed code?)`)
-        for (const k of ['gate2', 'gate3']) {
-          if (g[k] !== '' && !yn.includes(g[k])) prob(`${at}  ${k} '${g[k]}' invalid → use ${P.sch('finding.enum.gate')}`)
-        }
         if (kind === 'concern' && key === 'open_issues') {
           prob(`${at}  kind 'concern' cannot block a gate → move it to followups`)
         } else if (kind === 'contract-gap' && key === 'open_issues' && targetType === 'result') {
           prob(`${at}  result reviews may block only on kind 'defect' → move this spec/contract issue to followups (or reopen via revise/verify)`)
-        } else if (kind === 'defect' && key === 'followups') {
-          prob(`${at}  kind 'defect' belongs in open_issues or adjudications → followups are for later revise/verify work, not a current target defect`)
+        } else if (kind === 'defect' && key === 'followups' && !RECORD_CATEGORIES.includes(cat)) {
+          // kind owns the LOCATION of the flaw; category decides the HANDLING. A defect
+          // in a record category (a real but harmless slip in current code — a label
+          // typo) is recorded here like any record item; a must-fix defect never parks.
+          prob(`${at}  a defect parks in followups only in a record category (improvement · harmless-bug) → a must-fix defect belongs in open_issues, a settled one in adjudications`)
         }
-        if (kind === 'concern' && sev !== '' && sev !== 'nice-to-have') {
-          prob(`${at}  kind 'concern' must grade as 'nice-to-have' → concerns are notes, never blockers`)
+        // Era split. A legacy-shaped finding (pre-0.13 grade fields, no category) stays
+        // readable on a decided record; on an in-progress one it must be reclassified —
+        // never bulk-translated (an old should-fix is not automatically must-fix).
+        const legacy = LEGACY_GRADE_FIELDS.some(k => field(it, k) !== '')
+        if (cat === '' && legacy) {
+          if (undecided) prob(`${at}  pre-0.13 grade fields on an in-progress record — reclassify it by category (reviewers.md §Categories): a current must-fix stays here with category + condition + impact; the rest moves to followups (improvement · harmless-bug) or adjudications`)
+          return
         }
-        // The followups entry bar: a parked pool is a future planning pass's mandatory
-        // reading list, and a measured 87-item pool lost 76 at disposition — what dies
-        // there should die at entry. contrived/story is recorded (adjudications), not queued.
-        // Scope: undecided records only (in-progress · escalated · passed-pending). A record
-        // whose gate is already decided was written under the rules of its own cycle — the
-        // same grandfather that keeps historical tree records readable; its parked items
-        // still surface in `followups` and dry out at the next plan disposition.
-        if (key === 'followups' && (g.gate1 === 'contrived' || g.gate1 === 'story')
-            && !(topValue(text, 'status') === 'passed' && topValue(text, 'approved_by') !== 'pending')) {
-          prob(`${at}  followups take gate1 'behavior' or 'mechanism' only — a '${g.gate1}' finding is recorded, not queued: move it to adjudications (accepted-gap, reason included); it re-enters only with live measurement`)
+        for (const k of schList('finding.fm.required')) {
+          if (field(it, k) === '') prob(`${at}  field '${k}' missing or empty — a finding that states no category, condition, or impact cannot be classified`)
         }
-        if (g.gate1 === 'mechanism' && field(it, 'trigger') === '') prob(`${at}  gate1: mechanism needs 'trigger' — name the ONE ordinary step (a natural future edit, an in-scope consumer doing the documented thing) that turns the hole into wrong behavior; if naming it takes deliberate rule-breaking or a coincidence of edits, the honest answer is 'contrived'`)
-        if (g.gate2 === 'yes' && field(it, 'clause') === '') prob(`${at}  gate2: yes needs 'clause' — name the Contract/AC line it breaks`)
-        if (g.gate3 === 'yes' && field(it, 'workaround') === '') prob(`${at}  gate3: yes needs 'workaround' — name the documented way around it`)
-        if (prop === 'critical' && g.gate2 !== 'yes' && field(it, 'harm') === '') {
-          prob(`${at}  proposed: critical needs gate2: yes (a promised clause) or 'harm' — name the data lost/corrupted or the required input that fails`)
+        if (cat !== '' && !cats.includes(cat)) prob(`${at}  category '${cat}' invalid → use ${P.sch('finding.enum.category')}`)
+        if (cat !== '' && legacy) prob(`${at}  carries both category and pre-0.13 grade fields — one classification per finding; drop the legacy fields`)
+        if (key === 'open_issues' && RECORD_CATEGORIES.includes(cat)) {
+          prob(`${at}  category '${cat}' is record-only — it never blocks a gate; move it to followups`)
         }
-        if (sev !== '' && prop !== '' && sevs.includes(sev) && sevs.includes(prop) && g1s.includes(g.gate1) && yn.includes(g.gate2) && yn.includes(g.gate3)) {
-          const cap = severityCap(prop, g.gate1, g.gate2, g.gate3)
-          const capName = Object.keys(SEVERITY_RANK).find(k => SEVERITY_RANK[k] === cap)
-          if (SEVERITY_RANK[sev] > cap) {
-            prob(`${at}  severity '${sev}' exceeds what its gates allow — proposed ${prop} + (gate1 ${g.gate1} · gate2 ${g.gate2} · gate3 ${g.gate3}) caps it at '${capName}'`)
-          }
+        if (key === 'followups' && MUST_FIX_CATEGORIES.includes(cat) && kind !== 'contract-gap') {
+          prob(`${at}  a must-fix category parks in followups only as kind 'contract-gap' (a real problem routed to revise/verify) — otherwise it belongs in open_issues`)
+        }
+        if (kind === 'concern' && cat !== '' && !RECORD_CATEGORIES.includes(cat)) {
+          prob(`${at}  kind 'concern' takes a record category (improvement · harmless-bug) — concerns are notes, never blockers`)
+        }
+        if (cat === 'requirement-unmet' && field(it, 'requirement') === '') {
+          prob(`${at}  category requirement-unmet needs 'requirement' — name the user requirement / ref clause / Contract·AC line it fails; a duty no requirement states is an improvement, not a defect`)
         }
       })
     }
     validateFindingList('open_issues')
     validateFindingList('followups')
+
+    // --- the 0.13 close conditions, as invariants (shared with approve — core.mjs) ---
+    for (const m of completionProblems(text)) prob(`${rf}  ${m}`)
+    // A fix loop's position must be real: an in-progress current_item that names no
+    // open_issues entry is a resume pointer into nothing — the next session would
+    // "continue" an item that does not exist.
+    if (topValue(text, 'status') === 'in-progress' && hasTop(text, 'find_streak')) {
+      const cur = topValue(text, 'current_item').replace(/^(['"])(.*)\1$/, '$2').trim()
+      if (cur !== '' && !listItems(text, 'open_issues').some(it => field(it, 'id') === cur)) {
+        prob(`${rf}  current_item '${cur}' names no open_issues entry — the fix loop's resume pointer must be a real item`)
+      }
+    }
+
+    // Two silent gaps, one sweep (core.mjs strictYamlProblems): bytes grovespec reads
+    // fine that strict YAML refuses (a malformed quoted value breaks only the OUTSIDE
+    // consumer), and bytes grovespec silently LOSES whatever YAML thinks (a list item
+    // fallen to column 0 ends the list for every reader here — the items below vanish
+    // from every per-item check, so a settled adjudication can re-fire; a block
+    // scalar's body is depth the readers skip). A notice, never a problem: decided
+    // cycles' records are already written under these shapes, so blocking would fail
+    // history no one is going to rewrite — the line reprints every run until the spot
+    // is repaired (the same shape the untracked-gate notice uses).
+    for (const q of strictYamlProblems(text)) yamlNotices.push(`${rf}:${q.line}  ${q.msg}`)
 
     // Flow style turns every per-item rule OFF rather than failing it — measured: a
     // `followups: [ { severity: critical, kind: concern } ]` passed the grade checks and
@@ -410,7 +532,7 @@ export function cmdValidate (P) {
     // Left unbounded, `note` became where the story actually lived — block scalars of
     // 20-40 lines per round, 394 lines of them in one node (timelog-3 TASK-2.review.yaml),
     // carried by every later cold round that reads this file. The reasoning has a home
-    // (<id>.round<N>.brief.md · .judge.md · .confirm.md); the note points at it in one line.
+    // (<id>.round<N>.brief.md · .plan.md · .confirm.md); the note points at it in one line.
     // A round entry is FLAT: every line is one of the schema's fields, on one line, at the
     // entry's own indent. Checking only `note: >-` left the rule open to the same prose in
     // three other spellings — a plain multi-line scalar (`note:` then indented paragraphs),
@@ -461,7 +583,7 @@ export function cmdValidate (P) {
         if (col !== indent) {
           if (saidDeep) return                             // one entry, one telling of it
           saidDeep = true
-          prob(`${at2}  is indented past the entry's fields — an entry is a block item ('- n: 1', one field per line); a field's VALUE may be a one-line flow map ('found: { critical: 0, should_fix: 0, nice: 0 }'), but nothing here spans lines: put a pass's reasoning in ${home}.round<n>.brief.md (judge/confirm: .judge.md · .confirm.md) and leave a one-line 'note' pointing at it`)
+          prob(`${at2}  is indented past the entry's fields — an entry is a block item ('- n: 1', one field per line); a field's VALUE may be a one-line flow map ('found: { must_fix: 0, recorded: 0 }'), but nothing here spans lines: put a pass's reasoning in ${home}.round<n>.brief.md (plan/confirm: .plan.md · .confirm.md) and leave a one-line 'note' pointing at it`)
           return
         }
         const m = body.match(KEY)
@@ -671,6 +793,28 @@ export function cmdValidate (P) {
     if (want !== sectionsOf(convText).join('\n')) prob(`${P.convPath}  sections → need: ${P.sch('conventions.sections')}`)
   }
 
+  // --- the sideways-dependency ledger (waits.yaml) ---
+  const waitNotices = []
+  {
+    const wsv = readWaits(P)
+    for (const m of wsv.problems) prob(m)
+    if (wsv.problems.length === 0 && wsv.present) {
+      const liveW = wsv.entries.filter(e => e.resolved === '')
+      const seen = new Set()
+      for (const e of liveW) {
+        // done + live wait is the exact state this ledger exists to make impossible:
+        // "finished" over an open obligation is the unearned 100%.
+        if (P.statusOf(e.from) === 'done') prob(`${e.from} is done but still waits on ${e.to} (declared ${e.declared}) — a node cannot finish holding a live wait: resume and resolve it, or the done is unearned (reopen)`)
+        const k = `${e.from} → ${e.to}`
+        if (seen.has(k)) prob(`${waitsPath(P)}  two live waits ${k} — one live wait per pair, or which need is open goes ambiguous (resolve one)`)
+        seen.add(k)
+        if (P.statusOf(e.to) === 'done' && P.statusOf(e.from) !== 'done') {
+          waitNotices.push(`${e.from} → ${e.to}  declared ${e.declared} — ${e.need}`)
+        }
+      }
+    }
+  }
+
   // What this run actually looked at — so "I did not look" (a wrong path, an empty
   // tasks dir) can never read as "I looked and found nothing".
   say(`examined: tasks ${P.taskFiles().length} · tree nodes ${ids.length} · review files ${P.reviewFiles().length}`)
@@ -678,10 +822,45 @@ export function cmdValidate (P) {
   // allowed to look like a human-taken one — so every run says how many are outstanding.
   const unratified = ids.filter(t => P.unratified(t).length)
   if (unratified.length) {
-    say(`notice: ${unratified.length} node(s) auto-approved by machine, not yet ratified — ${unratified.join(', ')} (grovespec ratify <id>…)`)
+    say(`notice: ${unratified.length} node(s) taken by the machine on the cold verdict, not yet ratified — ${unratified.join(', ')} (grovespec ratify <id>…)`)
   }
   if (untrackedGates.length) {
     say(`notice: ${untrackedGates.length} passed gate record(s) not tracked by git — the verdict stands, but what it passed on is one clean-up away from gone: ${untrackedGates.join(', ')} (git add them with the gate's commit)`)
+  }
+  if (readNotices.length) {
+    say(`notice: ${readNotices.length} sealed or done node(s) not yet in the reading rules — a person opening these meets a wall of text. Not blocking (the spec is sealed, or its gates are decided); tidy each the next time it opens at draft:`)
+    for (const m of readNotices) say(`  ${m}`)
+  }
+  if (yamlNotices.length) {
+    say(`notice: ${yamlNotices.length} spot(s) in gate records that strict YAML cannot read, or that grovespec's own line readers cannot see — an outside YAML consumer (a dashboard, js-yaml) fails or drops the block, and a broken list shape hides its items from every per-item check here, so a settled finding can re-fire. Each line says its own repair:`)
+    for (const m of yamlNotices) say(`  ${m}`)
+  }
+  if (waitNotices.length) {
+    say(`notice: ${waitNotices.length} live wait(s) whose target is already done — the value landed; the waiter resumes there (read the entry, use the value, grovespec wait resolve):`)
+    for (const m of waitNotices) say(`  ${m}`)
+  }
+  if (markerNotices.length) {
+    say(`notice: ${markerNotices.length} sideways deferral marker(s) on sealed nodes — the text is bound by a seal, so this does not block; nothing re-reads a sideways note, so convert each (a wait, or a revise) when its node next opens at draft:`)
+    for (const m of markerNotices) say(`  ${m}`)
+  }
+  if (candNotices.length) {
+    say(`notice: ${candNotices.length} candidate-lane state(s) worth a look — never blocking, each line names its repair:`)
+    for (const m of candNotices) say(`  ${m}`)
+  }
+  // Routing-hook tripwire (v0.15.0) — the soft switch (config `hooks:`), the
+  // registration (.claude/settings.json) and the script must tell one story.
+  // Drift here is environment, not project state, so it reprints as a notice.
+  const hookNotes = []
+  const hs = hooksState(P)
+  if (hs.registered === null) hookNotes.push('.claude/settings.json exists but is not readable JSON — the hook registration state is unknowable (fix or remove the file, then grovespec hooks status)')
+  else {
+    if (hs.config === 'on' && !hs.registered) hookNotes.push('config says hooks: on but .claude/settings.json carries no registration — grovespec hooks install puts them back in step')
+    if (hs.registered && hs.config !== 'on') hookNotes.push(`the routing hook is registered but config says hooks: ${hs.config} — the hook stays silent; hooks install re-arms it, hooks remove clears the registration`)
+    if (hs.registered && !hs.script) hookNotes.push(`the routing hook is registered but ${HOOK_MARK} is missing — every edit prints a cannot-find-module warning until grovespec hooks remove clears it`)
+  }
+  if (hookNotes.length) {
+    say(`notice: ${hookNotes.length} routing-hook state drift — the switch, the registration and the script disagree (never blocks; each line names its repair):`)
+    for (const m of hookNotes) say(`  ${m}`)
   }
   if (problems === 0) { say('✓ validate: all checks passed'); return 0 }
   say(`✗ validate: ${problems} problem(s)`)
@@ -692,28 +871,38 @@ export function cmdValidate (P) {
 export function cmdStatus (P) {
   const gate = P.treeGatePending()
   if (gate) say(`! ${treeGateMsg(P)}`)
+  // The sideways-dependency ledger colors the per-node lines: an asleep node is not
+  // runnable and must not read as one. Unreadable ledger = say so and keep going —
+  // status informs, validate owns the verdict.
+  const ws = waitState(P)
+  for (const m of ws.problems) say(`! ${m}`)
   let nexts = ''
   for (const t of P.treeIds()) {
     const st = P.statusOf(t); const ub = P.unblocked(t); const rl = P.roleOf(t)
     const fu = P.followupCounts(t)
+    const asleep = ws.problems.length ? null : ws.asleepOn(t)
     if (st === 'done') {
       if (rl === 'skeleton') say(`${pad(t, 8)} done        (children already sketched → work them; grow only to add beyond the spec${fu.length ? `; followups noted: ${fu.join(' · ')} via revise/verify` : ''})`)
       else if (fu.length) say(`${pad(t, 8)} done        (followups noted: ${fu.join(' · ')} via revise/verify)`)
       else say(`${pad(t, 8)} done`)
     } else if (gate) say(`${pad(t, 8)} ${pad(st, 12)} (awaiting the tree gate)`)
     else if (ub !== 'yes') say(`${pad(t, 8)} ${pad(st, 12)} (${ub.slice(3)})`)
-    else if (P.humanWaits(t).length) say(`${pad(t, 8)} ${pad(st, 12)} (waiting on you — below)`)
+    else if (asleep !== null) say(`${pad(t, 8)} ${pad(st, 12)} (waiting on ${asleep.to} — declared ${asleep.declared})`)
+    else if (P.humanWaits(t).some(w => w.kind === 'escalated')) say(`${pad(t, 8)} ${pad(st, 12)} (waiting on you — below)`)
+    // A sealed clean gate is a step, not a wait (v0.18.0): nothing in it is the
+    // person's to decide, so the next driver turn takes it on the record.
+    else if (P.humanWaits(t).length) { say(`${pad(t, 8)} ${pad(st, 12)} → approve (sealed clean gate, nothing to decide — grovespec approve ${t})`); nexts += ` ${t}` }
     else { say(`${pad(t, 8)} ${pad(st, 12)} → ${P.nextAction(t)}`); nexts += ` ${t}` }
   }
-  // Decisions parked on the human, split out — so "nothing ready" can never hide
-  // an approval or confirm that is actually waiting on the user.
+  // Rulings parked on the human, split out — so "nothing ready" can never hide an
+  // escalation that is actually waiting on the user.
   const waiting = []
   if (gate && P.reviewStatus(`${P.reviewDir}/tree.verify.yaml`) === 'escalated') {
     const kind = P.treeGateKind() === 'fidelity' ? 'survey fidelity' : 'decomposition'
     waiting.push(`${pad('tree', 8)} ${kind} verify escalated — needs a human ruling (${P.reviewDir}/tree.verify.yaml)`)
   }
   for (const t of P.treeIds()) {
-    for (const w of P.humanWaits(t)) waiting.push(`${pad(t, 8)} ${w.text}`)
+    for (const w of P.humanWaits(t)) if (w.kind === 'escalated') waiting.push(`${pad(t, 8)} ${w.text}`)
   }
   if (waiting.length) {
     say('waiting on human:')
@@ -721,8 +910,17 @@ export function cmdStatus (P) {
   }
   const unratified = P.treeIds().map(t => [t, P.unratified(t)]).filter(([, l]) => l.length)
   if (unratified.length) {
-    say('auto-approved by machine, not yet ratified:')
-    for (const [t, labels] of unratified) say(`  ${pad(t, 8)} ${labels.join(' · ')} gate taken automatically — no human has looked (grovespec ratify ${t})`)
+    say('taken by the machine on the cold verdict, not yet ratified:')
+    for (const [t, labels] of unratified) say(`  ${pad(t, 8)} ${labels.join(' · ')} gate — nothing was pending for you; no human has looked (grovespec ratify ${t})`)
+  }
+  // Live waits are open obligations — while one exists the build is not "all done",
+  // whatever the per-node statuses say (the frozen node cannot reach done asleep).
+  if (ws.problems.length === 0 && ws.live.length) {
+    say('live waits (the turn follows the newest declaration):')
+    for (const e of ws.live) {
+      const landed = P.statusOf(e.to) === 'done' ? ' — target is done: resume and resolve' : ''
+      say(`  ${e.from} → ${e.to}  declared ${e.declared} — ${e.need}${landed}`)
+    }
   }
   if (gate) { say(`next: grovespec-verify the tree (the ${P.treeGateKind() === 'fidelity' ? 'survey fidelity' : 'decomposition'} gate)`); return 0 }
   if (nexts !== '') say(`next:${nexts}`)
@@ -745,59 +943,47 @@ function backlogLine (b) {
   return parts.join(' · ')
 }
 
-// ===================== followups (the parked later-work, in one sweep) =====================
-// Non-blocking findings survive their gate (kind: contract-gap / concern) and land in each
-// record's `followups`. This lists them all — the aggregate surface that keeps parked work
-// visible after the gates close. Working them off is grovespec-plan's job (a single item:
-// grovespec-revise); this command only shows.
-// Ordered by what an item can REACH today — `gate1`, the axis every finding already
-// answered at its gate. No new field, no re-grading: a planning pass that reads a flat
-// list of 152 has to weigh all 152 before it can start, and the one item whose wrong
-// behavior runs TODAY sits at line 97 (measured: timelog-3, 152 parked across 9 nodes).
-const REACH = [
-  ['behavior', 'the wrong behavior runs today'],
-  ['mechanism', 'hole verified, one ordinary step reaches it'],
-  ['contrived', "real, but reaching it needs action outside the product's stated reality"],
-  ['story', 'no verified hole; the victim is predicted']
+// ===================== followups (the parked record list, in one sweep) =====================
+// Non-blocking findings survive their gate and land in each record's `followups` — the
+// RECORD list: improvement · harmless-bug, plus must-fix work routed to another gate
+// (kind contract-gap). This lists them all — the aggregate surface that keeps parked work
+// visible after the gates close. It is a record, never an automatic queue: an item becomes
+// work only when the user picks it at grovespec-plan (a single item: grovespec-revise);
+// this command only shows.
+// Ordered by what a planning pass must rule on first: routed must-fix work item by item,
+// then the record categories in bulk, with unclassified legacy items last.
+const FOLLOWUP_GROUPS = [
+  ['routed', 'must-fix routed to revise/verify (kind contract-gap) — rule on these item by item'],
+  ['improvement', 'could be better — structure · performance · tests · readability; worked only on your pick'],
+  ['harmless-bug', 'wrong but harmless — no real effect on results, data, or security; worked only on your pick'],
+  ['legacy', 'pre-0.13 grades — reclassify by category when the node next reopens']
 ]
 
 export function cmdFollowups (P) {
-  // The SAME unquoting `validate` applies (both quote forms) — when this stripped only
-  // double quotes, a `gate1: 'behavior'` that validate certified as fully valid landed
-  // here as "(ungraded) — no gate1 recorded", which buried a behavior item under story.
-  // One spelling of a value cannot mean two things to two readers of the same bytes.
+  // The SAME unquoting `validate` applies (both quote forms) — one spelling of a value
+  // cannot mean two things to two readers of the same bytes (measured: a single-quoted
+  // field landed a fully valid item in the wrong group here).
   const unq = s => s.replace(/^(['"])(.*)\1$/, '$2').trim()
   const all = P.allFollowups()
-  const rank = f => {
-    const i = REACH.findIndex(([g]) => g === unq(f.gate1))
-    return i === -1 ? REACH.length : i                     // ungraded (legacy) sorts last, still shown
+  const groupOf = f => {
+    const cat = unq(f.category)
+    if (MUST_FIX_CATEGORIES.includes(cat)) return 'routed'
+    if (RECORD_CATEGORIES.includes(cat)) return cat
+    return 'legacy'
   }
-  const line = f => `  ${pad(f.tid, 8)} ${pad(f.lane, 7)} ${pad(`[${unq(f.severity)}]`, 15)} ${pad(unq(f.kind), 13)} ${unq(f.family)}`
-  const bySeverity = (a, b) => (SEVERITY_RANK[unq(b.severity)] ?? 0) - (SEVERITY_RANK[unq(a.severity)] ?? 0)
-  // Grade outranks reach. `gate2: yes` lifts the severity cap for a story-grade finding
-  // (a SHOWN break of a promised clause), so a legitimate `critical` can carry `gate1:
-  // story` — and grouping by reach alone filed it last, under a heading reading "no
-  // verified hole; the victim is predicted", inside the block a planning pass is told to
-  // dispose of in bulk. That is worse than the flat list this replaced, so anything still
-  // graded blocking is named first, whatever its reach.
-  const blocking = all.filter(f => SEVERITY_RANK[unq(f.severity)] >= SEVERITY_RANK['should-fix'])
-  const rest = all.filter(f => !(SEVERITY_RANK[unq(f.severity)] >= SEVERITY_RANK['should-fix']))
-  if (blocking.length) {
-    say(`blocking grade — critical · should-fix, whatever their reach (${blocking.length})`)
-    for (const f of blocking.sort((a, b) => bySeverity(a, b) || rank(a) - rank(b))) say(line(f))
-  }
-  for (let i = 0; i <= REACH.length; i++) {
-    const group = rest.filter(f => rank(f) === i).sort(bySeverity)
+  const label = f => unq(f.category) !== '' ? unq(f.category) : unq(f.severity) !== '' ? unq(f.severity) : '(unclassified)'
+  const line = f => `  ${pad(f.tid, 8)} ${pad(f.lane, 7)} ${pad(`[${label(f)}]`, 19)} ${pad(unq(f.kind), 13)} ${unq(f.family)}`
+  for (const [g, why] of FOLLOWUP_GROUPS) {
+    const group = all.filter(f => groupOf(f) === g)
     if (!group.length) continue
-    const [g, why] = REACH[i] ?? ['(ungraded)', 'no gate1 recorded — a legacy record; re-grade it when the node next reopens']
-    say(`${g} — ${why} (${group.length})`)
+    say(`${g === 'routed' ? 'routed must-fix' : g} — ${why} (${group.length})`)
     for (const f of group) say(line(f))
   }
   const b = P.backlogCounts()
   if (b.findings) say(`findings backlog: ${b.findings} unchecked (${P.findingsPath})`)
   if (b.restructuring) say(`restructuring backlog: ${b.restructuring} unchecked (${P.restructuringPath})`)
   if (b.total === 0) { say('no parked work — every followups list is empty, no backlog items'); return 0 }
-  say(`total: ${backlogLine(b)} — grovespec-plan structures these into the next pass`)
+  say(`total: ${backlogLine(b)} — grovespec-plan structures these into the next pass; nothing here is worked without your pick`)
   return 0
 }
 
@@ -807,6 +993,15 @@ export function cmdCheck (P, n) {
     say(n === '' ? `✗ ${treeGateMsg(P)}` : `✗ ${n}: ${treeGateMsg(P)}`)
     return 1
   }
+  // A frozen node must never read as ready — a skill auto-routing off this list
+  // would resume work the ledger deliberately parked. Unreadable ledger = refuse to
+  // answer, same reason as cmd-next.
+  const ws = waitState(P)
+  if (ws.problems.length) {
+    for (const m of ws.problems) say(m)
+    say('✗ readiness cannot be answered — the wait ledger is unreadable; fix it, then re-run')
+    return 2
+  }
   if (n === '') {
     say('ready to work now (top-down):')
     let any = false; let doneskel = false
@@ -815,7 +1010,7 @@ export function cmdCheck (P, n) {
         if (P.roleOf(t) === 'skeleton') doneskel = true
         continue
       }
-      if (P.unblocked(t) === 'yes') { say(`  ${pad(t, 8)} ${pad(P.statusOf(t), 12)} → ${P.nextAction(t)}`); any = true }
+      if (P.unblocked(t) === 'yes' && ws.asleepOn(t) === null) { say(`  ${pad(t, 8)} ${pad(P.statusOf(t), 12)} → ${P.nextAction(t)}`); any = true }
     }
     if (!any) say('  (none — every non-done node is blocked)')
     if (doneskel) say("  + done skeletons: their children are already sketched (work them above); 'grow' only adds children beyond the spec")
@@ -824,6 +1019,11 @@ export function cmdCheck (P, n) {
   if (P.read(P.taskPath(n)) === null) { say(`✗ ${n}: no task file`); return 2 }
   const ub = P.unblocked(n)
   if (ub === 'yes') {
+    const asleep = ws.asleepOn(n)
+    if (asleep !== null) {
+      say(`✗ ${n} is NOT ready — waiting on ${asleep.to} (declared ${asleep.declared}): ${asleep.need}. The turn returns when ${asleep.to} answers or goes done.`)
+      return 1
+    }
     say(`✓ ${n} is ready (${P.statusOf(n)}) — parent done, blocked_by done → next: ${P.nextAction(n)}`)
     return 0
   }
@@ -840,7 +1040,7 @@ export function cmdLang (P) {
 }
 
 // ===================== interview =====================
-// The fixed setup questionnaire (Q2 strength · Q3 models) as a paste-ready AskUserQuestion
+// The fixed setup questionnaire (Q2 find streak · Q3 models) as a paste-ready AskUserQuestion
 // payload. The runtime owns these strings because an agent re-typing them into tool-call
 // JSON corrupted single characters twice (proof runs #1·#3: 가벼운→가버운, 나뉩니다→나뉜니다)
 // by hand-encoding \uXXXX codepoints — so the output is pre-escaped pure ASCII: pasting it
@@ -848,13 +1048,13 @@ export function cmdLang (P) {
 // detected locale instead — see grovespec-init references/setup.md.
 const INTERVIEW = [
   {
-    question: '리뷰 강도 — GroveSpec은 코드를 다 쓰면 AI가 그 코드를 다시 검토해 문제를 찾아내요. 문제는 심각도로 나뉩니다: Critical(심각)=실제로 망가짐(안 돌아가거나 동작이 틀림), Should-Fix(고치는 게 좋음)=돌아는 가지만 나중에 버그·혼란으로 이어질 게 분명함, Nice-to-Have(있으면 좋음)=사소한 다듬기. 어느 심각도부터 "통과 못 함 → 다시 고쳐"로 되돌릴까요? (그보다 가벼운 건 메모만 하고 넘어가요.)',
-    header: '리뷰 강도',
+    question: '재검토 횟수 — GroveSpec은 스펙과 코드를 여러 AI가 반복해서 검토해 문제를 찾아요. 무엇을 반드시 고칠지는 문제의 종류로 정해져 있어요(실행 불가·요구사항 미충족·일반 사용 버그·손쉬운 오남용·보안 구멍은 반드시 수정, 개선점·사용에 지장 없는 버그는 기록만). 여기서 정하는 건 하나예요: "새로운 필수 수정 문제가 연속 몇 번 안 나와야 탐색을 끝낼까?" 횟수가 클수록 꼼꼼하지만 그만큼 느리고 비싸요.',
+    header: '재검토 횟수',
     multiSelect: false,
     options: [
-      { label: '2 — Critical + Should-Fix (추천)', description: '망가진 것 + 고치는 게 좋은 것까지 되돌려 고치게 함. 너무 빡빡하지도 느슨하지도 않은 기본값.' },
-      { label: '1 — Critical만', description: '진짜로 망가진 것만 되돌림. 가장 빠르고 느슨.' },
-      { label: '3 — + Nice-to-Have', description: '사소한 다듬기까지 전부 되돌림. 가장 꼼꼼하지만 가장 느림.' }
+      { label: '2 — 연속 2회 무발견 (추천)', description: '새 필수 문제가 두 번 연속 안 나오면 목록 확정. 발견율과 비용의 균형이 맞는 기본값.' },
+      { label: '1 — 연속 1회', description: '한 번 조용하면 바로 확정. 가장 빠르지만, 한 번의 운에 좌우될 수 있음.' },
+      { label: '3 — 연속 3회', description: '세 번 연속 조용해야 확정. 가장 꼼꼼하지만 가장 느리고 비쌈.' }
     ]
   },
   {
@@ -864,6 +1064,15 @@ const INTERVIEW = [
     options: [
       { label: '전부 같은 AI로', description: '검토 AI 전부 지금 이 대화에서 쓰는 모델 그대로. 따로 설정 없이 바로 됨. 단, 지금 비싼 모델(Opus 등)을 쓰고 있다면 검토 비용도 높아짐 — 넓게 훑는 쪽은 싼 모델로도 충분하기 때문에, 그 경우엔 아래 혼합이 오히려 비용도 낮고 효율적임.' },
       { label: '깊은 검토만 센 AI로', description: '넓게 훑는 쪽은 싼 AI, 깊이 파고드는 쪽만 더 똑똑하고 비싼 AI. 역할별로 필요한 만큼만 쓰므로 비용 대비 검토 품질이 가장 좋음. 다만 모델을 나눠 설정하고, 그 비싼 AI를 쓸 수 있어야 함.' }
+    ]
+  },
+  {
+    question: '편집 라우팅 훅 — GroveSpec을 거치지 않은 코드 수정도 나중에 감지되지만(fresh), 훅을 설치하면 편집하는 그 순간 "이 파일은 어느 노드 소유이고, 이 수정이 그 계약에 닿는지"를 계산해 에이전트에게 알려줘요. 아무것도 막지 않는 조언형이고, 이 프로젝트의 .claude/settings.json에만 등록돼요. 끄는 건 언제든 config 한 줄(hooks: off), 제거도 명령 하나(grovespec hooks remove)예요.',
+    header: '편집 라우팅 훅',
+    multiSelect: false,
+    options: [
+      { label: '설치 (추천)', description: '수정하는 순간에 라우팅 판단 재료가 주입됨 — 에이전트가 계약 변경을 놓칠 확률이 줄어듦. 다음 세션에서 호스트가 새 프로젝트 훅의 승인을 한 번 물어봄(정상 절차).' },
+      { label: '설치 안 함', description: '훅 없이 사후 감지(fresh)만으로 운영. 나중에 마음이 바뀌면 grovespec hooks install 한 줄.' }
     ]
   }
 ]
@@ -947,6 +1156,11 @@ function fingerprint (P) {
   }
   return h.digest('hex').slice(0, 16)
 }
+// What this runtime can do that an older one cannot, by name — a host checks for a word
+// here instead of comparing version labels. parallel-worktrees (v0.19.0): the shared id
+// floor and node claims across the worktrees of one repository (lib/shared.mjs).
+export const CAPABILITIES = ['parallel-worktrees']
+
 export function cmdVersion (P) {
   let found = false
   const rootV = `${P.root}/.grovespec/VERSION`
@@ -955,6 +1169,7 @@ export function cmdVersion (P) {
     try { process.stdout.write(readFileSync(p, 'utf8')); found = true; break } catch { /* next */ }
   }
   if (!found) say('(no VERSION file)')
+  say(`capabilities: ${CAPABILITIES.join(' ')}`)
   let fp
   try { fp = fingerprint(P) } catch (e) {
     say(`fingerprint: conflict — ${e.message}`)
@@ -979,6 +1194,12 @@ export function cmdVersion (P) {
 // therefore cannot see is history that no longer exists — a commit on a deleted branch,
 // or one dropped by a rewrite. That residue is stated, not papered over: the command
 // prints where it looked.
+// Nor can it see a number issued but not yet committed — taken by another worktree of
+// this repository, whose tree and files this checkout never reads, or by an earlier call
+// here whose node was never written. So a git repository also keeps a FLOOR in its
+// shared state (lib/shared.mjs, v0.19.0): every issuance records itself there inside the
+// shared lock, and the answer is max(scan, floor) + 1. The scan stays the truth for what
+// exists; the floor can only raise the answer, never lower it.
 export function cmdId (P) {
   let hi = 0
   const seen = tid => {
@@ -997,6 +1218,7 @@ export function cmdId (P) {
     return 2
   }
   const repo = rs === 'repo'
+  let floor = 0
   if (repo) {
     // Cut history reads SUCCESSFULLY and is wrong — a depth-1 clone re-issued a
     // burned number with exit 0. ids need the full clone (the refusal names it).
@@ -1017,9 +1239,27 @@ export function cmdId (P) {
       const m = /(?:^|\/)(TASK-[0-9]+)\.md$/.exec(p)
       if (m) seen(m[1])
     }
+    const ctx = sharedContext(P.root)
+    if (ctx.state === 'broken') { say('cannot derive an id — git did not answer where the repository\'s shared state lives (git rev-parse --git-common-dir)'); return 2 }
+    if (ctx.state === 'repo') {
+      const r = withSharedLock(ctx, () => {
+        const st = readState(ctx)
+        if (st.broken) return { broken: st.broken }
+        const f = st.data.ids[ctx.project] ?? 0
+        st.data.ids[ctx.project] = Math.max(hi, f) + 1
+        writeState(ctx, st.data)
+        return { floor: f }
+      })
+      if (r.refused) { say(`cannot issue an id — ${r.refused}`); return 2 }
+      if (r.value.broken) { say(`cannot issue an id — ${r.value.broken} — ${STATE_REMEDY}`); return 2 }
+      floor = r.value.floor
+    }
   }
-  say(`next id: TASK-${hi + 1}`)
+  say(`next id: TASK-${Math.max(hi, floor) + 1}`)
   say(hi === 0 ? 'highest seen: none' : `highest seen: TASK-${hi}`)
+  // Printed only when the floor, not the scan, decided the number — the ordinary single
+  // checkout (id → write the node → id) never meets it, so its output is unchanged.
+  if (floor > hi) say(`already issued: ${floor === hi + 1 ? `TASK-${floor}` : `TASK-${hi + 1}…TASK-${floor}`} — by another worktree of this repository or an earlier id here, and not in this checkout yet; a number is never issued twice`)
   say(repo
     ? 'looked at: tree · task files · gate records · every reachable commit (subjects + task-file paths). History no ref reaches — a deleted branch, a dropped commit — cannot be read by anything.'
     : 'looked at: tree · task files · gate records. Not a git repository, so no history was scanned.')

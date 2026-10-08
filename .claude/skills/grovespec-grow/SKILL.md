@@ -24,6 +24,8 @@ Detail exactly **one** node, and only when its parent is **`done`** (so you writ
 - **Initial build**: the next `sketch` node whose parent is `done` — `grovespec check` lists it (`sketch → grow (detail → draft)`). Confirm the parent is `done` mechanically; **never detail under a non-`done` parent** (bottom-up drift).
 - **Expansion**: the user points at a new capability not in the tree. Create a new Task under a `done` parent and add its id to `tree.md` — **the id comes from `node .grovespec/bin/grovespec.mjs id`, never counted by eye**: it skips every number that left a trace (tree · files · records, plus commit subjects and task-file paths across every reachable ref), so a merged-away node's commits can't leak into the new node's diff. Give the Task the exact current source headings in `refs`, or explicit `refs: []` when the capability intentionally has no ref source. (Belongs under a not-yet-`done` parent? Add it as a `sketch`, not a draft — see the callout above.)
 
+**Claim it:** `node .grovespec/bin/grovespec.mjs claim TASK-N grow` — non-zero = **stop** and report what it printed.
+
 ### 2. Read only what you need (thin)
 - **The node's sketch** (its one-line responsibility + rough I/O) and **exactly the headings its frontmatter `refs` assigns** — the intent source the full contract is written from. Check those coordinates against `ref/index.md`, which points at each topic's current record; never rediscover a broader/narrower scope from prose. `refs: []` means this node is intentionally no-ref, so ground it in the parent/brief instead. A field-absent Task is legacy: use only its explicit `ref/<file> §N` citations; do not guess when there are none.
 - The parent's **Contract** + this node's place in it (which clause it fills).
@@ -43,7 +45,7 @@ Fill the Task out fully: keep the `id`, **preserve `refs` exactly**, and set `st
 - **Measurable NFR targets** (latency·throughput·error-rate) go in the AC as checkable items.
 
 ### 4. Done → verify next
-The node is now a full `draft`. **Next is `grovespec-verify <this node>`** — the cold multi-persona check of the draft + human approval (`draft` → `approved`). grow does **no** review and sets **no** approval; that is verify's job, kept separate so the reviewers stay cold.
+The node is now a full `draft`. **Next is `grovespec-verify <this node>`** — the cold multi-persona check of the draft, then its gate (`draft` → `approved`). grow does **no** review and sets **no** approval; that is verify's job, kept separate so the reviewers stay cold.
 
 ## When it's done
 **Commit as `grow TASK-N: <summary>`** — the Task file you just detailed, plus anything else this step wrote (expansion also writes `tree.md`). The step name goes first on purpose: `^TASK-N: ` is the *code* cycle's diff anchor, and a spec commit wearing it drags this draft into the diff a later cold round reads (`FORMATS.md` "Commits"). A draft left uncommitted is also a draft the next session finds as an unexplained dirty tree.

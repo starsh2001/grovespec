@@ -2,26 +2,29 @@
 # File: <id>.verify.yaml (target_type spec) or <id>.review.yaml (target_type result). Each round is a new session that reads only this file and continues.
 target: tasks/TASK-0.md      # what's under review: the whole sketch tree (verify-tree) · the draft spec (verify) · this node's diff (review)
 target_type: spec            # tree (verify decomposition) | spec (verify node draft) | result (review code diff)
-level: full                  # skip | light | standard | full  (reviewer count·repeat, scaled to the change's reach)
-strength: 2                  # 1 | 2 | 3
-repeat: 2                    # MINIMUM find waves (the recall floor). Since 0.8.0 the cycle ends on
-                             # lists, never on a pass streak: find closes when the strategy ledger is
-                             # exhausted AND >= repeat waves ran; fix closes when the confirmed list is
-                             # empty and the last confirmation round is clean (reviewers.md §The cycle).
-max_rounds: 15               # escalation trigger on `round` (total spawned passes), not the terminator
+level: full                  # skip | light | standard | full  (reviewer count per wave, scaled to the change's reach)
+find_streak: 2               # N - find closes after N CONSECUTIVE waves confirming no NEW
+                             # must-fix finding (reviewers.md §The cycle). A new must-fix
+                             # resets the live counter; re-finds and record-only items don't.
+plan_streak: 2               # M - a fix plan is applied only after M consecutive clean cold
+                             # reviews of that plan (result cycles; spec fixes are lighter).
+max_rounds: 30               # escalation trigger on `round` (total spawned passes), not the terminator
 
-round: 1                     # total spawned passes: find waves + judge + confirmation rounds
-consecutive_passes: 0        # legacy counter. The schema still REQUIRES the field (validate checks
-                             # presence + range), but no rule reads its VALUE — keep writing 0.
-phase: find                  # find | judge | fix — where this cycle currently is
-                             # (rounds[] entries use find|judge|confirm — `fix` names the phase,
-                             #  `confirm` the pass kind inside it)
+round: 1                     # total spawned passes: find waves + plan reviews + confirmations
+no_new_streak: 0             # LIVE counter - consecutive completed find waves with no NEW
+                             # must-fix finding. Reset to 0 by a new must-fix; NOT advanced by
+                             # an aborted/incomplete wave or an unresolved candidate.
+phase: find                  # find | fix - where this cycle currently is
+current_item: ""             # fix phase only - the open_issues id being worked (one at a time)
+item_phase: plan             # fix phase only - plan (writing/reviewing the fix plan) | confirm
+plan_clear_streak: 0         # LIVE counter - consecutive clean plan reviews of the CURRENT
+                             # plan text. Any plan edit resets it to 0.
 status: in-progress          # in-progress | passed | escalated
 
-# The strategy ledger (find phase) — find ends by EXHAUSTING this list, never by quiet rounds.
-# Seeds per target type in reviewers.md §The strategy ledger (spec/tree: the checklist is the ledger).
-# Registering a NEW strategy takes a named blind class AND a candidate spot in this target;
-# the caller rules on additions at the wave boundary.
+# Search strategies (find phase) - a recall AID, not a terminator: assign each wave a
+# strategy the earlier waves didn't run, so waves are differently-armed (identically-armed
+# repeats measure luck). Seeds per target type in reviewers.md §Search strategies. No
+# strategy is owed per se - the streak above is what closes find.
 strategies:
   - name: single-axis-sweep
     owner: test-quality      # the lens carrying it (one owner per seed)
@@ -30,7 +33,7 @@ strategies:
 # The check table (verify/tree cycles only — code reviews have no checklist).
 # The accumulation's persistent home: a check shown in an earlier wave stays shown (frozen bytes),
 # and a NEW session resumes find from this table. A fix that edits anything `basis` cites reverts
-# that check to PARTIAL; the confirmation round re-works exactly those.
+# that check to PARTIAL; the item's confirmation round re-works exactly those.
 checks:
   - id: C1
     verdict: PARTIAL         # PASS | PARTIAL | FAIL
@@ -38,18 +41,21 @@ checks:
     basis: ""                # what the evidence cites (clauses · lines); a fix touching these un-shows it
     wave: 1                  # the wave that earned the current verdict
 
-# The found list (find phase) — raw finds, UNJUDGED; the judge phase grades them all at once.
-# Handed to every later wave as "do not re-report these or their shape; find what is NOT here".
+# The found list (find phase) - raw finds. CLASSIFIED AT EACH WAVE BOUNDARY, never left
+# for later: `judged` records the wave's ruling (kept items also land in open_issues or
+# followups with their category). Handed to every later wave as "do not re-report these
+# or their shape; find what is NOT here". An entry still `pending` (classification
+# undecided) blocks the no_new_streak from advancing until it is resolved.
 found:
   - id: F1
     wave: 1
     lens: correctness
     where: ""
     what: ""                 # one line — who is hurt + what goes wrong
-    judged: ""               # empty until judge; then kept | dropped | merged:<id>
+    judged: ""               # empty briefly at aggregation; then kept | dropped | merged:<id> | pending
 
 # Per-pass outcome (append one entry per spawned pass). What lives here is the COUNTABLE
-# result; the pass's reasoning lives in its own file (<id>.round<N>.brief.md · .judge.md ·
+# result; the pass's reasoning lives in its own file (<id>.round<N>.brief.md · .plan.md ·
 # .confirm.md) and `note` is the ONE line pointing at it. Left unbounded, `note` became
 # where the narrative actually lived (394 lines of it in one node), and every later cold
 # round that reads this file had to carry all of it.
@@ -59,13 +65,15 @@ found:
 # as the one-line flow map below, not as an indented block.
 rounds:
   - n: 1
-    phase: find              # find | judge | confirm
-    outcome: n/a             # find waves: n/a (waves aren't judged) · judge/confirm: pass | fail
-    found: { critical: 0, should_fix: 0, nice: 0 }   # judge/confirm only — counts after triage
+    phase: find              # find | plan | confirm (plan/confirm carry `item`)
+    outcome: n/a             # find waves: n/a (streak is counted in no_new_streak) · plan/confirm: pass | fail
+    found: { must_fix: 0, recorded: 0 }   # counts after this wave's classification
+    item: ""                 # plan/confirm passes - the open_issues id they served
     note: ""                 # ONE line — what this pass settled, and which round file holds the rest
 
-# Confirmed issues that block THIS lane right now.
-# `kind` chooses the lane before severity does:
+# Confirmed must-fix items that block THIS lane right now - the fix phase works them ONE
+# AT A TIME (plan → plan review → apply → confirm), never as a batch.
+# `kind` chooses the lane before category does:
 #   defect       = the current review target is wrong (the code/diff, or the spec/tree itself)
 #   contract-gap = a real issue, but it belongs in revise/verify rather than this code gate
 #   concern      = a note or suspicion; never a blocker
@@ -80,69 +88,48 @@ rounds:
 # `family` is the underlying hole/category, not the path that showed it. A review file may
 # name a family only once across `open_issues` + `followups`.
 #
-# The three gates are FIELDS here, not prose, and `grovespec validate` recomputes the
-# severity cap from them - a grade cannot be argued past its own gates, and nobody has to
-# adjudicate that by hand. The boundary they guard is should-fix -> nice-to-have: at
-# strength 2, critical and should-fix block identically, so the grade that decides whether
-# another round spins is a should-fix that shouldn't have survived.
-#
-# Arithmetic (nice 1 · should-fix 2 · critical 3), floor nice-to-have:
-#   gate1 mechanism -> cap should-fix · contrived/story -> cap nice-to-have
-#   (gate2: yes lifts the cap for mechanism/story - never for contrived)
-#   gate3 yes -> one level down. `severity` must be <= the cap; grading lower is allowed.
+# `category` is a FIELD with FIXED handling - `grovespec validate` refuses a record
+# category here and a must-fix category in followups (except contract-gap routing), so
+# what blocks is never re-argued per finding. The five must-fix categories and the two
+# record categories are defined in reviewers.md §Categories; `requirement-unmet` must
+# cite its `requirement` (the user's requirement, never a reviewer-invented duty).
 open_issues:
-  - id: F1                   # optional short handle, used in the round notes
+  - id: F1                   # short handle, used in round notes and current_item
     kind: defect             # defect | contract-gap | concern
     family: guard-has-no-teeth
-    severity: should-fix     # the FINAL grade - must be <= what the gates below allow
-    proposed: critical       # what it would be on its merits, before the gates
-    gate1: mechanism         # what can you exhibit TODAY by running committed code - and how is the
-                             # wrongness reached?
-                             #   behavior  = the wrong behavior itself runs today
-                             #   mechanism = the hole is verified (probe/mutation) AND one ORDINARY step
-                             #               reaches it (name it in `trigger`)
-                             #   contrived = hole shown, but reaching it needs abnormal action (breaking a
-                             #               documented rule on purpose · two independent edits coinciding ·
-                             #               input outside the product's stated reality)
-                             #   story     = no verified hole; the victim is predicted
-    trigger: ""              # required when gate1: mechanism - the ONE ordinary step (a natural future
-                             # edit, an in-scope consumer doing the documented thing) that turns the hole
-                             # into wrong behavior. Can't name one without rule-breaking? -> gate1: contrived
-    gate2: no                # does it break an EXPLICITLY promised Contract/AC clause - shown, not predicted? (yes -> lifts mechanism/story cap, never contrived; needs `clause`)
-    gate3: no                # documented workaround, or an existing signal that already catches it? (yes -> cap one down; needs `workaround`)
-    clause: ""               # required when gate2: yes - name the Contract/AC line
-    workaround: ""           # required when gate3: yes - name the documented way around it
-    harm: ""                 # required for `proposed: critical` when gate2 is not yes - what data is lost/corrupted, or which required input fails
+    category: normal-use-bug # crash | requirement-unmet | normal-use-bug | easy-abuse | security-hole
+    condition: ""            # the ordinary situation/steps that produce it (abuse/security: the realistic path)
+    impact: ""               # what reaches the user - wrong result, lost data, blocked work
+    requirement: ""          # required for requirement-unmet - the ref clause / Contract·AC line it fails
     where: ""                # where (file · section · line)
-    what: ""                 # what's wrong - who meets it first, and what exactly goes wrong
+    what: ""                 # what's wrong - expected vs actual, who meets it first
     measured: ""             # optional: what was actually run/observed
     closer: ""               # optional: the fix, and whether it was measured
 
-# Real issues that do NOT block this lane.
-# Use this for spec/contract revision work found during code review, or for concerns you
-# want carried forward without pretending the current code gate is still open.
-# ENTRY BAR: gate1 must be behavior or mechanism (validate enforces). A contrived/story
-# keep is recorded, not queued — write it to `adjudications` (accepted-gap, with reason);
-# it re-enters only as live measurement. A parked pool is a future planning pass's
-# mandatory reading list; what would die at disposition should die at entry.
+# The RECORD list - real observations that do NOT block: improvement | harmless-bug
+# (any kind - a harmless current-code defect included: kind names where the flaw lives,
+# category alone decides blocking), plus contract-gap routing of a must-fix found at the
+# wrong gate. This is a record, NEVER an automatic work queue: `next` (either mode) and
+# later planning rounds may not adopt an item from here on their own - only the user's
+# explicit pick makes one into work (with every node done and only record items parked,
+# `next --auto` ends instead of opening a planning session; ask mode routes to plan,
+# where that pick is the decision).
 followups:
   - id: F2
-    kind: contract-gap       # contract-gap | concern  (`defect` must not live here)
+    kind: contract-gap       # defect (record category only) | contract-gap | concern
     family: output-contract-unspecified
-    severity: nice-to-have
-    proposed: should-fix
-    gate1: mechanism
-    trigger: "a second exporter is added and sorts differently — the documented consumer diff breaks"
-    gate2: no
-    gate3: no
+    category: improvement    # improvement | harmless-bug (must-fix categories only with kind contract-gap)
+    condition: "a second exporter is added and sorts differently"
+    impact: "the documented consumer diff breaks - future work, no current wrongness"
     where: "docs/tasks/TASK-0.md # Contract"
     what: "the current code works, but the contract does not say whether the exported rows are stable-ordered"
 
 # Triage adjudications - do NOT re-raise these. A later cold review reads them to avoid
 # re-litigating: the caller hands them to every wave ITEMIZED (claim + verdict + reason) —
-# a verdict record settles one claim, never the area around it. contrived/story keeps that
-# fail the followups entry bar are recorded here as accepted-gap.
+# a verdict record settles one claim, never the area around it. A scope the USER excluded
+# is recorded here too (excluded-by-user, with the decision's source) - touching related
+# code never revives it; only new evidence of a current must-fix category reclassifies it.
 adjudications:
   - issue: ""                # short description
-    verdict: dropped         # dropped (nitpick) | accepted-gap
-    reason: ""               # why it's not a blocker
+    verdict: dropped         # dropped (nitpick) | accepted-gap | excluded-by-user
+    reason: ""               # why it's not a blocker (or where the user excluded it)

@@ -1,6 +1,6 @@
 ---
 name: grovespec-init
-description: Sets up GroveSpec in a project — the fixed setup interview (language · review strength · reviewer models) writes config, and on existing code it surveys the codebase into an all-`done` mapped tree + parked backlogs (findings·restructuring), ending at the survey fidelity gate. It records what IS; deciding what to build is grovespec-plan's (greenfield: init hands straight to plan #0). Use when the user wants to "start a new project with GroveSpec", "adopt GroveSpec in this codebase", "grovespec init", or "reconfigure / change the review settings or language". Re-invoking init re-runs the setup interview and updates config (it does not recreate the project). To plan or lay the tree use grovespec-plan; to change a done node use grovespec-revise.
+description: Sets up GroveSpec in a project — the fixed setup interview (language · review strength · reviewer models · routing hook) writes config, and on existing code it surveys the codebase into an all-`done` mapped tree + parked backlogs (findings·restructuring), ending at the survey fidelity gate. It records what IS; deciding what to build is grovespec-plan's (greenfield: init hands straight to plan #0). Use when the user wants to "start a new project with GroveSpec", "adopt GroveSpec in this codebase", "grovespec init", "reconfigure / change the review settings or language", or to "remove / uninstall GroveSpec / grovespec 제거" (→ §Uninstall — the ledger stays). Re-invoking init re-runs the setup interview and updates config (it does not recreate the project). To plan or lay the tree use grovespec-plan; to change a done node use grovespec-revise.
 ---
 
 # grovespec-init
@@ -26,8 +26,8 @@ Setup of a GroveSpec project: **it records what *is*** — config from a fixed i
 - **No code** → **greenfield**: §2, create the empty scaffolding (§4), and hand to `grovespec-plan` — init asks nothing about the product idea; the exploration is plan #0's.
 
 ### 2. Setup interview (the fixed questionnaire — ask before starting)
-Run the **fixed** interview in `references/setup.md` — **language** (confirm the detected locale) · **review strength** · **reviewer models** — and write the answers to `.grovespec/config.yaml`.
-- Ask **exactly those three questions, in order** — don't improvise or skip any. A fixed interview is what keeps every project configured the same and nothing decided silently.
+Run the **fixed** interview in `references/setup.md` — **language** (confirm the detected locale) · **review repetition** (the no-new-finding streak) · **reviewer models** · **routing hook** (install into this project's `.claude/settings.json`, via the runtime) — and write the answers to `.grovespec/config.yaml`.
+- Ask **exactly those four questions, in order** — the strings, the order and the why live in `setup.md`; don't improvise, reorder or skip (the hook especially is asked, never silently installed).
 - The **test command is not asked** — it's a derivable value, auto-detected per `setup.md`'s note (brownfield: §3; greenfield: the first `grovespec-review` derives it).
 
 ### 3. Brownfield survey (existing code only)
@@ -53,6 +53,9 @@ Read and follow `references/code-to-tree.md` — read the code first and map it 
 > **Open and close in the step-report shape** (`FORMATS.md` "The step report" — fixed `starting` opening; `Result · Open · Your turn · Next` closing, warm full sentences). Here, *Open / Your turn* typically carry: the survey awaiting the fidelity verify · backlog items · unanswered setup questions.
 
 > **Recommend a new session for the next step** (greenfield: `plan`; brownfield: the fidelity verify). The agent that just mapped the tree must not also orchestrate its cold review — start it fresh, with clean bounded context (WORKFLOW §5).
+
+### Uninstall (removing GroveSpec from the project)
+When the user asks to remove GroveSpec, run **`node .grovespec/bin/grovespec.mjs uninstall`** — the runtime removes the tool (hook registration · both skill bundles · runtime files) and **keeps the ledger**: gate records · waits · config · everything under docs/ stay as plain markdown/YAML that outlives the tool. Deleting the ledger too is `--purge` — collect the user's explicit yes before passing it; the runtime only obeys the flag. Never uninstall by hand-deleting folders — `.grovespec/` mixes the runtime with that ledger.
 
 ## What it looks like when done
 ```

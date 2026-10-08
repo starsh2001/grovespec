@@ -7,7 +7,12 @@ origin: mapped
 blocked_by: [TASK-2]
 tdd: false
 tdd_skip_reason: "existing code, documented after the fact (brownfield); tests to follow"
+
 ---
+
+# TASK-4 · list command
+
+> Shows every stored expense, oldest first.
 
 ## Overview
 Shows every stored expense, one per line, in the order they were saved.

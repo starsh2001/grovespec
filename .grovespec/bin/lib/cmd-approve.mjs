@@ -16,12 +16,14 @@
 // Every check runs BEFORE any write. The two writes (task status, then record) are not
 // one atomic operation, so an interrupted approval leaves task=advanced + record=pending
 // — validate names that state, and re-running approve completes it (the repair path).
-import { duplicateNestedKeys, nestedValue, splitLines, topValue, listItemCount, setFmValue } from './core.mjs'
+import { duplicateNestedKeys, nestedValue, splitLines, topValue, listItemCount, setFmValue, completionProblems } from './core.mjs'
 import { writeAtomic } from './project.mjs'
 import { taskEvidenceDigest, specDigest, treeDigest } from './cmd-pin.mjs'
 import { dirtyResultSubject, git, repoState, ignoredState, resultSealBreach } from './git.mjs'
 import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDigest, validateCompletedPacket } from './source-evidence.mjs'
 import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
+import { waitState } from './cmd-wait.mjs'
+import { releaseOnDone, releaseTree } from './cmd-claim.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 const hasTop = (text, key) => splitLines(text).some(line => new RegExp(`^${key}[ \\t]*:`).test(line))
@@ -84,6 +86,11 @@ function recordUndecidable (P, path, label) {
   const st = topValue(text, 'status')
   if (st !== 'passed') return `its ${label} record is '${st === '' ? 'unset' : st}', not passed — a gate that did not come out clean is never approved past`
   if (listItemCount(text, 'open_issues') > 0) return `its ${label} record still lists open issues — clear them (grovespec-fix), never approve past them`
+  // The 0.13 close conditions, recomputed at the decision too (same helper as validate —
+  // a record wearing `passed` without meeting its own cycle's close conditions must not
+  // reach a stamp just because approve is a different door than validate).
+  const incomplete = completionProblems(text)
+  if (incomplete.length) return `its ${label} record is passed without meeting its close conditions — ${incomplete[0]}${incomplete.length > 1 ? ` (+${incomplete.length - 1} more — grovespec validate names them all)` : ''}`
   const ab = topValue(text, 'approved_by')
   if (ab === '') return `its ${label} record is legacy (no approved_by) — it binds nothing; re-run the gate to seal a fresh cycle`
   if (ab !== 'pending') return `its ${label} gate is already decided (approved_by: ${ab}) — a new decision needs a new cycle (grovespec-verify/-review, or reopen)`
@@ -158,6 +165,8 @@ function approveTree (P, human) {
   writeAtomic(tp, upsertTop(text, 'approved_by', 'human'))
   P.forget()
   say('tree approved by you — the decomposition gate is open; the per-node build begins')
+  // The tree-wide step ends with its gate (v0.19.0): this worktree's tree claim goes.
+  for (const line of releaseTree(P)) say(line)
   return 0
 }
 
@@ -179,6 +188,24 @@ export function cmdApprove (P, n, human) {
   const repairing = st === target                          // interrupted earlier: task moved, record didn't
 
   // ---- every check, before any write ----
+  // A live wait is an open obligation — approving a gate over one is exactly the
+  // "done over an IOU" state the ledger exists to prevent. The
+  // waiter resumes and resolves first; an unreadable ledger refuses the same way
+  // (deciding blind is not deciding clean).
+  {
+    const ws = waitState(P)
+    if (ws.problems.length) {
+      for (const m of ws.problems) say(m)
+      say(`${n}: the wait ledger cannot be read — a gate must not be decided over an unreadable obligation list; fix it, then re-run`)
+      return 2
+    }
+    const open = ws.live.filter(e => e.from === n)
+    if (open.length) {
+      for (const e of open) say(`${n} still waits on ${e.to} (declared ${e.declared}) — ${e.need}`)
+      say(`${n}: a gate cannot be approved while the node holds a live wait — resume the frozen step and grovespec wait resolve it first`)
+      return 2
+    }
+  }
   const err = recordUndecidable(P, record, label)
   if (err !== null) { say(`${n}: ${err}`); return 2 }
   const text = P.read(record)
@@ -262,6 +289,9 @@ export function cmdApprove (P, n, human) {
 
   if (human) say(`approved by you: ${n} ${repairing ? `(finishing an interrupted approval at ${st})` : `${st} → ${target}`} (${label} gate)`)
   else say(`approved by machine: ${n} ${repairing ? `(finishing an interrupted approval at ${st})` : `${st} → ${target}`} (${label} gate) — NOT human-approved; ratify it when you have looked`)
+  // Done HERE (v0.19.0): this worktree's claim becomes a done mark for the worktrees that
+  // have not got this commit yet, or simply ends. Said, never allowed to undo the decision.
+  if (target === 'done') for (const line of releaseOnDone(P, n)) say(line)
   return 0
 }
 

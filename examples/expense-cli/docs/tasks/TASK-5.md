@@ -7,7 +7,12 @@ origin: mapped
 blocked_by: [TASK-2]
 tdd: false
 tdd_skip_reason: "existing code, documented after the fact (brownfield); tests to follow"
+
 ---
+
+# TASK-5 · report command
+
+> Adds the expenses up by category and prints a total.
 
 ## Overview
 Sums expenses by category and prints a total. Reads everything from storage, adds up each category, prints them in name order with a grand total.
@@ -18,7 +23,9 @@ Sums expenses by category and prints a total. Reads everything from storage, add
 ## Contract
 - Takes: ignores its args.
 - Gives: exit code `0` (always). Prints per-category totals + a separator + the grand total.
-- Invariant: sums `amount` per category (whole won, matches storage), prints **category-name ascending**. Grand total = the sum of the category totals. Amounts right-aligned, thousands commas. Empty data → just the separator + a `0` total (doesn't crash).
+- Invariant: sums `amount` per category (whole won, matches storage), prints **category-name ascending**; the grand total is the sum of the category totals.
+  - Amounts are right-aligned, with thousands commas.
+  - Empty data prints just the separator and a `0` total — it doesn't crash.
 - Responsibility: storage reads; report aggregates and displays.
 
 (Consumes storage — `blocked_by: [TASK-2]`.)
