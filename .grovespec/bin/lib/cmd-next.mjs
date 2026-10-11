@@ -221,7 +221,7 @@ export function cmdNext (P, auto) {
     }
     say('nothing runnable — the tree is empty (run grovespec-init)')
   } else {
-    // Every node done. Before anything routes to plan, the round owes its CLOSING
+    // Every node done. Before anything routes to plan, the milestone owes its CLOSING
     // LOOK (v0.16.0): node-scoped gates structurally miss defects composed across
     // nodes (the launcher's startup-timeout dead-end had every ingredient recorded
     // in three Tasks and was found only by a whole-tree review after all gates were
@@ -239,9 +239,9 @@ export function cmdNext (P, auto) {
       return 1
     }
     if (ro.owed) {
-      const stop = treeHeld("the round's retrospective (grovespec-retro)")
+      const stop = treeHeld("the milestone's retrospective (grovespec-retro)")
       if (stop !== null) return stop
-      say(`next: retro — every node is done, and ${ro.work.length} TASK commit(s) landed since ${ro.anchor === null ? 'the round began' : `retro-${ro.n}`}; the round owes its closing look before the next plan (grovespec-retro)`)
+      say(`next: retro — every node is done, and ${ro.work.length} TASK commit(s) landed since ${ro.anchor === null ? 'the milestone began' : `retro-${ro.n}`}; the milestone owes its closing look before the next plan (grovespec-retro)`)
       return 0
     }
     // Parked work (followups · brownfield backlogs · fresh hand-edits) routes to the

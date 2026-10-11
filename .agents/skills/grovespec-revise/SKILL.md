@@ -64,7 +64,7 @@ A `done` `feature` turns out to need sub-nodes ("scale this up / more behavior a
 The role promotion *is* the change; the children themselves are grown afterward, normally.
 
 ## Where the batches come from — grovespec-plan
-The parked work (review-file `followups` · the brownfield backlogs `findings.md`/`restructuring.md` · `fresh` hand-edits) is **structured into rounds by `grovespec-plan`**, which clusters it, gets the human's disposition, and translates each kept item into exactly the changes above — a behavior change (A) arrives here as a reopen, a structural one as (B). A **single small item needs no plan**: come straight here. Check a backlog item off (or delete it) once its node is `done` again.
+The parked work (review-file `followups` · the brownfield backlogs `findings.md`/`restructuring.md` · `fresh` hand-edits) is **structured into milestones by `grovespec-plan`**, which clusters it, gets the human's disposition, and translates each kept item into exactly the changes above — a behavior change (A) arrives here as a reopen, a structural one as (B). A **single small item needs no plan**: come straight here. Check a backlog item off (or delete it) once its node is `done` again.
 
 ## Session
 Thin — read only the Task·relevant code of the node you're changing, and (when declaring candidates) just enough of each consumer to enumerate it.
@@ -72,7 +72,7 @@ Thin — read only the Task·relevant code of the node you're changing, and (whe
 ## When it's done
 The changed node is `done` again, with the reason in the Change Log. If the contract changed, the consumers have been re-reviewed and are coherent again.
 
-> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — fixed `starting` opening; `Result · Open · Your turn · Next` closing, warm full sentences). Here, *Open / Your turn* typically carry: candidates declared and awaiting their recheck · an escalated gate.
+> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — a `## … starting` heading to open; `### Result · Open · Your turn · Next` headings to close, warm full sentences). Here, *Open / Your turn* typically carry: candidates declared and awaiting their recheck · an escalated gate.
 
 **Commit the reopening as `revise TASK-N: <summary>`** before the re-run steps begin — the changed Task file(s), every `refs` update, the tree edit if the structure moved, the fresh tree-cycle record when source ownership changed, the candidate declarations (`.grovespec/candidates.yaml`), and the `reopen` result. The step name goes first (`FORMATS.md` "Commits"); the cycle that follows writes its own `TASK-N: ` commits.
 

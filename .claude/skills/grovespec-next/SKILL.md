@@ -40,7 +40,7 @@ Say the mode in the invocation when you call a step skill: **ask** — put every
 - `next: TASK-N (name) <status> → <skill>` — run it (§3). It may also list what's waiting on the human, and nodes another worktree holds or finished on a branch not merged here (skipped here); carry those into your report. The step may be `grovespec approve` — a sealed clean gate, taken on the record in either mode.
 - `next: tree → grovespec-verify (…)` — a tree gate is armed (decomposition, or the brownfield survey's fidelity) — run `grovespec-verify` on the tree (§3).
 - `next: recheck — …` — a contract change landed and its candidates are armed — run `grovespec-recheck` (§3): one step judges reach for them all; only judged-touched nodes reopen. Same in both modes.
-- `next: retro — …` — every node is done and the round owes its closing look — run `grovespec-retro` (§3). It asks nothing and reopens nothing, so it runs the same in both modes.
+- `next: retro — …` — every node is done and the milestone owes its closing look — run `grovespec-retro` (§3). It asks nothing and reopens nothing, so it runs the same in both modes.
 - `next: plan — …` — the planning pass is due — run `grovespec-plan` (§3). Its decisions (the disposition confirm, the tree gate it ends on) stay the human's in both modes.
 - `nothing runnable — …` — **stop** and go to §4. The reason is on the line: everything done with nothing parked · everything blocked, or held by another worktree (a node, or the tree-wide step that is due) · waiting on you (an escalation or the tree gate, per node).
 

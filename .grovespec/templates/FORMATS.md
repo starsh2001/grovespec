@@ -171,7 +171,7 @@ One top-level `waits:` block list (block style, `[]`-free; every value one stric
 Scheduling reads the ledger with one rule — **the turn follows the newest declaration**: a node holding a live wait (unresolved, target not `done`) is asleep, *unless* a live wait pointing at it is newer than every live wait it holds — the counter-declaration is the wake signal, so exactly one node of a chain is awake and a mutual wait is a turn-pass, never a deadlock. **Re-declaring a pair that already has a live entry refreshes that entry's `declared` (and `need`) in place** — the woken node's way of yielding back after answering. The ledger therefore holds each pair's **current** state, never its history: superseded clocks and wordings live in the Change Logs and in git, because the ledger rides every freezing step's commit. A wait whose target went `done` stops blocking (the value landed) and is surfaced by `validate` until the waiter resumes and resolves it. A `done` node holding a live wait is a validate problem — that done was earned over an open obligation. `approve` refuses a gate while the node holds a live wait. Both sides of every declaration and resolution are also written as Change-Log sentences by the step that made them — the ledger orders the turn; the Change Logs tell the story. The ledger file rides in the freezing step's own commit, like every other artifact a step writes.
 
 ## findings.md / restructuring.md  (brownfield backlog — optional)
-Lightweight checklists `code-to-tree` parks while mapping existing code into the all-`done` tree; they hold what's *wrong with* that reality, kept **out** of the tree and **worked off in rounds by `grovespec-plan`** (a single item may go straight to `grovespec-revise`). **Not** strict frontmatter artifacts — documented here but deliberately **not** in `.grovespec/schema`/`validate` (a checklist-shaped optional backlog; strict validation would be ceremony). Created only when non-empty (absent for greenfield or clean code). Content in `config.language`; a board may read them as draft issues.
+Lightweight checklists `code-to-tree` parks while mapping existing code into the all-`done` tree; they hold what's *wrong with* that reality, kept **out** of the tree and **worked off by `grovespec-plan`, one milestone at a time** (a single item may go straight to `grovespec-revise`). **Not** strict frontmatter artifacts — documented here but deliberately **not** in `.grovespec/schema`/`validate` (a checklist-shaped optional backlog; strict validation would be ceremony). Created only when non-empty (absent for greenfield or clean code). Content in `config.language`; a board may read them as draft issues.
 - **findings.md** — node-level. `##` sections: `Bugs` · `Duplications` · `Doc ↔ code mismatches`. Each item a `- [ ]` line naming *where* + the resolving step (`grovespec-revise`, or extract via `grovespec-grow`). Template `.grovespec/templates/findings.md`.
 - **restructuring.md** — tree-level structural debt. A flat `- [ ]` list, each naming the structural problem + the proposed `grovespec-revise` split·merge·move. Template `.grovespec/templates/restructuring.md`.
 
@@ -181,8 +181,8 @@ Lightweight checklists `code-to-tree` parks while mapping existing code into the
 ## recheck-N.md  (a reach-check's record — appears with the first armed recheck)
 `<paths.review>/recheck-N.md`, written by `grovespec-recheck`: frontmatter `origins:` (the from-nodes judged), body = per candidate the machine reach line, each wave's finding (the shown miss or the reached use — never "looks fine"), and the settle. Markdown on purpose, same reasoning as `retro-N.md` below. Commit `recheck #N: <summary>` carries it with the settled ledger.
 
-## retro-N.md  (the round's closing record — appears when the first round closes)
-`<paths.review>/retro-N.md`, written by `grovespec-retro` when every node is done and TASK- work landed since the last record (`grovespec retro` derives the owed-state and the round's numbers). Frontmatter: **`anchor: <commit sha>`** — the HEAD the retro's own commit lands on top of; TASK- work after this anchor is what owes the *next* retro (the retro commit is not TASK-shaped, so a closed retro never owes itself). Body in `config.language`: the measured numbers, the round's story in plain sentences, the findings table with dispositions, the lessons a next round should read. **Markdown on purpose, not a gate record**: it is prose for a person and vetoes nothing — its must-fix findings live as backlog items in `findings.md`/`restructuring.md` (the surface plan already reads), so `validate`'s yaml record sweep never adopts it.
+## retro-N.md  (the milestone's closing record — appears when the first milestone closes)
+`<paths.review>/retro-N.md`, written by `grovespec-retro` when every node is done and TASK- work landed since the last record (`grovespec retro` derives the owed-state and the milestone's numbers). Frontmatter: **`anchor: <commit sha>`** — the HEAD the retro's own commit lands on top of; TASK- work after this anchor is what owes the *next* retro (the retro commit is not TASK-shaped, so a closed retro never owes itself). Body in `config.language`: the measured numbers, the milestone's story in plain sentences, the findings table with dispositions, the lessons a next milestone should read. **Markdown on purpose, not a gate record**: it is prose for a person and vetoes nothing — its must-fix findings live as backlog items in `findings.md`/`restructuring.md` (the surface plan already reads), so `validate`'s yaml record sweep never adopts it.
 
 ## Shared worktree state — `<git-common-dir>/grovespec/state.json`
 **Not a project artifact.** It lives in the git common directory every worktree of the repository shares (`.git/` in a plain checkout), is never committed, and only the runtime writes it — `grovespec id`, `grovespec claim`, `approve`/`amend` when a node is done, and `approve tree --human` — under the short lock `<git-common-dir>/grovespec/lock/` (a second writer waits a few seconds; a lock still held after that is named by path, never reclaimed). JSON, one object:
@@ -242,7 +242,7 @@ An all-mapped no-ref tree remains code-grounded when either a spec or result rec
 
 ## The step report (what a skill says to the person)
 
-Every step skill **opens and closes in the same shape**, so the person finds the same information in the same place on every run — a human gate only works if the report feeding it reads the same way the tenth time as the first. The labels are fixed English (like every header in this file); the prose between them is written in `config.language`, **warmly and in full sentences** (in the language's respectful-address register — the writing rules at the top of this file), for the same reader as the setup interview — someone who may not code. The artifact rules at the top of this file cut filler because artifacts are re-read; a report is spoken once to *orient a person*, so here the explanation is the payload — never compress it into a telegram line ("R2 pass, no issues" fails this format even when it's true).
+Every step skill **opens and closes in the same shape**, so the person finds the same information in the same place on every run — a human gate only works if the report feeding it reads the same way the tenth time as the first. The headings are fixed English (like every header in this file); the prose between them is written in `config.language`, **warmly and in full sentences** (in the language's respectful-address register — the writing rules at the top of this file), for the same reader as the setup interview — someone who may not code. The artifact rules at the top of this file cut filler because artifacts are re-read; a report is spoken once to *orient a person*, so here the explanation is the payload — never compress it into a telegram line ("R2 pass, no issues" fails this format even when it's true).
 
 **Written so the reader has never read these docs.** This is the one place GroveSpec asks a person for something, and it is the place its vocabulary leaks hardest — the step has spent its whole run inside check codes, round numbers and lens names, and they come out sounding like words. They are not words to the reader. So:
 - **Never a bare code.** `C4`, `R11`, `F-D`, `PASS`, `normal-use-bug` — none of these reach the person alone. Say what was found and what it means for them. The code is available in the record if they ask.
@@ -250,31 +250,51 @@ Every step skill **opens and closes in the same shape**, so the person finds the
 - **The gate question is asked in the person's terms, about their thing** — what it now does, what it will not do, what they are agreeing to. "Is this the right decomposition?" is the *skill's* question; the person's is "이 구조로 지으면 원하시는 게 나오는지".
 - The test: read your closing aloud to someone who has never heard of GroveSpec. Every sentence they would stop on is a sentence to rewrite.
 
-**A decision, not a stage — what may stop for the person.** A step stops for the person only where a decision is genuinely theirs: **an ambiguous requirement** (the source or the person left it open — a name, a policy, a constraint, a question with no defensible default), **a product behavior or scope choice** (a `(gap)` ruling, a planning disposition, the decomposition), or **accepting an unmet or unverifiable requirement** (a requirement the only fix would narrow or drop, a measurable target nothing can check). A gate that came out clean within the agreed requirements is **not** one: its verdict is recorded (`approved_by: machine` — the cold verdict, never the person's approval) and the flow goes on. Every ask has four parts — **the issue** (what is undecided, in one line) · **the options** · **each option's impact** · **the recommended one** with its one-line why — and always allows a free-form answer. **No issue, no ask**: "shall I record this as done?" over nothing to decide is a stage approval, and a stage approval is the rubber stamp this format exists to prevent. The verdicts (the gate records) and the person's decisions (`adjudications`, Change-Log lines, `ratify`) are kept apart — one never stands in for the other.
+**A decision, not a stage — what may stop for the person.** A step stops for the person only where a decision is genuinely theirs: **an ambiguous requirement** (the source or the person left it open — a name, a policy, a constraint, a question with no defensible default), **a product behavior or scope choice** (a `(gap)` ruling, a planning disposition, the decomposition), or **accepting an unmet or unverifiable requirement** (a requirement the only fix would narrow or drop, a measurable target nothing can check). A gate that came out clean within the agreed requirements is **not** one: its verdict is recorded (`approved_by: machine` — the cold verdict, never the person's approval) and the flow goes on. Every ask has four parts — **the issue** (what is undecided, in one line) · **the options** · **each option's impact** · **the recommended one** with its one-line why — and always allows a free-form answer. **The four parts go in the message, not in the question tool**: when the ask goes through a host's question tool mid-turn (`AskUserQuestion` · `request_user_input_async`) rather than the closing *Your turn*, write all four in the message body before calling it, and give the tool only the question and short option labels — hosts show the tool's other fields unevenly (an option's `preview` or description may never appear), and nothing the whole decision rests on (the list being approved, the delta) goes in one option's field. **No issue, no ask**: "shall I record this as done?" over nothing to decide is a stage approval, and a stage approval is the rubber stamp this format exists to prevent. The verdicts (the gate records) and the person's decisions (`adjudications`, Change-Log lines, `ratify`) are kept apart — one never stands in for the other.
 
-Fails this format, though every word is true — `Result: R2에서 C4가 PARTIAL로 남았고 normal-use-bug 하나가 open_issues에 있습니다.` Passes — `Result: 두 번째 검토에서 한 가지가 걸렸습니다. 목표를 세운 당일의 달성 여부를 세는 규칙이 스펙과 코드에서 서로 다르게 읽혀서, 지금 상태로는 스트릭 숫자가 하루 어긋날 수 있습니다.`
+Fails this format, though every word is true — a *Result* reading `R2에서 C4가 PARTIAL로 남았고 normal-use-bug 하나가 open_issues에 있습니다.` Passes — `두 번째 검토에서 한 가지가 걸렸습니다. 목표를 세운 당일의 달성 여부를 세는 규칙이 스펙과 코드에서 서로 다르게 읽혀서, 지금 상태로는 스트릭 숫자가 하루 어긋날 수 있습니다.`
+
+**Markdown headings, not label lines.** The anchor is a `##` heading and each slot a `###` heading with its prose underneath — never `Result: …` run on as a label line, which buries the slots in one block of text. Inside a slot, a list or a short table is fine where it reads better than a paragraph (the items of a decision, the nodes that changed).
 
 **Opening** — the first message when the skill starts:
 ```
-[grovespec <skill> <target>] starting
-```
-followed by a short paragraph (2–4 sentences): what this step is for, in plain words — even if the person has seen it ten times; what it is about to do on this target; and what the person will have when it ends.
+## [grovespec <skill> <target>] starting
 
-**Closing** — the last message of the run: the anchor line, then all four slots, this order, no slot ever dropped (an empty slot is information — write the sentence that says so):
+<what this step is for · what it is about to do on this target · what the person will have when it ends>
 ```
-[grovespec <skill> <target>] done — <the outcome in half a line>
-Result: <what actually happened, with its evidence — rounds, tests, counts, decisions taken.>
-Open: <what this step leaves unresolved — open issues, parked findings, accepted gaps, unverified targets. "Nothing open" is a claim: say it only checked.>
-Your turn: <what now waits on the person — a decision in the four-part shape above (the issue · the options · each one's impact · the recommended one), or the sentence that nothing does and what that means for the flow (a clean gate is recorded and passed through; a look of their own is `ratify`). A file path or command comes after the substance, never instead of it.>
-Next: <the next step and where to run it — including the new-session recommendation when the workflow calls for one.>
+The paragraph is short (2–4 sentences) and in plain words — even if the person has seen it ten times.
+
+**Closing** — the last message of the run: the anchor heading, then all four slot headings, this order, no slot ever dropped (an empty slot is information — write the sentence that says so):
+```
+## [grovespec <skill> <target>] done — <the outcome in half a line>
+
+### Result
+<what actually happened, with its evidence — rounds, tests, counts, decisions taken.>
+
+### Open
+<what this step leaves unresolved — open issues, parked findings, accepted gaps, unverified targets. "Nothing open" is a claim: say it only checked.>
+
+### Your turn
+<what now waits on the person — a decision in the four-part shape above (the issue · the options · each one's impact · the recommended one), or the sentence that nothing does and what that means for the flow (a clean gate is recorded and passed through; a look of their own is `ratify`). A file path or command comes after the substance, never instead of it.>
+
+### Next
+<the next step and where to run it — including the new-session recommendation when the workflow calls for one.>
 ```
 A run that ends without reaching its normal end (escalated · blocked · refused) closes the same way with **`stopped — <why>`** instead of `done`. The structure is what's fixed; the content must be **this run's facts** — every sentence checkable against what just happened, no stock reassurance.
 
 Filled, it reads like this (prose in the project's language):
 ```
-[grovespec review TASK-3] done — the aggregation code is written, reviewed and clean; 14 of 14 tests pass
-Result: TASK-3 is the part that adds your records up per day and decides whether a goal was met. It is now built and all 14 of its tests pass. Reviewers who had not seen it being written read it twice over, raised nine concerns, and three of those turned out to be real: a record crossing midnight was counted on the wrong day, a goal set today reported a streak of one, and an empty day returned nothing instead of zero minutes. All three are fixed, and a fresh reading of just those fixes found nothing new.
-Open: Nothing is left open here — the three are closed and the other six were ruled out with reasons, which are kept with the review so they do not come back round after round.
-Your turn: Nothing here needs a decision from you: the three problems were real and are fixed, and nothing the reviewers raised asks you to choose between behaviors or to accept a gap. So the gate is recorded as passed by the review — not as approved by you — and the build moves on; if you want to look it over yourself, say so and I will record that you did.
-Next: TASK-4 — the weekly report screen — is the next one to spec out, and the loop goes there on its own. Best started in a fresh session, so the reviewers come to it without having watched it being written.
+## [grovespec review TASK-3] done — the aggregation code is written, reviewed and clean; 14 of 14 tests pass
+
+### Result
+TASK-3 is the part that adds your records up per day and decides whether a goal was met. It is now built and all 14 of its tests pass. Reviewers who had not seen it being written read it twice over, raised nine concerns, and three of those turned out to be real: a record crossing midnight was counted on the wrong day, a goal set today reported a streak of one, and an empty day returned nothing instead of zero minutes. All three are fixed, and a fresh reading of just those fixes found nothing new.
+
+### Open
+Nothing is left open here — the three are closed and the other six were ruled out with reasons, which are kept with the review so they do not come back round after round.
+
+### Your turn
+Nothing here needs a decision from you: the three problems were real and are fixed, and nothing the reviewers raised asks you to choose between behaviors or to accept a gap. So the gate is recorded as passed by the review — not as approved by you — and the build moves on; if you want to look it over yourself, say so and I will record that you did.
+
+### Next
+TASK-4 — the weekly report screen — is the next one to spec out, and the loop goes there on its own. Best started in a fresh session, so the reviewers come to it without having watched it being written.
 ```

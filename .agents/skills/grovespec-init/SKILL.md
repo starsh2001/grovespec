@@ -21,12 +21,12 @@ Setup of a GroveSpec project: **it records what *is*** — config from a fixed i
 ### 1. Figure out what you have
 **Check the directory first** (glob for source files + any docs); ask the user only if it's ambiguous.
 
-- **Already a GroveSpec project** (a `tree.md` with nodes exists) → this is a *reconfigure*: run only **§2 (the setup interview)**, update config, and **stop**. (Plan the next round → grovespec-plan; change a done node → grovespec-revise.)
+- **Already a GroveSpec project** (a `tree.md` with nodes exists) → this is a *reconfigure*: run only **§2 (the setup interview)**, update config, and **stop**. (Plan the next milestone → grovespec-plan; change a done node → grovespec-revise.)
 - **Source files exist** → **brownfield**: §2 then §3 (the survey).
 - **No code** → **greenfield**: §2, create the empty scaffolding (§4), and hand to `grovespec-plan` — init asks nothing about the product idea; the exploration is plan #0's.
 
 ### 2. Setup interview (the fixed questionnaire — ask before starting)
-Run the **fixed** interview in `references/setup.md` — **language** (confirm the detected locale) · **review repetition** (the no-new-finding streak) · **reviewer models** · **routing hook** (install into this project's `.claude/settings.json`, via the runtime) — and write the answers to `.grovespec/config.yaml`.
+Run the **fixed** interview in `references/setup.md` — **language** (confirm the detected locale) · **review repetition** (the no-new-finding streak) · **reviewer models** · **routing hook** (install into this project's `.claude/settings.json` and `.codex/hooks.json`, via the runtime) — and write the answers to `.grovespec/config.yaml`.
 - Ask **exactly those four questions, in order** — the strings, the order and the why live in `setup.md`; don't improvise, reorder or skip (the hook especially is asked, never silently installed).
 - The **test command is not asked** — it's a derivable value, auto-detected per `setup.md`'s note (brownfield: §3; greenfield: the first `grovespec-review` derives it).
 
@@ -34,7 +34,7 @@ Run the **fixed** interview in `references/setup.md` — **language** (confirm t
 Read and follow `references/code-to-tree.md` — read the code first and map it into the tree (even with docs present, code comes first: docs drift from code).
 - **The survey is a photograph, not a design**: the whole existing structure as an all-`done` tree, `origin: mapped`, **honest even if ugly** — a tangled module maps to a tangled node; inventing a clean structure the code doesn't have is falsifying the survey.
 - **Every mapped Task gets `refs: []`.** Its criterion is the code, even when the user brought reference docs. The explicit empty list records that this is intentionally no-ref; a doc↔code mismatch is parked in `findings.md` instead of turning the intent doc into the survey's truth.
-- **What's *wrong* goes beside the tree, not into it**: `findings.md` (node-level bugs · duplications · doc↔code mismatches) and `restructuring.md` (tree-level structural debt) — only if non-empty. `grovespec-plan` structures them into the next round; the tree itself stays what *is*.
+- **What's *wrong* goes beside the tree, not into it**: `findings.md` (node-level bugs · duplications · doc↔code mismatches) and `restructuring.md` (tree-level structural debt) — only if non-empty. `grovespec-plan` structures them into the next milestone; the tree itself stays what *is*.
 - **Set `paths` in `.grovespec/config.yaml` to the existing layout** (e.g. `src`, `tasks`) so later searches hit the real dirs.
 - **Detect the test command** (`package.json` `scripts.test` / pytest config / `Makefile` / `cargo`·`go` layout / …) and write `review.test`. Leave it empty only if nothing is clearly detectable.
 - **conventions.md** — fill in the facts the code guarantees (terms · global rules) now (→ `code-to-tree.md` §7).
@@ -48,9 +48,9 @@ Read and follow `references/code-to-tree.md` — read the code first and map it 
 
 ### 5. Hand off
 - *Greenfield* → **next is `grovespec-plan`** (plan #0: explore → intent record + brief → the all-`sketch` tree → the decomposition gate). Init ends after config + scaffolding — deliberately small: adopting GroveSpec and designing the product are different acts.
-- *Brownfield* → **next is the survey fidelity gate**: `grovespec-verify` on the tree (`target_type: tree`, write `tree_evidence_mode: fidelity` when the initial record is created, before round 1; fidelity checklist F1–F4 — reviewers.md): the survey is an agent's claim too, so cold reviewers check it *against the code* (coverage · contract↔behavior · no beautification · backlog honesty) → fix → `pin tree` seals the structure plus every mapped node's explicit no-ref assignment → **human approves the vetted survey** (`grovespec approve tree --human`). The runtime blocks node work until then. After the gate, `grovespec-plan` (plan #1) structures the backlog into the first round; `grovespec-revise`/`grovespec-grow` execute it.
+- *Brownfield* → **next is the survey fidelity gate**: `grovespec-verify` on the tree (`target_type: tree`, write `tree_evidence_mode: fidelity` when the initial record is created, before round 1; fidelity checklist F1–F4 — reviewers.md): the survey is an agent's claim too, so cold reviewers check it *against the code* (coverage · contract↔behavior · no beautification · backlog honesty) → fix → `pin tree` seals the structure plus every mapped node's explicit no-ref assignment → **human approves the vetted survey** (`grovespec approve tree --human`). The runtime blocks node work until then. After the gate, `grovespec-plan` (plan #1) structures the backlog into the first milestone; `grovespec-revise`/`grovespec-grow` execute it.
 
-> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — fixed `starting` opening; `Result · Open · Your turn · Next` closing, warm full sentences). Here, *Open / Your turn* typically carry: the survey awaiting the fidelity verify · backlog items · unanswered setup questions.
+> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — a `## … starting` heading to open; `### Result · Open · Your turn · Next` headings to close, warm full sentences). Here, *Open / Your turn* typically carry: the survey awaiting the fidelity verify · backlog items · unanswered setup questions.
 
 > **Recommend a new session for the next step** (greenfield: `plan`; brownfield: the fidelity verify). The agent that just mapped the tree must not also orchestrate its cold review — start it fresh, with clean bounded context (WORKFLOW §5).
 

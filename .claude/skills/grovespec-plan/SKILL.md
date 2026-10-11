@@ -1,11 +1,11 @@
 ---
 name: grovespec-plan
-description: The planning pass — decides what to build next, then ends at the tree gate. Two modes by project state. Empty tree (greenfield, right after init) = plan #0 — draw out the intent (explore), write the intent record + brief, lay the whole sketch tree. Tree all done + parked work (followups · brownfield findings/restructuring backlogs · fresh hand-edits · new wants) = plan #N — collect it all, cluster, propose a disposition per cluster (reopen · structural change · new node · consciously drop), get the human's confirmation, translate into reopens/grows so `grovespec next` picks the work up again. Use when the user wants to "plan the next sprint / work off the followups / structure the backlog / what should the next round be / grovespec plan / 다음 스프린트 계획", or when `grovespec next` answers `next: plan`. For a single small change skip the ceremony — grovespec-revise directly.
+description: The planning pass — decides what to build next, then ends at the tree gate. Two modes by project state. Empty tree (greenfield, right after init) = plan #0 — draw out the intent (explore), write the intent record + brief, lay the whole sketch tree. Tree all done + parked work (followups · brownfield findings/restructuring backlogs · fresh hand-edits · new wants) = plan #N — collect it all, cluster, propose a disposition per cluster (reopen · structural change · new node · consciously drop), get the human's confirmation, translate into reopens/grows so `grovespec next` picks the work up again. Use when the user wants to "plan the next milestone / work off the followups / structure the backlog / what should the next milestone be / grovespec plan / 다음 마일스톤 계획", or when `grovespec next` answers `next: plan`. For a single small change skip the ceremony — grovespec-revise directly.
 ---
 
 # grovespec-plan
 
-The planning pass. `init` records what *is* (config; brownfield: the surveyed tree); **plan decides what to build next** — from intent (plan #0) or from what the last round parked (plan #N) — and every plan ends at the **tree gate** (cold verify + human approval) before any node is built.
+The planning pass. `init` records what *is* (config; brownfield: the surveyed tree); **plan decides what to build next** — from intent (plan #0) or from what the last milestone parked (plan #N) — and every plan ends at the **tree gate** (cold verify + human approval) before any node is built.
 
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
 
@@ -24,10 +24,10 @@ The one-time big exploration (this is what used to live in init):
 4. **Lay the whole tree as sketches** — `references/spec-to-tree.md`: every node one-line responsibility + rough I/O, `status: sketch`; mark the root's own deliverable (base env + runnable empty shell). On every sketch, record the exact current ref headings it owns in frontmatter `refs: [spec.md@4, spec.md@5.4]`. Use `refs: []` only when the node intentionally has no ref source (for example system scaffolding the ref never states); a non-empty heading whose content is all `(gap)` still stays non-empty because it is sourced scope, deliberately undefined.
 5. **End at the tree gate** — next is `grovespec-verify` on the tree (`target_type: tree`, `tree_evidence_mode: decomposition` written before round 1, the decomposition checklist D1–D5) → fix → `pin tree` seals structure plus the visible current catalog, its canonical source material, and the `refs` assignment (`source_scope_digest`) → human approves the vetted tree. D1 checks the source→node assignment from those `refs`, including a current row with no owner, not a new summary of the intent. Then the per-node build begins, top-down.
 
-## plan #N — sprint planning: structure the parked work
-The project is at "every node done + a backlog" (a finished sprint — which is also exactly where a brownfield adoption stands after its fidelity gate).
+## plan #N — milestone planning: structure the parked work
+The project is at "every node done + a backlog" (a finished milestone — which is also exactly where a brownfield adoption stands after its fidelity gate).
 
-1. **Collect — mechanically.** `node .grovespec/bin/grovespec.mjs followups` (every parked finding across all gate records + the findings/restructuring backlog counts) and `grovespec fresh` (hand-edits that skipped the skills). Read the named review files and backlog files for the substance — and the newest `retro-N.md` (its cross-node must-fix items already sit in the backlogs; its prose carries the closed round's lessons). Ask the user for **new wants** — anything they now know they need (this is a small `explore.md` pass, not a re-interview).
+1. **Collect — mechanically.** `node .grovespec/bin/grovespec.mjs followups` (every parked finding across all gate records + the findings/restructuring backlog counts) and `grovespec fresh` (hand-edits that skipped the skills). Read the named review files and backlog files for the substance — and the newest `retro-N.md` (its cross-node must-fix items already sit in the backlogs; its prose carries the closed milestone's lessons). Ask the user for **new wants** — anything they now know they need (this is a small `explore.md` pass, not a re-interview).
    - **It comes ordered — work it in that order.** `followups` names the **must-fix items routed to another gate** first (`kind: contract-gap` — real requirement problems waiting on a revise/verify), then the record categories: **improvement** → **harmless-bug**, with ungraded legacy items last. The routed block is what a human must rule on item by item; below it, cluster and dispose in bulk. A pool of 150 read flat is a pass that weighs everything before it can start anything.
    - **The record list is not a queue, and this pass does not promote it.** An `improvement` becomes work **only when the user picks it here** — never because several reviewers noted it, never because the loop was otherwise idle. Don't re-classify to sort: the categories are the cold reviewers' own answers with the evidence in front of them; bring a *changed* class only with new measurement, and say what you measured.
    - **What the user excluded stays excluded.** An `excluded-by-user` adjudication is not on this table unless new evidence of a *current* must-fix problem exists — and then it goes back to the user as exactly that, never quietly re-listed.
@@ -47,11 +47,11 @@ After either mode: `grovespec next` drives again — plan opened the doors; it n
 
 ## What plan is not
 - **Not a gate bypass.** A disposition cannot close an open issue — open issues belong to the fix/verify loop that owns them.
-- **Not required for one small item.** A single trivial followup → `grovespec-revise` directly; a two-item sprint needs no ceremony.
+- **Not required for one small item.** A single trivial followup → `grovespec-revise` directly; a two-item milestone needs no ceremony.
 - **Not a re-interview.** Config (language · streaks · models) is init's; re-invoke init to reconfigure.
 
 > **Where it runs.** Main session — the tree gate it ends on spawns cold reviewers as subagents (never run a grovespec skill *as* a subagent; spawn once, message never, clear residents before a wave — `reviewers.md` §Spawning).
 
-> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — fixed `starting` opening; `Result · Open · Your turn · Next` closing, warm full sentences). Here, the closing's substance is: the disposition table · what was dropped and why · what the next sprint will build.
+> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — a `## … starting` heading to open; `### Result · Open · Your turn · Next` headings to close, warm full sentences). Here, the closing's substance is: the disposition table · what was dropped and why · what the next milestone will build.
 
 > **Recommend a new session for the next step** (the tree verify, or the first reopened node's cycle). Clean, bounded context per step (WORKFLOW §5). *(Driving with `grovespec next` in a loop? `@new` already starts that session — this recommendation is for a person going step by step, and it is never a reason to end the loop.)*

@@ -160,7 +160,7 @@ export function cmdValidate (P) {
     // `approved` on, the spec is sealed (spec_digest): demanding the edit would demand
     // breaking a seal validate itself defends, so a sealed node reports as a notice
     // until the node next opens at draft (measured on the first live sync: two
-    // approved specs mid-round would have needed a reopen just to reword a note).
+    // approved specs mid-milestone would have needed a reopen just to reword a note).
     for (const m of taskText.matchAll(/\[[ \t]*→[ \t]*child\/deferred[ \t]*:([^\]]*)\]/g)) {
       for (const idm of m[1].matchAll(/TASK-[0-9]+/g)) {
         const named = idm[0]
@@ -848,16 +848,17 @@ export function cmdValidate (P) {
     for (const m of candNotices) say(`  ${m}`)
   }
   // Routing-hook tripwire (v0.15.0) — the soft switch (config `hooks:`), the
-  // registration (.claude/settings.json) and the script must tell one story.
-  // Drift here is environment, not project state, so it reprints as a notice.
+  // registrations (.claude/settings.json · .codex/hooks.json) and the script must
+  // tell one story. Drift here is environment, not project state, so it reprints as a notice.
   const hookNotes = []
   const hs = hooksState(P)
-  if (hs.registered === null) hookNotes.push('.claude/settings.json exists but is not readable JSON — the hook registration state is unknowable (fix or remove the file, then grovespec hooks status)')
-  else {
-    if (hs.config === 'on' && !hs.registered) hookNotes.push('config says hooks: on but .claude/settings.json carries no registration — grovespec hooks install puts them back in step')
-    if (hs.registered && hs.config !== 'on') hookNotes.push(`the routing hook is registered but config says hooks: ${hs.config} — the hook stays silent; hooks install re-arms it, hooks remove clears the registration`)
-    if (hs.registered && !hs.script) hookNotes.push(`the routing hook is registered but ${HOOK_MARK} is missing — every edit prints a cannot-find-module warning until grovespec hooks remove clears it`)
+  for (const r of hs.registrations) {
+    if (r.registered === null) hookNotes.push(`${r.file} exists but is not readable JSON — the hook registration state is unknowable (fix or remove the file, then grovespec hooks status)`)
+    else if (hs.config === 'on' && !r.registered) hookNotes.push(`config says hooks: on but ${r.file} carries no registration — grovespec hooks install puts them back in step`)
   }
+  const anyReg = hs.registrations.some(r => r.registered === true)
+  if (anyReg && hs.config !== 'on') hookNotes.push(`the routing hook is registered but config says hooks: ${hs.config} — the hook stays silent; hooks install re-arms it, hooks remove clears the registration`)
+  if (anyReg && !hs.script) hookNotes.push(`the routing hook is registered but ${HOOK_MARK} is missing — every edit prints a cannot-find-module warning until grovespec hooks remove clears it`)
   if (hookNotes.length) {
     say(`notice: ${hookNotes.length} routing-hook state drift — the switch, the registration and the script disagree (never blocks; each line names its repair):`)
     for (const m of hookNotes) say(`  ${m}`)
@@ -983,7 +984,7 @@ export function cmdFollowups (P) {
   if (b.findings) say(`findings backlog: ${b.findings} unchecked (${P.findingsPath})`)
   if (b.restructuring) say(`restructuring backlog: ${b.restructuring} unchecked (${P.restructuringPath})`)
   if (b.total === 0) { say('no parked work — every followups list is empty, no backlog items'); return 0 }
-  say(`total: ${backlogLine(b)} — grovespec-plan structures these into the next pass; nothing here is worked without your pick`)
+  say(`total: ${backlogLine(b)} — grovespec-plan structures these into the next milestone; nothing here is worked without your pick`)
   return 0
 }
 
@@ -1043,8 +1044,9 @@ export function cmdLang (P) {
 // The fixed setup questionnaire (Q2 find streak · Q3 models) as a paste-ready AskUserQuestion
 // payload. The runtime owns these strings because an agent re-typing them into tool-call
 // JSON corrupted single characters twice (proof runs #1·#3: 가벼운→가버운, 나뉩니다→나뉜니다)
-// by hand-encoding \uXXXX codepoints — so the output is pre-escaped pure ASCII: pasting it
-// verbatim has no encoding step left to get wrong. Q1 (language) is composed from the
+// by hand-encoding \uXXXX codepoints — so the Claude form is pre-escaped pure ASCII: pasting
+// it verbatim has no encoding step left to get wrong (the Codex form below is plain UTF-8,
+// for a reason of its own). Q1 (language) is composed from the
 // detected locale instead — see grovespec-init references/setup.md.
 const INTERVIEW = [
   {
@@ -1067,7 +1069,7 @@ const INTERVIEW = [
     ]
   },
   {
-    question: '편집 라우팅 훅 — GroveSpec을 거치지 않은 코드 수정도 나중에 감지되지만(fresh), 훅을 설치하면 편집하는 그 순간 "이 파일은 어느 노드 소유이고, 이 수정이 그 계약에 닿는지"를 계산해 에이전트에게 알려줘요. 아무것도 막지 않는 조언형이고, 이 프로젝트의 .claude/settings.json에만 등록돼요. 끄는 건 언제든 config 한 줄(hooks: off), 제거도 명령 하나(grovespec hooks remove)예요.',
+    question: '편집 라우팅 훅 — GroveSpec을 거치지 않은 코드 수정도 나중에 감지되지만(fresh), 훅을 설치하면 편집하는 그 순간 "이 파일은 어느 노드 소유이고, 이 수정이 그 계약에 닿는지"를 계산해 에이전트에게 알려줘요. 아무것도 막지 않는 조언형이고, 이 프로젝트의 .claude/settings.json(Claude Code)과 .codex/hooks.json(Codex)에만 등록돼요. 끄는 건 언제든 config 한 줄(hooks: off), 제거도 명령 하나(grovespec hooks remove)예요.',
     header: '편집 라우팅 훅',
     multiSelect: false,
     options: [
@@ -1076,7 +1078,25 @@ const INTERVIEW = [
     ]
   }
 ]
-export function cmdInterview () {
+// Codex form: request_user_input_async, the question tool Codex offers in its default
+// mode — request_user_input is refused outside Plan mode, and init writes files, so it
+// never runs in Plan mode (measured, codex-cli 0.159.3). Its schema is
+// { title, options: [string] } with no per-option description, so each option's
+// explanation joins the title as a list. The labels stay byte-identical to the Claude
+// form, so one set of Write: rules maps an answer from either host.
+// The Codex form is plain UTF-8, not escaped: Codex shows a command's output inside a
+// JSON string, so \uXXXX arrives doubled and the agent cannot tell which form to pass \u2014
+// it sent trial questions to find out in 3 of 4 measured runs and corrupted the payload
+// in the fourth. A lone native command's UTF-8 passes through PowerShell unchanged (measured).
+export function cmdInterview (surface) {
+  if (!['', 'claude', 'codex'].includes(surface)) { say('usage: grovespec interview [claude|codex]'); return 2 }
+  if (surface === 'codex') {
+    say(JSON.stringify(INTERVIEW.map(q => ({
+      title: `${q.question}\n\n${q.options.map(o => `- ${o.label}: ${o.description}`).join('\n')}`,
+      options: q.options.map(o => o.label)
+    })), null, 2))
+    return 0
+  }
   const json = JSON.stringify(INTERVIEW, null, 2)
   say(json.replace(/[\u007f-\uffff]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')))
   return 0

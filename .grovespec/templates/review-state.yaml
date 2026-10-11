@@ -110,7 +110,7 @@ open_issues:
 # (any kind - a harmless current-code defect included: kind names where the flaw lives,
 # category alone decides blocking), plus contract-gap routing of a must-fix found at the
 # wrong gate. This is a record, NEVER an automatic work queue: `next` (either mode) and
-# later planning rounds may not adopt an item from here on their own - only the user's
+# later planning passes may not adopt an item from here on their own - only the user's
 # explicit pick makes one into work (with every node done and only record items parked,
 # `next --auto` ends instead of opening a planning session; ask mode routes to plan,
 # where that pick is the decision).

@@ -62,6 +62,6 @@ Running the node's existing regression tests along the way is fine — it is not
 ## When it's done
 The `open_issues` list is empty, every closure carries its measurement, `status: fixed`, and `grovespec-review` is running again. fix never marks `done` itself — only review's seal + the gate decision does.
 
-> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — fixed `starting` opening; `Result · Open · Your turn · Next` closing, warm full sentences). Here, *Open / Your turn* typically carry: an item you could *not* fix (spec-level · shared-node · needs a human ruling) · the record list's notable additions.
+> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — a `## … starting` heading to open; `### Result · Open · Your turn · Next` headings to close, warm full sentences). Here, *Open / Your turn* typically carry: an item you could *not* fix (spec-level · shared-node · needs a human ruling) · the record list's notable additions.
 
 > **Recommend a new session to re-run `grovespec-review`** (or continue in-session if the loop was short). A clean orchestrator keeps context bounded across the `reviewed ⇄ fixed` loop (WORKFLOW §5) — and the record's `current_item`/`item_phase` mean an interrupted loop resumes mid-item, not from the top.

@@ -79,6 +79,6 @@ review:
 
 # Edit-routing hook — advisory context injected on src/tests edits (see `grovespec
 # hooks install|remove|status`; the registration itself lives in .claude/settings.json
-# and is managed by that command, never by hand). 'off' silences an installed hook
-# without touching the registration. on | off.
+# and .codex/hooks.json and is managed by that command, never by hand). 'off' silences
+# an installed hook without touching the registration. on | off.
 hooks: off

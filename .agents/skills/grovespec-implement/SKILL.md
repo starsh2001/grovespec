@@ -74,6 +74,6 @@ Greenfield, this node's children were already **sketched** at init. Building the
 ## When it's done
 Code·tests are in `src/`·`tests/`, the Task is `implemented` (plus a Change-Log decomposition if it became a skeleton). Next is `grovespec-review`.
 
-> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — fixed `starting` opening; `Result · Open · Your turn · Next` closing, warm full sentences). Here, *Open / Your turn* typically carry: an unresolved decomposition call · a blocked dependency.
+> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — a `## … starting` heading to open; `### Result · Open · Your turn · Next` headings to close, warm full sentences). Here, *Open / Your turn* typically carry: an unresolved decomposition call · a blocked dependency.
 
 > **Recommend a new session for `grovespec-review`.** The agent that just wrote the code shouldn't also orchestrate its cold review — start it fresh, clean bounded context (WORKFLOW §5).

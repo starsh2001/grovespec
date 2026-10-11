@@ -271,7 +271,7 @@ The caller classifies **each wave's finds as the wave closes** (§Categories) �
 
 For **result** reviews, only `kind: defect` may stay in `open_issues`; move `contract-gap` and `concern` to `followups`. For **spec/tree** reviews, `defect` and `contract-gap` may stay in `open_issues`, while `concern` still belongs in `followups`.
 
-**`followups` is a record, not a queue.** It holds the record categories (`improvement` · `harmless-bug`) — whatever their `kind`, a harmless current-code defect included — and must-fix work routed to another gate (`contract-gap`). Nothing promotes an item out of it automatically — not `next auto`, not a later cleanup round, not several reviewers having noted the same one; only the user's explicit pick at a planning pass makes one into work. A drop whose reason should outlive the list is an `adjudications` entry instead.
+**`followups` is a record, not a queue.** It holds the record categories (`improvement` · `harmless-bug`) — whatever their `kind`, a harmless current-code defect included — and must-fix work routed to another gate (`contract-gap`). Nothing promotes an item out of it automatically — not `next auto`, not a later cleanup batch, not several reviewers having noted the same one; only the user's explicit pick at a planning pass makes one into work. A drop whose reason should outlive the list is an `adjudications` entry instead.
 
 ## Cycle hand-off
 If a phase surfaced real but non-blocking later work, record it in `followups` (a record category, or a routed `contract-gap`) rather than forcing it into `open_issues`; a drop that should stay settled is an adjudication, not a queue item.

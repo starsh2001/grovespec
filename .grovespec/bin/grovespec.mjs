@@ -20,7 +20,7 @@
 //   test [ID]  run config review.test; with ID, record exit+log as the node's evidence
 //   fresh      out-of-band signals: src/tests changes that skipped the skills (report)
 //   followups  every parked non-blocking finding across all gate records + the brownfield
-//              backlogs — the aggregate surface grovespec-plan structures into a next pass
+//              backlogs — the aggregate surface grovespec-plan structures into the next milestone
 //   source ID [coordinates…]  emit the assigned canonical ref-clause packet for a spec find round
 //   pin ID     bind the gate to the bytes: spec digest at approve, commit+digest at done
 //   id         the next node id, derived (highest ever seen + 1 — ids are never reused:
@@ -34,18 +34,20 @@
 //   tree       the id-only tree.md rendered with names + status
 //   lang       the project's reply/artifact language (config.language)
 //   locale     detect the OS language (for init); prints nothing if undetectable
-//   interview  the fixed setup questions (init Q2–Q4) as a paste-ready payload,
-//              pre-escaped to pure ASCII — re-typing them is how they got corrupted
+//   interview [claude|codex]  the fixed setup questions (init Q2–Q4) as a paste-ready
+//              payload for that host's question tool (Claude: pre-escaped to pure
+//              ASCII; Codex: plain UTF-8) — re-typing them is how they got corrupted
 //   hooks install|remove|status  the advisory edit-routing hook's registration in
-//              .claude/settings.json — the merge is runtime code, surgical + idempotent
+//              .claude/settings.json + .codex/hooks.json — the merge is runtime code,
+//              surgical + idempotent
 //   uninstall [--purge]  remove the tool (runtime + skills + hook registration); the
 //              ledger (gate records · waits · config · docs/) stays unless --purge
 //   amend TASK-N  absorb a documentation-only edit to a sealed node: Contract·AC
 //              byte-identical (proven vs HEAD) → re-seal in place, no reopen
 //   recheck [declare|close|open]  the candidate ledger: a contract change makes
 //              dependents candidates, and ONE armed step judges reach for them all
-//   retro      the round's closing look: is a retrospective owed (TASK- work since the
-//              last retro record), plus the round measured — grovespec-retro's floor
+//   retro      the milestone's closing look: is a retrospective owed (TASK- work since the
+//              last retro record), plus the milestone measured — grovespec-retro's floor
 //   version    the installed runtime's version (.grovespec/VERSION)
 //
 // Runtime: Node 18+, node builtins only — no package.json, no npm install.
@@ -82,7 +84,7 @@ const rest = process.argv.slice(3)
 
 // The one spelling of the command surface (tests/doccheck.sh pins it against the
 // dispatch table, the header comment and README — edit them together).
-const USAGE = 'grovespec — validate | status | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups | source TASK-N [file.md@4…] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|release <TASK-N|tree>] | lang | locale | interview | hooks install|remove|status | uninstall [--purge] | amend TASK-N | recheck [declare|close|open …] | retro | impact TASK-N | tree | version\n'
+const USAGE = 'grovespec — validate | status | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups | source TASK-N [file.md@4…] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|release <TASK-N|tree>] | lang | locale | interview [claude|codex] | hooks install|remove|status | uninstall [--purge] | amend TASK-N | recheck [declare|close|open …] | retro | impact TASK-N | tree | version\n'
 
 // The argv gate: an unknown flag or a surplus argument is a typo'd INTENTION and exits 2 —
 // `approve TASK-1 --humman` used to be silently accepted and recorded a MACHINE decision
@@ -92,7 +94,7 @@ const AV = {
   validate: [0], status: [0], check: [1], next: [0, ['--auto', 'auto']],
   approve: [1, ['--human']], reopen: [2], ratify: [Infinity], wait: [Infinity], diff: [1], files: [1],
   test: [1], fresh: [0], followups: [0], source: [Infinity], pin: [1], id: [0], claim: [2], lang: [0], locale: [0],
-  interview: [0], hooks: [1], uninstall: [0, ['--purge']], retro: [0], amend: [1], recheck: [Infinity], impact: [1], tree: [0], version: [0]
+  interview: [1], hooks: [1], uninstall: [0, ['--purge']], retro: [0], amend: [1], recheck: [Infinity], impact: [1], tree: [0], version: [0]
 }
 // No command takes two flags, and none takes the same one twice — `next --auto --auto`
 // and `next --auto auto` (aliases of one flag) are both a surplus token, not emphasis.
@@ -190,7 +192,7 @@ if (badArg !== null) {
       case 'pin': ec = cmdPin(new Project(), arg); break
       case 'lang': ec = cmdLang(new Project()); break
       case 'locale': ec = cmdLocale(); break
-      case 'interview': ec = cmdInterview(); break
+      case 'interview': ec = cmdInterview(arg); break
       case 'hooks': ec = cmdHooks(new Project(), arg); break
       case 'uninstall': {
         const P = new Project()

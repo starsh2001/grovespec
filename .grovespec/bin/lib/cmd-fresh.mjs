@@ -10,7 +10,7 @@ const say = s => process.stdout.write(s + '\n')
 // Not every out-of-band change carries the same interest rate. One that touches a
 // done node's CONTRACT surface compounds — the next gated consumer builds on the
 // stale contract — so it wants a revise before anyone reads it. One inside the
-// contract is cheap debt: batchable to a cleanup round. The distinction is a
+// contract is cheap debt: it can wait for a later cleanup batch. The distinction is a
 // computation (owner's Contract idents ∩ the change's text), so fresh makes the
 // call instead of leaving it to an agent's or a person's judgment at absorption
 // time. The hook (bin/hook-route.mjs) mirrors these two helpers at edit time.
@@ -59,7 +59,7 @@ function gradeLines (P, ownerToo) {
     if (task === null) { lines.push(`    → ${owner} (its Task file is gone) — treat as contract-touching`); continue }
     const name = P.nameOf(owner)
     const hit = text === null ? '?' : (contractIdents(task).find(id => text.includes(id)) ?? null)
-    if (hit === null) lines.push(`    → ${owner} (${name}): inside the contract — batchable to a cleanup round`)
+    if (hit === null) lines.push(`    → ${owner} (${name}): inside the contract — can wait for a later cleanup batch`)
     else if (hit === '?') lines.push(`    → ${owner} (${name}): diff unreadable — graded contract-touching (the safe direction)`)
     else lines.push(`    → ${owner} (${name}): touches its Contract surface (\`${hit}\`) — revise before a consumer reads it`)
   }
@@ -185,6 +185,6 @@ export function cmdFresh (P) {
     }
   }
   if (nested) say('(nested in a larger repository — committed history is not classified here; the list above is uncommitted changes only)')
-  say('→ contract-surface items want a revise before a consumer reads them; inside-the-contract items can wait for a cleanup round. grovespec-revise absorbs either.')
+  say('→ contract-surface items want a revise before a consumer reads them; inside-the-contract items can wait for a later cleanup batch. grovespec-revise absorbs either.')
   return 1
 }

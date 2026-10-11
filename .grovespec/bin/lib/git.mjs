@@ -373,7 +373,7 @@ export const TASK_COMMIT = /^TASK-[0-9]+: /
 // step-first gate shapes, the decision turns, plan and init. fresh must exempt these
 // too — a gate commit legitimately carries what its own cycle wrote (a test touch-up
 // inside a review round), and counting it as out-of-band re-reported the same two
-// `review TASK-N:` commits three planning rounds running (proof-run measurement).
+// `review TASK-N:` commits three planning passes running (proof-run measurement).
 // Deliberately exact, not `/TASK-/ anywhere`: a hand commit merely *mentioning* a task
 // ("fix thing, see TASK-3") must stay out-of-band.
 export const SKILL_COMMIT = /^(?:(?:grow|verify|review|revise) TASK-[0-9]+: |verify tree: |approve (?:TASK-[0-9]+|tree): |ratify TASK-[0-9]+( TASK-[0-9]+)*: |plan #[0-9]+: |retro #[0-9]+: |recheck #[0-9]+: |amend TASK-[0-9]+: |init: )/

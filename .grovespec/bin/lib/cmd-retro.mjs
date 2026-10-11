@@ -1,4 +1,4 @@
-// retro — the round's closing look (v0.16.0).
+// retro — the milestone's closing look (v0.16.0).
 //
 // Node-scoped gates structurally cannot see a defect COMPOSED across nodes: the
 // launcher's startup-timeout dead-end (M1) had every ingredient recorded in three
@@ -8,7 +8,7 @@
 // lenses that deliberately read across contract seams.
 //
 // This command is the deterministic floor of that step: it answers whether a retro
-// is OWED and prints the round's measured numbers; the prose, the cold wave and the
+// is OWED and prints the milestone's measured numbers; the prose, the cold wave and the
 // record belong to grovespec-retro (the skill). Owed = any `TASK-N:` cycle commit
 // after the newest retro record's anchor (or ever, when no record exists) — the
 // retro's own commit is not TASK-shaped, so a closed retro never owes itself.
@@ -17,7 +17,7 @@
 // capable reviewer asked again always returns something, so a closing review that
 // could veto completion is a completion that never comes. Its must-fix findings are
 // written into the standing backlogs (findings.md / restructuring.md), which already
-// route the terminal to plan — the round stays closed; the NEXT round gains a reason
+// route the terminal to plan — the milestone stays closed; the NEXT milestone gains a reason
 // to open.
 import { readdirSync } from 'node:fs'
 import { git, repoState, shallowState, showPrefix, log, TASK_COMMIT, SKILL_COMMIT } from './git.mjs'
@@ -27,7 +27,7 @@ import { readWaits } from './cmd-wait.mjs'
 const say = s => process.stdout.write(s + '\n')
 
 // The newest retro record: paths.review/retro-N.md, highest N. Its frontmatter
-// `anchor:` is the commit the round closed on. Missing/never = no anchor.
+// `anchor:` is the commit the milestone closed on. Missing/never = no anchor.
 // Retro records are md on purpose — prose for a person, not gate state — so
 // validate's yaml record sweep never adopts them; the directory is read directly.
 export function latestRetro (P) {
@@ -57,7 +57,7 @@ export function retroOwed (P) {
   let commits = all
   // A project nested in a larger repository sees the OUTER repo's history too — an
   // unrelated outer `TASK-77:` commit read as this project's work and made a debt
-  // no retro could ever clear (external review 2026-09-25, F4). Nested, the round
+  // no retro could ever clear (external review 2026-09-25, F4). Nested, the milestone
   // is only the commits touching the project's own subtree (`-- .` relative to the
   // project root). Stated limit, same as fresh's: an empty commit inside a nested
   // project is invisible to a pathspec and goes uncounted.
@@ -76,29 +76,29 @@ export function retroOwed (P) {
     commits = commits.filter(c => after.has(c.h))
   }
   const work = commits.filter(c => TASK_COMMIT.test(c.s))
-  return { owed: work.length > 0, n: last.n, anchor: last.anchor, work, inRound: commits, broken: null }
+  return { owed: work.length > 0, n: last.n, anchor: last.anchor, work, inMilestone: commits, broken: null }
 }
 
 export function cmdRetro (P) {
   const rs = repoState(P.root)
-  if (rs === 'none') { say('not a git repository — retro measures the round from its commits'); return 2 }
+  if (rs === 'none') { say('not a git repository — retro measures the milestone from its commits'); return 2 }
   if (rs === 'broken') { say('git did not answer (missing or failing git) — nothing was measured'); return 2 }
-  if (shallowState(P.root) === 'shallow') { say('shallow clone — the round\'s history is cut; unshallow it (git fetch --unshallow), then re-run'); return 2 }
+  if (shallowState(P.root) === 'shallow') { say('shallow clone — the milestone\'s history is cut; unshallow it (git fetch --unshallow), then re-run'); return 2 }
   const o = retroOwed(P)
   if (o.broken !== null) { say(`retro: cannot decide — ${o.broken}`); return 2 }
 
   if (!o.owed) {
-    say(`retro: clean — no TASK- work since ${o.anchor === null ? 'ever (empty round)' : `retro-${o.n} (anchor ${o.anchor.slice(0, 7)})`}; nothing to close`)
+    say(`retro: clean — no TASK- work since ${o.anchor === null ? 'ever (empty milestone)' : `retro-${o.n} (anchor ${o.anchor.slice(0, 7)})`}; nothing to close`)
     return 0
   }
 
-  // ── the round, measured ──
+  // ── the milestone, measured ──
   const perNode = new Map()
   for (const c of o.work) {
     const id = c.s.match(/^(TASK-[0-9]+): /)[1]
     perNode.set(id, (perNode.get(id) ?? 0) + 1)
   }
-  const steps = o.inRound.filter(c => SKILL_COMMIT.test(c.s)).length
+  const steps = o.inMilestone.filter(c => SKILL_COMMIT.test(c.s)).length
 
   const escalated = []
   for (const f of P.reviewFiles()) {
@@ -113,13 +113,13 @@ export function cmdRetro (P) {
   const freshLine = sig.broken !== null ? `unreadable (${sig.broken})` : `${sig.dirty.length} uncommitted · ${sig.offband.length} out-of-band commit(s)`
 
   say(`retro: owed — TASK- work landed since ${o.anchor === null ? 'the beginning (no retro yet)' : `retro-${o.n} (anchor ${o.anchor.slice(0, 7)})`}`)
-  say(`the round, measured:`)
+  say(`the milestone, measured:`)
   say(`  nodes worked: ${perNode.size} — ${[...perNode.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}(${v})`).join(' · ')}`)
-  say(`  commits: ${o.work.length} TASK cycle · ${steps} gate/step — ${o.work.length + steps} of ${o.inRound.length} total in the round`)
+  say(`  commits: ${o.work.length} TASK cycle · ${steps} gate/step — ${o.work.length + steps} of ${o.inMilestone.length} total in the milestone`)
   say(`  escalated cycles: ${escalated.length}${escalated.length ? ' — ' + escalated.join(' · ') : ''}`)
   say(`  live waits: ${liveWaits} · machine-approved awaiting ratify: ${unratified.length}${unratified.length ? ` (${unratified.join(', ')})` : ''}`)
   say(`  fresh debt: ${freshLine}`)
   say(`next record: ${P.reviewDir.slice(P.root.length + 1)}/retro-${o.n + 1}.md — grovespec-retro writes it (anchor = the HEAD its commit lands on top of)`)
-  say('→ the retro never reopens a node: must-fix findings go to findings.md/restructuring.md for the next plan; the round stays closed.')
+  say('→ the retro never reopens a node: must-fix findings go to findings.md/restructuring.md for the next plan; the milestone stays closed.')
   return 1
 }

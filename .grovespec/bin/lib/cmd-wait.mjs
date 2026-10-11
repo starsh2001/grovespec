@@ -3,7 +3,7 @@
 // Mid-step (verify·implement) a node discovers it needs a contract value another node
 // has not defined yet. The old move — a sideways `[→ child/deferred: …]` note — closed
 // the gate over a live obligation nobody ever re-read, and "every node is done" went
-// false (proof-run measurement: the same promise slipped two rounds running). The new
+// false (proof-run measurement: the same promise slipped two milestones running). The new
 // move: DECLARE the dependency and stop. The declaration is timestamped, so scheduling
 // has one rule — **the turn follows the newest declaration**:
 //   · a node with a live outgoing wait is asleep,
