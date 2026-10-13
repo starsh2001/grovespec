@@ -1,6 +1,6 @@
 ---
 name: grovespec-recheck
-description: The reach check — when a contract change lands (its node back at done), ONE step judges every armed candidate dependent together, and it judges exactly one question, does the change reach this node's use? Untouched candidates close in place (their done and seals were never disturbed); only judged-touched nodes reopen through grovespec-revise. Use when `grovespec next` names recheck, or the user asks to "judge the candidates / run the reach check / grovespec recheck / 후보 점검 / 영향 검사".
+description: The reach check — when a contract change lands (its node back at done), ONE step judges every armed candidate dependent together, and it judges exactly one question, does the change reach this node's use? Untouched candidates close in place (their done and seals were never disturbed); only judged-touched nodes reopen — the touched verdict reopens them itself. Use when `grovespec next` names recheck, or the user asks to "judge the candidates / run the reach check / grovespec recheck / 후보 점검 / 영향 검사".
 ---
 
 # grovespec-recheck
@@ -28,10 +28,10 @@ Each wave writes its finding per candidate: **untouched** (with the shown miss �
 ### 3. Settle every candidate
 A verdict settles one (candidate, origin) pair — when a candidate has two armed origins, name the one judged: `recheck close|open TASK-N TASK-FROM "…"`.
 - **Untouched** → `grovespec recheck close TASK-N "<the shown reason>"` — its done and its seals were never disturbed; the verdict is the record.
-- **Touched** → `grovespec recheck open TASK-N "<the reached use>"`, then reopen it through **grovespec-revise** (spec touched → draft; code-only → approved). **The lane repeats one layer down**: if that node's own cycle changes *its* Contract, its dependents become candidates the same way (`recheck declare`) — never mass reopens.
+- **Touched** → `grovespec recheck open TASK-N draft|approved "<the reached use>"` — the verdict **reopens the node itself**: `draft` when the reached use needs its spec to change, `approved` when only its code does; unsure → `draft`, the wider lane. Then add one Change Log line to that node — the origin and the reached use: its next step (verify for draft, implement for approved) reads it there. **The lane repeats one layer down**: if that node's own cycle changes *its* Contract, its dependents become candidates the same way (`recheck declare`) — never mass reopens.
 
 ### 4. The record, then the commit
-Write **`<paths.review>/recheck-N.md`** (N = 1 + the highest existing): frontmatter `origins:` (the from-nodes judged), then per candidate the machine line, each wave's finding, and the settle. **Commit as `recheck #N: <one-line summary>`** — the record, the settled ledger (`.grovespec/candidates.yaml`), nothing else. Then release the tree: `node .grovespec/bin/grovespec.mjs claim release tree`.
+Write **`<paths.review>/recheck-N.md`** (N = 1 + the highest existing): frontmatter `origins:` (the from-nodes judged), then per candidate the machine line, each wave's finding, and the settle. **Commit as `recheck #N: <one-line summary>`** — the record, the settled ledger (`.grovespec/candidates.yaml`), and each reopened node's Task and reset gate records — nothing else. Then release the tree: `node .grovespec/bin/grovespec.mjs claim release tree`.
 
 > **Open and close in the step-report shape** (`FORMATS.md` "The step report"). *Your turn* typically carries: the nodes judged touched and now reopened (their cycles are the next steps) · nothing, when all closed untouched.
 

@@ -1,0 +1,13 @@
+# GroveSpec's own files stay in git even when the project's .gitignore was written
+# for its stack: .NET's `bin/` swallowed .grovespec/bin (a fresh clone then had no
+# runtime) and a blanket `*.log` swallowed every review test log (the gate's evidence
+# never reached history) — and validate passed throughout, reading the files on disk.
+#
+# This lives INSIDE the bundle on purpose, like .gitattributes beside it: copying
+# .grovespec/ into a project carries the rule along, so the install never edits that
+# project's own root .gitignore. A nested file outranks the root one (gitignore(5):
+# patterns in a lower-level file override higher-level ones), so `!` re-includes here.
+# A project rule that ignores .grovespec/ itself can't be undone from inside it —
+# `grovespec validate` names any GroveSpec file git still ignores.
+!bin/
+!review/*.log

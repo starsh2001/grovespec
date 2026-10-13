@@ -7,8 +7,8 @@
 // `next` names one recheck step that judges every armed candidate together, and it
 // judges exactly one question — does the change reach this node's use? — nothing
 // else. Untouched candidates close in place (their seals were never broken, so
-// there is nothing to re-approve); touched ones open through grovespec-revise and
-// the same procedure repeats one layer down.
+// there is nothing to re-approve); touched ones reopen in that same `open` verdict
+// (v0.21.0) and the same procedure repeats one layer down.
 //
 // The machine's share is MATERIAL, never a verdict. v0.17.0 let a grep decide:
 // a footprint spelling none of the origin's contract names closed mechanically as
@@ -28,6 +28,7 @@ import { git, repoState, log, touched } from './git.mjs'
 import { writeAtomic } from './project.mjs'
 import { listItems, itemValue } from './core.mjs'
 import { contractIdents } from './cmd-fresh.mjs'
+import { cmdReopen } from './cmd-reopen.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 
 const say = s => process.stdout.write(s + '\n')
@@ -157,10 +158,20 @@ export function cmdRecheck (P, rest) {
     // different question, and a waiting origin's question does not even exist yet
     // (its change has not landed). v0.17.0 settled by node alone and one verdict
     // erased another origin's pending obligation — the external review's F4.
+    //
+    // `open` reopens the node in the same command (v0.21.0). Until then it only
+    // recorded "opened — …" and printed "now reopen it through grovespec-revise":
+    // a proof project's node was judged touched, nothing ran that revise, the node stayed
+    // done, and the regression the verdict had named shipped until retro found it. A
+    // verdict with no consumer is a record, not an obligation — so the lane (draft:
+    // the reached use needs the spec to change; approved: only the code does) is named
+    // on the verdict itself, and no step between judging and reopening can be skipped.
     const node = rest[1] ?? ''
-    const from = ID.test(rest[2] ?? '') ? rest[2] : ''
-    const verdict = rest.slice(from === '' ? 2 : 3).join(' ').trim()
-    if (!ID.test(node) || verdict === '') { say(`usage: grovespec recheck ${sub} TASK-N [TASK-FROM] <verdict — the shown reason, not a feeling>`); return 2 }
+    let at = 2
+    const from = ID.test(rest[at] ?? '') ? rest[at++] : ''
+    const lane = sub === 'open' && (rest[at] === 'draft' || rest[at] === 'approved') ? rest[at++] : ''
+    const verdict = rest.slice(at).join(' ').trim()
+    if (!ID.test(node) || verdict === '') { say(`usage: grovespec recheck ${sub} TASK-N [TASK-FROM]${sub === 'open' ? ' draft|approved' : ''} <verdict — the shown reason, not a feeling>`); return 2 }
     const t = now()
     if (t === null) { say('GROVESPEC_NOW is set but not strict ISO-8601 UTC — refused'); return 2 }
     const c = readCands(P)
@@ -178,18 +189,36 @@ export function cmdRecheck (P, rest) {
       if (new Set(armed.map(e => e.from)).size > 1) { say(`${node}: armed entries from ${[...new Set(armed.map(e => e.from))].join(' · ')} — one verdict cannot judge two different changes; name the origin: grovespec recheck ${sub} ${node} TASK-FROM "…"`); return 2 }
       entry = armed[0]
     }
+    // The reopen runs BEFORE the entry closes: a refused reopen leaves the obligation
+    // open. A done node takes the named lane. An approved one was reopened by an earlier
+    // verdict of this same step — a draft reach widens it (the spec gate is the one
+    // behind approved); anything else is already mid-cycle, and that cycle reads the
+    // landed contract when it runs, the same reason `declare` skips open nodes.
+    const st = P.statusOf(node)
+    let reopened = ''
+    if (sub === 'open') {
+      if (st === 'done' && lane === '') { say(`${node}: a touched done node reopens here — name the lane: draft (the reached use needs its spec to change) or approved (only its code does); unsure → draft, the wider one`); return 2 }
+      const to = st === 'done' ? lane : st === 'approved' && lane === 'draft' ? 'draft' : ''
+      if (to !== '') {
+        if (cmdReopen(P, node, to, { hint: false }) !== 0) return 2
+        reopened = to
+      }
+    }
     entry.closed = t
     entry.verdict = (sub === 'open' ? 'opened — ' : 'untouched — ') + verdict
     writeCands(P, c.entries)
     const left = live.length - 1
     const staying = left ? ` ${left} other open entr${left > 1 ? 'ies' : 'y'} on ${node} stay${left > 1 ? '' : 's'} — different origins, different questions.` : ''
+    const opened = reopened === ''
+      ? `it is already ${st}, so its own open cycle reads the change — verdict recorded`
+      : st === 'done' ? `reopened to ${reopened}` : 'widened to draft (an earlier verdict reopened it to approved; this reach needs the spec)'
     say(sub === 'open'
-      ? `${node}: judged TOUCHED by ${entry.from}'s change — now reopen it through grovespec-revise; if ITS contract changes, its dependents become candidates the same way.${staying}`
+      ? `${node}: judged TOUCHED by ${entry.from}'s change — ${opened}. Write the origin and the reached use into its Change Log now: its next step reads them there. If ITS contract changes, its dependents become candidates the same way.${staying}`
       : `${node}: closed untouched against ${entry.from}'s change — its done and its seals were never disturbed; the verdict is the record.${staying}`)
     return 0
   }
 
-  if (sub !== '') { say('usage: grovespec recheck [declare TASK-FROM TASK-N… <need> | close TASK-N [TASK-FROM] <verdict> | open TASK-N [TASK-FROM] <verdict>]'); return 2 }
+  if (sub !== '') { say('usage: grovespec recheck [declare TASK-FROM TASK-N… <need> | close TASK-N [TASK-FROM] <verdict> | open TASK-N [TASK-FROM] draft|approved <verdict>]'); return 2 }
 
   // report
   const s = recheckState(P)

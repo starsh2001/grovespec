@@ -80,7 +80,8 @@ function freshCycle (P, text, keep = {}) {
   return { text: out, counters }
 }
 
-export function cmdReopen (P, n, target) {
+// `hint: false` — the caller says why on its own line (recheck open names the reached use).
+export function cmdReopen (P, n, target, { hint = true } = {}) {
   if (n === 'tree') {
     if (target !== 'decomposition' && target !== 'fidelity') {
       say('usage: grovespec reopen tree decomposition|fidelity')
@@ -160,6 +161,6 @@ export function cmdReopen (P, n, target) {
   P.forget()
 
   say(`reopened: ${n} ${st} → ${target}${resets.length ? ` — ${resets.join(' · ')}` : ''}`)
-  say(`  a fresh cycle starts here; record why in the Change Log (grovespec-revise owns the prose)`)
+  if (hint) say(`  a fresh cycle starts here; record why in the Change Log (grovespec-revise owns the prose)`)
   return 0
 }

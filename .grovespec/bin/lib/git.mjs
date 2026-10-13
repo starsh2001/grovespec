@@ -165,6 +165,14 @@ export function ignoredState (root) {
   return 'broken'
 }
 
+// Untracked files git IGNORES under the given project-relative paths — files that can
+// never reach a commit. Project-relative (ls-files names paths from the -C directory);
+// null when git cannot answer.
+export function ignoredUnder (root, paths) {
+  const r = git(root, ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--', ...paths])
+  return r.ok ? r.out.split('\0').filter(Boolean) : null
+}
+
 // One shared path domain for result pin and result approval. Git reports paths from
 // the repository root while GroveSpec config is project-rooted; nested projects must
 // pass through this conversion before src/tests comparisons.

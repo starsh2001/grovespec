@@ -20,7 +20,7 @@ Applying every fix and then reviewing the pile is how a wrong fix hides behind a
 Then pick **one** item — `current_item` if the record already names one; otherwise `crash` items first, then by blast radius — and write it to the record.
 
 ### 2. Plan the fix — before touching code
-Write the item's fix plan into this round's `<id>.round<n>.plan.md` (a few sentences is enough for a small fix; `item_phase: plan`):
+Write the item's fix plan into this round's `<id>.review.round<n>.plan.md` (a few sentences is enough for a small fix; `item_phase: plan`):
 - the problem's **occurrence condition and cause** (not the symptom — what makes it happen);
 - **what will change**, and why that change removes the cause;
 - the existing behavior the change **directly touches**;
@@ -42,6 +42,7 @@ A blocking answer must walk **a concrete path**: the current repro conditions or
 - If the issue says a **test was hollow or wrong**, fix the test (and the behavior it should have caught) — not just the code.
 - **If the issue means the *spec* is wrong** (the contract, not the code) — stop: that's `grovespec-revise` (a contract change propagates to consumers), not a silent code patch here.
 - Fix exactly what the plan says — no drive-by refactors, no second item folded in. Put the net line delta (`+N/−N`) in the commit body.
+- **Your own measuring** — a repro, a timing, a screen check — follows `reviewers.md`'s experiment rules (§Spawning): bounded, owned, cleaned up, and the person's machine only with their OK.
 - **Commit the item as `TASK-N: fix <item-id> — <summary>`** (the `TASK-N:` prefix keeps the diff boundary mechanical — `FORMATS.md`). Include the record + this item's round files in the commit — a gate's evidence outside git is one clean-up away from gone.
 
 ### 5. Confirm the item — one cold round, this item's scope only

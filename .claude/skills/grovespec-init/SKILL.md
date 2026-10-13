@@ -72,4 +72,4 @@ docs/                               docs/
 ```
 The greenfield brief and every ref *intent record* appear at plan #0 / plan #N — those are plan's outputs, written from intent, which is exactly why init doesn't write them.
 
-**Commit as `init: <summary>`** — the config, and on brownfield everything the survey wrote (tree · mapped Tasks · brief · backlogs · ref). No `TASK-N: ` prefix ever (`FORMATS.md` "Commits").
+**Commit as `init: <summary>`** — the config, the hook registrations the interview installed (`.claude/settings.json` · `.codex/hooks.json`), and on brownfield everything the survey wrote (tree · mapped Tasks · brief · backlogs · ref). Run `grovespec validate` first: it names any GroveSpec file the project's `.gitignore` still swallows (the bundle's own `.grovespec/.gitignore` re-includes `bin/` and the review logs) — add a `!` exception for it to that `.gitignore` and commit it with the rest. No `TASK-N: ` prefix ever (`FORMATS.md` "Commits").

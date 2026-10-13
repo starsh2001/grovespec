@@ -7,8 +7,8 @@ import { sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValu
 import { Project, treeGateMsg, scriptDir, FORMAT } from './project.mjs'
 import { taskEvidenceDigest, specDigest, treeDigest } from './cmd-pin.mjs'
 import { lastTest } from './cmd-approve.mjs'
-import { git, repoState, ignoredState, shallowState, showPrefix, ancestorState, canonicalOidState, dirtyResultSubject, resultSealBreach, log, touched, trackedPaths, allSubjects, allTouchedPaths } from './git.mjs'
-import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDigest, validateCompletedPacket, validateTaskRefsSyntax } from './source-evidence.mjs'
+import { git, repoState, ignoredState, ignoredUnder, shallowState, showPrefix, ancestorState, canonicalOidState, dirtyResultSubject, resultSealBreach, log, touched, trackedPaths, allSubjects, allTouchedPaths } from './git.mjs'
+import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDigest, taskRefAssignment, validateCompletedPacket, validateTaskRefsSyntax } from './source-evidence.mjs'
 import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
 import { readWaits, waitState, waitsPath } from './cmd-wait.mjs'
 import { hooksState, HOOK_MARK } from './cmd-hooks.mjs'
@@ -54,6 +54,8 @@ export function cmdValidate (P) {
   const readNotices = []             // readability of sealed (approved+) or done nodes — same
   const yamlNotices = []             // gate-record spots strict YAML can't read (or grovespec can't see) — same
   const markerNotices = []           // sideways deferral markers on sealed (approved+) nodes — same
+  const ignoredOwn = []              // GroveSpec files git ignores — same
+  const refNotices = []              // a sketch/draft node its next spec gate will refuse — same
 
   // A schema key that resolves to nothing turns its checks OFF, not green — the
   // `for` loop it feeds runs zero times and the run stays clean. A renamed or lost
@@ -224,19 +226,68 @@ export function cmdValidate (P) {
     }
   }
 
-  // --- blocked_by cycle (Kahn): resolve nodes whose deps are all resolved; leftovers = cycle ---
+  // --- blocked_by never names the node's own descendant ---
+  // A child already waits for its parent (`unblocked`: the parent is done first), so a
+  // parent whose blocked_by names a descendant waits on a node that waits on it — the
+  // moment both are open, neither can start. A brownfield survey's mapped root listed 32
+  // descendants (a facade "uses" every module it calls), and two later plans could not
+  // reopen it at all: they built a bypass node and left the root's Contract knowingly
+  // wrong — the drift this method exists to stop. The tree edge already orders the pair, and
+  // revise finds consumers by grep as well as by blocked_by, so the entry carries nothing.
+  const ancestorsOf = t => {
+    const out = new Set()
+    for (let p = P.parentOf(t); p !== '' && !out.has(p); p = P.parentOf(p)) out.add(p)
+    return out
+  }
+  const downEdge = new Set()
+  for (const t of ids) {
+    const down = P.blockedIdsOf(P.taskPath(t)).filter(b => ancestorsOf(b).has(t))
+    if (!down.length) continue
+    for (const b of down) downEdge.add(`${t}>${b}`)
+    const what = down.length === 1 ? `its own descendant ${down[0]}` : `${down.length} of its own descendants (${down.join(', ')})`
+    prob(`${t} blocked_by lists ${what} — a child already waits for its parent, so the two wait on each other the moment both are open; drop ${down.length === 1 ? 'it' : 'them'} from ${t}'s blocked_by (the tree edge already orders them)`)
+  }
+
+  // --- wait cycle (Kahn): a node waits on its blocked_by AND its parent; leftovers = cycle ---
+  // blocked_by alone missed a cycle that closes through the tree (a parent waiting on a
+  // node that waits on one of its children); a descendant edge is named above, not twice.
   const resolved = new Set()
   for (;;) {
     let progress = false
     for (const t of ids) {
       if (resolved.has(t)) continue
-      if (P.blockedIdsOf(P.taskPath(t)).every(b => resolved.has(b))) { resolved.add(t); progress = true }
+      const waits = P.blockedIdsOf(P.taskPath(t)).filter(b => !downEdge.has(`${t}>${b}`))
+      const p = P.parentOf(t)
+      if (p !== '') waits.push(p)
+      if (waits.every(b => resolved.has(b))) { resolved.add(t); progress = true }
     }
     if (!progress) break
   }
-  for (const t of ids) {
-    if (!resolved.has(t)) prob(`${t} is in a blocked_by cycle (unresolvable)`)
+  // A leftover node either sits ON a cycle or only waits below one — with the parent edge
+  // in, a cycle near the root would otherwise name its whole subtree as cyclic.
+  const left = ids.filter(t => !resolved.has(t))
+  const waitsLeft = t => {
+    const w = P.blockedIdsOf(P.taskPath(t)).filter(b => !downEdge.has(`${t}>${b}`))
+    const p = P.parentOf(t)
+    if (p !== '') w.push(p)
+    return w.filter(b => left.includes(b))
   }
+  const onCycle = t => {
+    const seen = new Set()
+    const stack = waitsLeft(t)
+    while (stack.length) {
+      const u = stack.pop()
+      if (u === t) return true
+      if (!seen.has(u)) { seen.add(u); stack.push(...waitsLeft(u)) }
+    }
+    return false
+  }
+  const below = []
+  for (const t of left) {
+    if (onCycle(t)) prob(`${t} is in a blocked_by cycle (unresolvable)`)
+    else below.push(t)
+  }
+  if (below.length) prob(`${below.join(', ')} can never start — ${below.length === 1 ? 'it waits' : 'they wait'} on a node above that can never finish (a cycle, or a missing node); repair that one`)
 
   // --- review-state files (the gates' evidence — format + identity) ---
   // A record IS evidence only for the node its filename names — a copied yaml whose
@@ -532,7 +583,9 @@ export function cmdValidate (P) {
     // Left unbounded, `note` became where the story actually lived — block scalars of
     // 20-40 lines per round, 394 lines of them in one node (timelog-3 TASK-2.review.yaml),
     // carried by every later cold round that reads this file. The reasoning has a home
-    // (<id>.round<N>.brief.md · .plan.md · .confirm.md); the note points at it in one line.
+    // (<id>.round<N>.brief.md · .plan.md · .confirm.md — the result gate's own files as
+    // <id>.review.round<N>.*, so a review round never overwrites the brief a spec seal
+    // pinned); the note points at it in one line.
     // A round entry is FLAT: every line is one of the schema's fields, on one line, at the
     // entry's own indent. Checking only `note: >-` left the rule open to the same prose in
     // three other spellings — a plain multi-line scalar (`note:` then indented paragraphs),
@@ -542,7 +595,7 @@ export function cmdValidate (P) {
     // fields ('critical' · 'should_fix' · 'nice') — names the schema does list, under a
     // message that sent the reader to a list they were already following.
     const roundKeys = new Set([...schList('round.fm.required'), ...schList('round.fm.optional')])
-    const home = base.replace(/\.(verify|review)\.yaml$/, '')
+    const home = base.replace(/\.verify\.yaml$/, '').replace(/\.yaml$/, '')
     listItems(text, 'rounds').forEach((it, i) => {
       const at = `${rf}  rounds[${i + 1}]`
       for (const k of schList('round.fm.required')) {
@@ -680,6 +733,44 @@ export function cmdValidate (P) {
         claim(P.reviewYamlPath(t), `${t} result`)
       }
       claim(P.treeYamlPath(), 'tree')
+    }
+  }
+  // --- GroveSpec's own files that git ignores ---
+  // A project's .gitignore was written for its stack, not for GroveSpec: .NET's `bin/`
+  // swallowed .grovespec/bin (one project from install on, another for three months)
+  // and a blanket `*.log` swallowed every review test log — validate passed throughout,
+  // because it reads the files on disk. A clone or another worktree then opens with no
+  // runtime, and a gate's test evidence never reaches history. The bundle's
+  // .grovespec/.gitignore now re-includes those two; this names whatever else a project
+  // rule catches. Run-time scratch (run.lock, a crashed write's .tmp-<pid>) is meant to
+  // stay out. A NOTICE, like the untracked-record one above: the fix is the project's
+  // .gitignore, and halting `next` would not write it. Asked only when the project itself
+  // is visibly not ignored — the whole-project case and an unanswering git are named above.
+  if (repo && ignoredState(P.root) === 'no') {
+    const relp = p => p.startsWith(`${P.root}/`) ? p.slice(P.root.length + 1).replace(/\/+$/, '') : null
+    const own = ['.grovespec', ...[P.tasksDir, P.treePath, P.briefPath, P.convPath, P.refDir, P.findingsPath, P.restructuringPath, P.reviewDir]
+      .map(relp).filter(p => p !== null && p !== '')]
+    for (const tree of ['.claude', '.agents']) if (existsSync(`${P.root}/${tree}/skills`)) own.push(`${tree}/skills/grovespec-*`)
+    const ig = ignoredUnder(P.root, [...new Set(own)])
+    if (ig === null) prob('git ls-files --ignored did not answer — whether git ignores GroveSpec files is unread; an unread check is not a passed one')
+    else ignoredOwn.push(...ig.filter(f => f !== '.grovespec/run.lock' && !/\.tmp-[0-9]+$/.test(f)))
+  }
+
+  // --- the next spec gate's own refusal, said before it runs ---
+  // A tree gate sealed with source_scope_digest re-proves every Task's ref assignment
+  // above (a refusal there is a problem). Without that seal nothing reads the
+  // assignments until `grovespec source` runs inside the next spec verify — a project
+  // migrated an older install, validate passed, and that verify then refused for a
+  // missing `refs` (40 nodes assigned by hand). Each sketch/draft node is asked now, the
+  // same way.
+  if (!hasTop(P.read(P.treeYamlPath()) ?? '', 'source_scope_digest')) {
+    for (const t of new Set(ids)) {
+      const st = P.statusOf(t)
+      if (st !== 'sketch' && st !== 'draft') continue
+      try { taskRefAssignment(P, t, { requireCurrent: true }) } catch (e) {
+        if (!(e instanceof SourceEvidenceError)) throw e
+        refNotices.push(`${t} (${st}): ${e.message.replace(`${t}: `, '')}`)
+      }
     }
   }
 
@@ -826,6 +917,20 @@ export function cmdValidate (P) {
   }
   if (untrackedGates.length) {
     say(`notice: ${untrackedGates.length} passed gate record(s) not tracked by git — the verdict stands, but what it passed on is one clean-up away from gone: ${untrackedGates.join(', ')} (git add them with the gate's commit)`)
+  }
+  if (ignoredOwn.length) {
+    // grouped by directory — a whole ignored bin/ reads as one entry, not twenty-six
+    const groups = new Map()
+    for (const f of ignoredOwn) {
+      const d = f.slice(0, f.lastIndexOf('/') + 1)
+      groups.set(d, [...(groups.get(d) ?? []), f])
+    }
+    const shown = [...groups].map(([d, fs]) => fs.length > 1 ? `${d} (${fs.length} files)` : fs[0])
+    say(`notice: ${ignoredOwn.length} GroveSpec file(s) ignored by git — they never reach a commit, so a clone or another worktree runs without them: ${shown.join(', ')} (add '!' exceptions for them to the project's .gitignore, then commit them)`)
+  }
+  if (refNotices.length) {
+    say(`notice: ${refNotices.length} sketch/draft node(s) that the next spec verify will refuse as they stand — it reads each one's ref assignment through grovespec source; settle it before that gate (an older install's layout is the usual cause):`)
+    for (const m of refNotices) say(`  ${m}`)
   }
   if (readNotices.length) {
     say(`notice: ${readNotices.length} sealed or done node(s) not yet in the reading rules — a person opening these meets a wall of text. Not blocking (the spec is sealed, or its gates are decided); tidy each the next time it opens at draft:`)

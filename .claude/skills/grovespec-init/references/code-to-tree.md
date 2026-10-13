@@ -45,7 +45,7 @@ So that another node can use this one *without seeing the internals*:
 - `status: done` — it's already-working code.
 - `origin: mapped` — this node was mapped, not gated; `validate`'s status↔evidence checks exempt it (until a later revise sends it through a real gate).
 - `role`: skeleton if it holds children, feature if it's actual behavior.
-- `blocked_by`: the number of a shared node it uses.
+- `blocked_by`: the number of a shared node it uses — **never its own descendant**. A parent already comes before its children, so a facade that calls every module it holds lists none of them (`validate` refuses it: the two would wait on each other once both reopen).
 - `refs: []` — a brownfield survey is grounded in code, not an intent record. Write the explicit empty list even when brought-in docs exist; doc↔code disagreements belong in `findings.md`, not in the mapped node's source criteria.
 - `tdd`: existing code is usually `false` + `tdd_skip_reason` ("existing code, documenting the contract after the fact; tests to follow"). Validation·test gaps go unchecked in the AC·Subtasks.
 

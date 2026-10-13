@@ -45,7 +45,8 @@
 //   amend TASK-N  absorb a documentation-only edit to a sealed node: Contract·AC
 //              byte-identical (proven vs HEAD) → re-seal in place, no reopen
 //   recheck [declare|close|open]  the candidate ledger: a contract change makes
-//              dependents candidates, and ONE armed step judges reach for them all
+//              dependents candidates, ONE armed step judges reach for them all, and
+//              `open` reopens a judged-touched one in the same command
 //   retro      the milestone's closing look: is a retrospective owed (TASK- work since the
 //              last retro record), plus the milestone measured — grovespec-retro's floor
 //   version    the installed runtime's version (.grovespec/VERSION)
