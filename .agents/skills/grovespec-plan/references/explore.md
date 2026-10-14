@@ -43,7 +43,8 @@ What to draw out:
 How to draw it out:
 - **Walk, don't list.** "Show me what happens when a user [does X]" is better than "list your features." Walk the product as a user; each fork in the walk is a feature boundary.
 - **Sketch as you go.** After each cluster of features, feed back a mini-summary ("so far I see: A does X, B does Y, C is shared by both — right?"). Corrections are cheap here.
-- **Mark the gaps, don't fill them.** Where the user says "I haven't thought about that" — note it as a gap, move on. It becomes an unchecked AC in the draft Task. Don't invent the answer.
+- **Ask what the input already asks.** An open question the input doc writes itself ("OQ1", "TBD", "도입 전 합의 필요") and a policy that spans several nodes (who may edit what, what stays private, when a period closes) are asked here, before the tree — as a concrete scene ("월요일 회의가 수요일로 밀리면 지난주는 언제 닫히나요?").
+- **Mark the gaps, don't fill them.** Where the user says "I haven't thought about that" — note it as a gap, move on. It becomes a `(gap)` AC item in the draft Task. Don't invent the answer.
 - **Stop when you can tree it.** You have enough when you can decompose the product into a tree of nodes, each with a reasonable contract (takes · gives · guarantees) and identified gaps. You don't need every edge nailed — verify will probe them.
 
 ## Steps (both phases)

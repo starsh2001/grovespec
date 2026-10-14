@@ -35,7 +35,7 @@ Walk the spec top-down. Each distinct capability with its own eventual contract 
 For each node, fill the Task **thinly**, `status: sketch`:
 - **name** + a **one-line responsibility** — it is the title line and the lede (`# TASK-N · <name>`, then one `>` line), and the Overview restates it in two or three sentences. A sketch is mostly lede: that one line is what the tree gate reads.
 - **Rough I/O** in the Contract section — a sentence on what it roughly takes / gives. **Not** the full takes·gives·guarantees; that's grow's job. A `[→ detail at grow]` marker is fine.
-- **Note the spec's gaps** — where the spec is silent, say so (it becomes an unchecked `(gap)` AC when grow details it — `FORMATS.md`). Don't invent.
+- **Note the spec's gaps** — where the spec is silent, say so (it becomes a `(gap)` AC item when grow details it — `FORMATS.md`). Don't invent.
 - Leave AC/Subtasks mostly empty (grow writes them from the spec when it details the node).
 - **Actors & entities** the spec names (employee · hire-date · team) — note which node will *own* each, so the closure isn't lost (verify's C1 + grow check it later).
 - **`refs`** — the exact current `file@numbered-heading` coordinates assigned to this node. Resolve them through `ref/index.md` now; do not leave grow to rediscover the scope from prose later. If one heading genuinely feeds multiple nodes, list it on each and make the responsibility split visible in the sketches so D1 can verify that overlap rather than guessing.
@@ -48,7 +48,7 @@ For each node, fill the Task **thinly**, `status: sketch`:
 - `tdd: true` (greenfield default; grow can change it when detailing).
 
 ### 5. Write the tree · Tasks · conventions
-- **tree.md**: the full structure by id, all `sketch`. Indent = depth.
+- **tree.md**: the full structure by id, all `sketch`. Indent = depth. **Sibling order is build order** — `next` builds in tree order, skipping what is blocked — so when the spec decides an order ("a minimal end-to-end path first, visuals after"), lay the siblings on that path first.
 - **tasks/**: one thinly-filled sketch Task per node (template/FORMATS format — all sections present, content thin), in `config.language`.
 - **conventions.md**: if the spec states cross-cutting rules (all amounts whole-won · every request authenticated · key terms), seed them now.
 

@@ -26,9 +26,9 @@ tdd_skip_reason: ""        # required when tdd: false
 {What it guarantees to the outside (the parent · other nodes): what it takes · what it gives · invariants (units · order · empty cases). Other nodes rely on this without seeing the internals. The line is **consumer observability**: public names·boundary shapes·errors·ordering·observable atomicity/concurrency promises are contract; algorithms·private structure·transaction internals belong to implement or to children. Defer mechanism + child-owned edges with a marker — `[→ child/deferred: <what>]` — rather than pinning them here; a skeleton stays lean and defers most detail.}
 
 ## AC
-<!-- One checkable claim per item, ≤200 characters. The fixture, the number, the "this is what breaks" — those are NESTED items under it, not more sentences appended to it. Measurable non-functional targets (latency · throughput · error rate) are checkable items too, e.g. "- [ ] p95 < 200ms @ 100 rps". An item prefixed "(gap)" = behavior deliberately left undefined (see FORMATS: verify probes it; implement/review skip it). -->
-- [ ] {one claim, stated so a reader can tell pass from fail}
-  - [ ] {the fixture or number that settles it}
+<!-- One checkable claim per item, ≤200 characters — a plain item, no checkbox (the spec seal covers AC). The fixture, the number, the "this is what breaks" — those are NESTED items under it, not more sentences appended to it. Measurable non-functional targets (latency · throughput · error rate) are checkable items too, e.g. "- p95 < 200ms @ 100 rps". An item prefixed "(gap)" = behavior deliberately left undefined (see FORMATS: verify probes it; implement/review skip it). -->
+- {one claim, stated so a reader can tell pass from fail}
+  - {the fixture or number that settles it}
 
 ## Subtasks
 <!-- A skeleton/root also builds its OWN structural deliverable (the glue/shell children slot into; the root: base environment + an empty runnable shell) — include that as a step, not only delegating to its children. -->

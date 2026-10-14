@@ -31,12 +31,12 @@ Other nodes (add/list/report) use storage by this contract alone, without seeing
 - **Responsibility split**: storage *defines* the record shape but does *not validate* it — that's the caller's (add's) job.
 
 ## AC
-- [x] `load()` returns `[]` when the file is missing
-- [x] `load()` returns the stored list when the file exists
-- [x] a list survives a `save()` → `load()` round-trip unchanged
-- [x] `add_record()` appends to the end
-- [ ] (gap) `load()` raises on a broken/empty file — undefined in the contract
-- [ ] (gap) no lock on save/add_record — concurrent runs clobber — undefined in the contract
+- `load()` returns `[]` when the file is missing
+- `load()` returns the stored list when the file exists
+- a list survives a `save()` → `load()` round-trip unchanged
+- `add_record()` appends to the end
+- (gap) `load()` raises on a broken/empty file — undefined in the contract
+- (gap) no lock on save/add_record — concurrent runs clobber — undefined in the contract
 
 ## Subtasks
 - [x] load/save/add_record (storage.py)

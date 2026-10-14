@@ -7,7 +7,7 @@ A board can read this file and show each line as a draft issue. TREE-SHAPE probl
 -->
 
 ## Bugs
-<!-- A defect in already-`done` code. Map the node as-is, but leave the broken AC item unchecked; fix later via `grovespec-revise` (reopen → fix). -->
+<!-- A defect in already-`done` code. Map the node as-is, but write the broken behavior's AC item as a `(gap)` (the contract doesn't promise it yet); fix later via `grovespec-revise` (reopen → fix). -->
 - [ ] TASK-N {node} — {what's wrong, briefly} → revise
 
 ## Duplications

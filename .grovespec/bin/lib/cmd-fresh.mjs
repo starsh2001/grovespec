@@ -2,7 +2,7 @@
 // A REPORT, not a gate: a human may hot-fix deliberately; the answer is grovespec-revise
 // (reconcile spec ↔ code), so validate stays green and this command surfaces the list.
 // Exit 1 when signals exist (CI can watch it); the skills surface it, never block on it.
-import { git, porcelainPaths, repoState, shallowState, log, touched, mergeHashes, TASK_COMMIT, SKILL_COMMIT } from './git.mjs'
+import { git, porcelainPaths, repoState, shallowState, log, touched, mergeHashes, TASK_COMMIT, SKILL_COMMIT, gitFailure } from './git.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
@@ -73,7 +73,7 @@ function gradeLines (P, ownerToo) {
 export function freshSignals (P) {
   const rs = repoState(P.root)
   if (rs === 'none') return { dirty: [], offband: [], adoption: null, repo: false, nested: false, broken: null }
-  if (rs === 'broken') return { dirty: [], offband: [], adoption: null, repo: true, nested: false, areas: [], broken: 'git did not answer (missing or failing git)' }
+  if (rs === 'broken') return { dirty: [], offband: [], adoption: null, repo: true, nested: false, areas: [], broken: `git did not answer (${gitFailure()})` }
   const sh = shallowState(P.root)
   if (sh === 'broken') return { dirty: [], offband: [], adoption: null, repo: true, nested: false, areas: [], broken: 'git rev-parse --is-shallow-repository failed' }
   if (sh === 'shallow') return { dirty: [], offband: [], adoption: null, repo: true, nested: false, areas: [], broken: 'shallow clone — classification over cut history would under-report; unshallow it (git fetch --unshallow)' }

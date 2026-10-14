@@ -21,7 +21,7 @@
 import { createHash } from 'node:crypto'
 import { duplicateFrontmatterKeys, isFence, splitLines, treeRows, topValue } from './core.mjs'
 import { writeAtomic } from './project.mjs'
-import { dirtyResultSubject, git, repoState, ignoredState, resultSealBreach } from './git.mjs'
+import { dirtyResultSubject, git, repoState, ignoredState, resultSealBreach, gitFailure } from './git.mjs'
 import { SourceEvidenceError, assertFindRound, latestFindRound, parseSourcePacket, sourceScopeDigest, specDigest, validateCompletedPacket } from './source-evidence.mjs'
 import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest, treeEvidenceMode } from './tree-evidence.mjs'
 
@@ -288,7 +288,7 @@ export function cmdPin (P, n) {
     const rt = P.read(rp)
     if (rt === null) { say(`${n}: no review record to pin (${rp} missing) — run grovespec-review first`); return 2 }
     const rs = repoState(P.root)
-    if (rs === 'broken') { say('git did not answer (missing or failing git) — a review pin records a commit that cannot be read right now'); return 2 }
+    if (rs === 'broken') { say(`git did not answer (${gitFailure()}) — a review pin records a commit that cannot be read right now`); return 2 }
     if (rs === 'none') { say('not a git repository — a review pin records the reviewed commit'); return 2 }
     const ig = ignoredState(P.root)
     if (ig === 'broken') { say('git check-ignore did not answer — whether this project is gateable cannot be established, so nothing was sealed'); return 2 }

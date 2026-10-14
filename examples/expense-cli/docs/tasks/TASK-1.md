@@ -29,10 +29,10 @@ The entry point. `python src/cli.py <command> ...` reads the first arg and route
 - Responsibility: arg-shape validation and the real work belong to each command (child). The dispatcher only decides "which command."
 
 ## AC
-- [x] `add`/`list`/`report` as the first arg runs that command
-- [x] no arg / unknown command → usage + return `1`
-- [x] the command's return value becomes the exit code
-- [ ] (gap) an exception thrown inside a command isn't caught by the dispatcher — undefined in the contract
+- `add`/`list`/`report` as the first arg runs that command
+- no arg / unknown command → usage + return `1`
+- the command's return value becomes the exit code
+- (gap) an exception thrown inside a command isn't caught by the dispatcher — undefined in the contract
 
 ## Subtasks
 - [x] command table + dispatch (cli.py)

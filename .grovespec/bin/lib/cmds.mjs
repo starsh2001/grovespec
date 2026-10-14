@@ -3,11 +3,11 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createHash } from 'node:crypto'
-import { sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, strictYamlProblems, MUST_FIX_CATEGORIES, RECORD_CATEGORIES, LEGACY_GRADE_FIELDS, completionProblems, frontmatterBoundaryProblem, readabilityFindings } from './core.mjs'
+import { cfgValue, sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, strictYamlProblems, MUST_FIX_CATEGORIES, RECORD_CATEGORIES, LEGACY_GRADE_FIELDS, completionProblems, frontmatterBoundaryProblem, readabilityFindings } from './core.mjs'
 import { Project, treeGateMsg, scriptDir, FORMAT } from './project.mjs'
 import { taskEvidenceDigest, specDigest, treeDigest } from './cmd-pin.mjs'
 import { lastTest } from './cmd-approve.mjs'
-import { git, repoState, ignoredState, ignoredUnder, shallowState, showPrefix, ancestorState, canonicalOidState, dirtyResultSubject, resultSealBreach, log, touched, trackedPaths, allSubjects, allTouchedPaths } from './git.mjs'
+import { git, repoState, ignoredState, ignoredUnder, shallowState, showPrefix, ancestorState, canonicalOidState, dirtyResultSubject, resultSealBreach, log, touched, trackedPaths, allSubjects, allTouchedPaths, gitFailure } from './git.mjs'
 import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDigest, taskRefAssignment, validateCompletedPacket, validateTaskRefsSyntax } from './source-evidence.mjs'
 import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
 import { readWaits, waitState, waitsPath } from './cmd-wait.mjs'
@@ -56,6 +56,7 @@ export function cmdValidate (P) {
   const markerNotices = []           // sideways deferral markers on sealed (approved+) nodes — same
   const ignoredOwn = []              // GroveSpec files git ignores — same
   const refNotices = []              // a sketch/draft node its next spec gate will refuse — same
+  const streakNotices = []           // a running cycle with a lower find_streak than config — same
 
   // A schema key that resolves to nothing turns its checks OFF, not green — the
   // `for` loop it feeds runs zero times and the run stays clean. A renamed or lost
@@ -222,7 +223,12 @@ export function cmdValidate (P) {
       if (e.closed !== '') continue // settled entries naming gone nodes are history
       if (P.read(P.taskPath(e.node)) === null) prob(`${candsPath(P)}  open candidate names ${e.node}, which has no task file — settle or repair the entry`)
       else if (P.read(P.taskPath(e.from)) === null) prob(`${candsPath(P)}  open candidate of ${e.from}, which has no task file — settle or repair the entry`)
-      else if (P.statusOf(e.node) !== 'done') candNotices.push(`${e.node} is ${P.statusOf(e.node)} but still holds an open candidate entry from ${e.from} — settle it first (grovespec recheck open|close ${e.node} <verdict>), the ledger must not trail the state`)
+      // Advise only a command that can run: a verdict needs the origin's change to have
+      // landed (recheck refuses a waiting origin), so an entry whose node reopened on its
+      // own before its origin came back has nothing to do yet.
+      else if (P.statusOf(e.node) !== 'done') candNotices.push(P.statusOf(e.from) === 'done'
+        ? `${e.node} is ${P.statusOf(e.node)} but still holds an open candidate entry from ${e.from} — settle it (grovespec recheck open|close ${e.node} ${e.from} <verdict>), the ledger must not trail the state`
+        : `${e.node} is ${P.statusOf(e.node)} and holds a candidate entry from ${e.from}, whose change has not landed (${e.from} is ${P.statusOf(e.from) || 'missing'}) — nothing to do now; the recheck step settles it once ${e.from} is done`)
     }
   }
 
@@ -322,6 +328,17 @@ export function cmdValidate (P) {
       if (v === '') continue
       if (!/^[0-9]+$/.test(v) || Number(v) < lo || (k === 'strength' && Number(v) > 3)) {
         prob(`${rf}  ${k} '${v}' out of range (${k === 'strength' ? '1–3' : `≥ ${lo}`})`)
+      }
+    }
+    // A cycle may carry its own find_streak (overridable per node), but a LOWER one ends
+    // find sooner than the project chose — and one was put to a person as "(recommended)".
+    // Named while the cycle runs, never blocking: the person may have chosen it.
+    if (topValue(text, 'status') === 'in-progress') {
+      const block = targetType === 'result' ? 'review' : 'verify'
+      const cfgN = cfgValue(P.configText, block, 'find_streak')
+      const recN = topValue(text, 'find_streak')
+      if (/^[0-9]+$/.test(cfgN) && /^[0-9]+$/.test(recN) && Number(recN) < Number(cfgN)) {
+        streakNotices.push(`${rf}  find_streak ${recN} is below this project's ${block}.find_streak ${cfgN} — a lowered streak ends find sooner; keep it only if the person chose it`)
       }
     }
     v = topValue(text, 'item_phase')
@@ -687,7 +704,7 @@ export function cmdValidate (P) {
   // DID NOT ANSWER must not wear that skip — every history-bound check below would go
   // unread under a clean tick (a missing git binary read as "not a repo", measured).
   const rState = repoState(P.root)
-  if (rState === 'broken') prob('git did not answer (missing or failing git) — every history-bound check (pins · reviewed commits · tdd evidence · ignored-subtree) is unread; an unread check is not a passed one')
+  if (rState === 'broken') prob(`git did not answer (${gitFailure()}) — every history-bound check (pins · reviewed commits · tdd evidence · ignored-subtree) is unread; an unread check is not a passed one`)
   const repo = rState === 'repo'
   // A project inside an IGNORED subtree of a bigger repo answers `inRepo` yes while no
   // commit of its code can exist there — every result gate would bind to a foreign HEAD
@@ -928,6 +945,10 @@ export function cmdValidate (P) {
     const shown = [...groups].map(([d, fs]) => fs.length > 1 ? `${d} (${fs.length} files)` : fs[0])
     say(`notice: ${ignoredOwn.length} GroveSpec file(s) ignored by git — they never reach a commit, so a clone or another worktree runs without them: ${shown.join(', ')} (add '!' exceptions for them to the project's .gitignore, then commit them)`)
   }
+  if (streakNotices.length) {
+    say(`notice: ${streakNotices.length} running cycle(s) with a lower find_streak than the project's config:`)
+    for (const m of streakNotices) say(`  ${m}`)
+  }
   if (refNotices.length) {
     say(`notice: ${refNotices.length} sketch/draft node(s) that the next spec verify will refuse as they stand — it reads each one's ref assignment through grovespec source; settle it before that gate (an older install's layout is the usual cause):`)
     for (const m of refNotices) say(`  ${m}`)
@@ -1014,10 +1035,14 @@ export function cmdStatus (P) {
     say('waiting on human:')
     for (const w of waiting) say(`  ${w}`)
   }
+  // One line, not one per node: ~120 machine-taken gates across the audited projects
+  // were ratified 0 times, and a block per node repeated on every status buried the rest
+  // of the report. Nor "no human has looked" — a gate whose cycle carried the person's own
+  // rulings was still printed that way; what the record knows is only that the person
+  // has not ratified it.
   const unratified = P.treeIds().map(t => [t, P.unratified(t)]).filter(([, l]) => l.length)
   if (unratified.length) {
-    say('taken by the machine on the cold verdict, not yet ratified:')
-    for (const [t, labels] of unratified) say(`  ${pad(t, 8)} ${labels.join(' · ')} gate — nothing was pending for you; no human has looked (grovespec ratify ${t})`)
+    say(`taken by the machine on the cold verdict, not yet ratified by you (${unratified.length}): ${unratified.map(([t, l]) => `${t} ${l.join('·')}`).join(', ')} — grovespec ratify <id>… records your own look`)
   }
   // Live waits are open obligations — while one exists the build is not "all done",
   // whatever the per-node statuses say (the frozen node cannot reach done asleep).
@@ -1339,7 +1364,7 @@ export function cmdId (P) {
   }
   const rs = repoState(P.root)
   if (rs === 'broken') {
-    say('cannot derive an id — git did not answer (missing or failing git); an id issued over unread history could collide')
+    say(`cannot derive an id — git did not answer (${gitFailure()}); an id issued over unread history could collide`)
     return 2
   }
   const repo = rs === 'repo'

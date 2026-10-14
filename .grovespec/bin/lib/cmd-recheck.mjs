@@ -170,7 +170,11 @@ export function cmdRecheck (P, rest) {
     let at = 2
     const from = ID.test(rest[at] ?? '') ? rest[at++] : ''
     const lane = sub === 'open' && (rest[at] === 'draft' || rest[at] === 'approved') ? rest[at++] : ''
+    // A wave writes its finding as "untouched — …" / "touched: …" and the caller passes it
+    // on whole; the record's own prefix already says that word, so a leading copy is
+    // dropped — the deployed ledgers read "untouched — untouched — …".
     const verdict = rest.slice(at).join(' ').trim()
+      .replace(sub === 'open' ? /^(touched|opened)\s*[—–:-]\s*/i : /^untouched\s*[—–:-]\s*/i, '')
     if (!ID.test(node) || verdict === '') { say(`usage: grovespec recheck ${sub} TASK-N [TASK-FROM]${sub === 'open' ? ' draft|approved' : ''} <verdict — the shown reason, not a feeling>`); return 2 }
     const t = now()
     if (t === null) { say('GROVESPEC_NOW is set but not strict ISO-8601 UTC — refused'); return 2 }

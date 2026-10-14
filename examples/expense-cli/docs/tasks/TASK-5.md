@@ -31,11 +31,11 @@ Sums expenses by category and prints a total. Reads everything from storage, add
 (Consumes storage — `blocked_by: [TASK-2]`.)
 
 ## AC
-- [x] sums `amount` per category
-- [x] prints categories in ascending name order
-- [x] prints a grand total after a separator
-- [x] empty data → safe `0` total
-- [ ] (gap) a record missing `category`/`amount` raises KeyError — undefined (storage assumed to guarantee the shape)
+- sums `amount` per category
+- prints categories in ascending name order
+- prints a grand total after a separator
+- empty data → safe `0` total
+- (gap) a record missing `category`/`amount` raises KeyError — undefined (storage assumed to guarantee the shape)
 
 ## Subtasks
 - [x] sum by category → sort → print → total (report.py)

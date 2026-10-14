@@ -53,7 +53,7 @@ verify:
     skip:     { reviewers: 0 }   # trivial spec edit (format·comment)
     light:    { reviewers: 2 }   # small, contract unchanged
     standard: { reviewers: 3 }   # a normal new node
-    full:     { reviewers: 5 }   # contract changed / 3+ consumers / a skeleton
+    full:     { reviewers: 5 }   # an already-used contract changes / 3+ consumers / a skeleton / security
 
 # review — code cold-review on THIS NODE'S DIFF only (never the whole codebase) + tests.
 review:
@@ -75,7 +75,7 @@ review:
     skip:     { reviewers: 0 }   # trivial diff (format·comment·≤2 lines)
     light:    { reviewers: 2 }   # small diff, no new behavior
     standard: { reviewers: 3 }   # a normal node's implementation
-    full:     { reviewers: 5 }   # security-touching / large / contract-bearing diff
+    full:     { reviewers: 5 }   # security-touching / large / changes an already-used contract
 
 # Edit-routing hook — advisory context injected on src/tests edits (see `grovespec
 # hooks install|remove|status`; the registration itself lives in .claude/settings.json

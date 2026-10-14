@@ -29,9 +29,9 @@ Shows every stored expense, one per line, in the order they were saved.
 (Consumes storage — `blocked_by: [TASK-2]`.)
 
 ## AC
-- [x] prints one line per record with date·category·amount·note
-- [x] empty data → prints nothing, returns `0`
-- [ ] (gap) a record missing `date`/`category`/`amount` raises KeyError — undefined (storage is assumed to guarantee the shape)
+- prints one line per record with date·category·amount·note
+- empty data → prints nothing, returns `0`
+- (gap) a record missing `date`/`category`/`amount` raises KeyError — undefined (storage is assumed to guarantee the shape)
 
 ## Subtasks
 - [x] read → format → print (list_cmd.py)

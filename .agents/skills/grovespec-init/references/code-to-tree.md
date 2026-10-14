@@ -8,7 +8,7 @@
 - **Be honest to the real structure — even when it's ugly.** Don't invent an intermediate layer the code doesn't have.
   - If the code *resists* a clean tree (no clear entry point · a god-module doing everything · a circular dependency · dead code), **map it as-is anyway — never fabricate a tidy hierarchy it lacks.** Every later task would inherit the lie.
   - Record the structural problem in `restructuring.md` (step 8) instead — the tree stays honest, the fix-direction isn't lost.
-- **Uncertain → mark it as a gap.** Where the code doesn't pin down behavior, don't fill it with a guess — mark it (leave the AC unchecked).
+- **Uncertain → mark it as a gap.** Where the code doesn't pin down behavior, don't fill it with a guess — mark it (a `(gap)` AC item).
 - **Map reality, park the defects.** The tree maps what *exists* (all `done`). What's *wrong with* it — bugs · duplications · doc↔code disagreements (node-level), or structural problems (tree-level) — does **not** go in the tree; it's parked as a draft backlog (`findings.md` · `restructuring.md`) and worked off later by `grovespec-revise` (step 8). A backlog gets actioned; a note buried in brief risks gets lost.
 - **Greenfield's "top layer + hypothesis" doesn't apply here.** That rule is about not pre-baking what's *not built yet*. Code is already-built, verified structure, so map it *as-is* (all `done`). If the code is huge, map from the top and dig deeper into a region when you work on it — the reason is *cost·need*, not lack of verification.
 
@@ -38,8 +38,8 @@ So that another node can use this one *without seeing the internals*:
 - **Invariants**: from the behavior — units, order (does it sort?), empty cases (empty value? exception?), side effects.
 - **Make the implicit explicit too**: things obvious from the code but written nowhere (e.g. "amount is a whole-won integer", "load returns an empty list when the file is missing").
 - **Responsibility split**: who does validation·locking (this node? the caller?).
-- **Mark the gaps**: edges the code doesn't pin down (broken input, etc.) — write them as *undefined in the contract* and leave them unchecked in the AC, prefixed `(gap)` (`FORMATS.md`). Don't fill them with guesses.
-- **Watch for bugs**: pin the code's *current* behavior as the contract, but if it's an *obvious bug*, don't freeze it into the contract — leave its AC item unchecked and park it in `findings.md` (Bugs) for a later `revise`. (Code-first, but don't enshrine a bug as a contract.)
+- **Mark the gaps**: edges the code doesn't pin down (broken input, etc.) — write them as *undefined in the contract* — AC items prefixed `(gap)` (`FORMATS.md`). Don't fill them with guesses.
+- **Watch for bugs**: pin the code's *current* behavior as the contract, but if it's an *obvious bug*, don't freeze it into the contract — write its AC item as a `(gap)` (the contract doesn't promise it yet) and park the bug in `findings.md` (Bugs) for a later `revise`. (Code-first, but don't enshrine a bug as a contract.)
 
 ### 5. Fill the meta
 - `status: done` — it's already-working code.

@@ -52,7 +52,7 @@ Change the shape in **`tree.md` only** — it's the single source of truth for p
 - **Merge**: two ids into one in `tree.md`, merge the Task content into the surviving Task. Any node whose `blocked_by` listed either one now points at the merged node (update those). **The retired id is burned, never reassigned** — its `TASK-N:` commits and its task file's path stay in history, and a new node wearing that number would inherit them as its diff (`grovespec id` skips it automatically, across every reachable ref).
 
 **Then re-run the decomposition gate.** After a structure **or `refs` assignment** change (and any propagation), run **`node .grovespec/bin/grovespec.mjs reopen tree decomposition`**, then `grovespec-verify` with the **explicit target `tree`**. The command preserves settled `adjudications`, removes the prior seal, and writes the mode before round 1; never hand-reset the YAML or rely on inference from a built tree. D1 reviews the new source→node map, and `pin tree` writes a fresh `source_scope_digest`; the prior passed record cannot authorize a different assignment.
-- **Scale to the change**: a single move with the contract unchanged → `light`; a split·merge or several nodes → `standard`+ (round up).
+- **Scale to the change**: a single move with the contract unchanged → `light`; a split·merge or several nodes → `standard`.
 - On a built tree the reviewers read each node's **id·name·Overview + `refs` only** (`reviewers.md`), and `tree.verify.yaml`'s `adjudications` carry over as do-not-raise — settled calls aren't re-litigated.
 
 > Prefer *keeping the outer contract* — that's what keeps the partial tree small and contained.

@@ -4,7 +4,7 @@
 // starts when the node leaves approved; once a review is pinned (reviewed_commit,
 // written at done), the next cycle's commits are the ones after that pin.
 import { topValue } from './core.mjs'
-import { git, porcelainPaths, repoState, shallowState, ancestorState, canonicalOidState, emptyTree, log, touched, showPrefix } from './git.mjs'
+import { git, porcelainPaths, repoState, shallowState, ancestorState, canonicalOidState, emptyTree, log, touched, showPrefix, gitFailure } from './git.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
@@ -12,7 +12,7 @@ export function cmdDiff (P, n) {
   if (n === '') { say('usage: grovespec diff TASK-N'); return 2 }
   if (P.read(P.taskPath(n)) === null) { say(`no such node: ${n}`); return 2 }
   const rs = repoState(P.root)
-  if (rs === 'broken') { say('git did not answer (missing or failing git) — the cycle cannot be read; no diff was produced'); return 2 }
+  if (rs === 'broken') { say(`git did not answer (${gitFailure()}) — the cycle cannot be read; no diff was produced`); return 2 }
   if (rs === 'none') { say('not a git repository — diff reads the cycle from TASK- commits'); return 2 }
 
   // Before ANY history answer, not just before the base: cut history also hides the

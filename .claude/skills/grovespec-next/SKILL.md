@@ -54,7 +54,7 @@ When it finishes, run **two** commands:
 - **`grovespec next` again, with the SAME flags as §2's run** — auto mode re-runs `next --auto`. Its answer, not your reading of the situation, decides §4's last line. (The two modes answer differently at the terminal — the record list ends an auto run and routes an ask run to plan — and a flag dropped here switches the build's mode mid-loop.)
 
 ## 4. Report, then the final line
-**Report.** When a step skill ran, its own step-report closing (`FORMATS.md` "The step report") *is* the report — don't re-summarize it; add only what the driver knows: **anything the machine approved**, named, with the standing note that a look is theirs to record (`grovespec ratify`). When nothing ran, say in that same closing shape what is waiting on the human (each item: what it is · the issue in one line · what's needed).
+**Report.** When a step skill ran, its own step-report closing (`FORMATS.md` "The step report") *is* the report — don't re-summarize it; add only what the driver knows. Machine-taken gates are not re-listed — their backlog is named once, at the milestone's retro. When nothing ran, say in that same closing shape what is waiting on the human (each item: what it is · the issue in one line · what's needed).
 
 Then the last line — **read it off the `grovespec next` you just ran, don't decide it**:
 

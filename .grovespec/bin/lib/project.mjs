@@ -481,5 +481,12 @@ export class Project {
 
 export const GATE_MSG = 'decomposition gate pending — sketch nodes exist but the tree has not passed its cold verify. Run grovespec-verify on the TREE first (fix → human approval); node work (grow/verify/implement) starts after that.'
 export const SURVEY_MSG = 'survey fidelity gate pending — this tree was mapped from existing code but never cold-verified against it. Run grovespec-verify on the TREE first (accuracy check → human approval); node work (revise/grow) starts after that.'
-// The pending-gate message, worded by which question is armed.
-export const treeGateMsg = P => (P.treeGateKind() === 'fidelity' ? SURVEY_MSG : GATE_MSG)
+// The pending-gate message, worded by which question is armed — and by what is still
+// missing: once the cold verify passed, telling status/check readers to "run
+// grovespec-verify on the TREE first" sent them back to a gate already done (next words
+// that state itself).
+export const treeGateMsg = P => {
+  const kind = P.treeGateKind()
+  if (P.treeAwaitingHuman()) return `${kind === 'fidelity' ? 'survey fidelity' : 'decomposition'} gate — the cold verify passed; only your approval is missing (look at the tree, or on a re-verify the delta since your last approval, then grovespec approve tree --human). Node work starts after that.`
+  return kind === 'fidelity' ? SURVEY_MSG : GATE_MSG
+}

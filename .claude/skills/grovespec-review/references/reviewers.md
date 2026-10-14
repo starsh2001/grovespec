@@ -99,6 +99,7 @@ Every kept finding also needs lane fields:
 Lane rule — **`kind` names where the flaw lives; `category` alone decides whether it blocks**:
 - `defect` = the current review target itself is wrong. A must-fix defect blocks in `open_issues`; a defect in a record category — a real but harmless slip in current code (a label typo) — is recorded in `followups` like any record item.
 - `contract-gap` = a real issue, but it belongs in later revise/verify work rather than this code gate — the one way a must-fix category may sit in `followups` (a `contract-gap` in a record category is just a record item).
+- **A must-fix in another node that is already `done`** — found while reviewing this one, or met by implement — is a `contract-gap` here: this gate still blocks only on its own target. **And the caller asks the person on the spot** (FORMATS.md "A decision, not a stage"): *fix it now* — when this step ends, that node reopens through `grovespec-revise` with the defect as its reason, and the item leaves `followups` — or *next milestone* — it stays in `followups` for plan. Recommend *now* when it is critical — data lost or corrupted, a security hole or easy abuse, or the main path of ordinary use crashes or is blocked; otherwise *next milestone*.
 - `concern` = a note or suspicion; never a blocker (record categories only).
 - If the flaw is in the current cycle's diff or in the text under review right now, it is `defect` even if the eventual repair also needs a spec change.
 - A review file may name a `family` only once across `open_issues` + `followups`; the same hole re-shown through a second path is one finding, not two.
@@ -153,7 +154,8 @@ Source-evidence packet (spec only): {the entire exact grovespec-source-evidence/
 never excerpts and never a summary}
 For a spec, open every packet coordinate in the original ref record before judging, and use each
 clause's `heading` path as its local context. Treat text summarized by the caller as untrusted
-navigation, not as source evidence. Return the packet's stable clause ids with only the disposition
+navigation, not as source evidence. (Windows PowerShell 5.1 reads files as the ANSI code page —
+use the host's file-read tool, or `Get-Content -Encoding UTF8`, or non-ASCII text arrives garbled.) Return the packet's stable clause ids with only the disposition
 fields your lens owns; preserve its roster exactly.
 Do NOT raise (already settled / out of scope). Each entry settles ONE claim — the area
 around it stays open; this list marks nothing safe: {the adjudicated list (claim · verdict ·

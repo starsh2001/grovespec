@@ -5,7 +5,7 @@
 // what calls what) is then a read of THESE files rather than a grep of the codebase.
 //
 // Nothing is stored: the mapping is derived from history every time, so it cannot drift.
-import { git, repoState, shallowState, showPrefix, trackedPaths, log, touched } from './git.mjs'
+import { git, repoState, shallowState, showPrefix, trackedPaths, log, touched, gitFailure } from './git.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
@@ -13,7 +13,7 @@ export function cmdFiles (P, n) {
   if (n === '') { say('usage: grovespec files TASK-N'); return 2 }
   if (P.read(P.taskPath(n)) === null) { say(`no such node: ${n}`); return 2 }
   const rs = repoState(P.root)
-  if (rs === 'broken') { say('git did not answer (missing or failing git) — nothing was listed'); return 2 }
+  if (rs === 'broken') { say(`git did not answer (${gitFailure()}) — nothing was listed`); return 2 }
   if (rs === 'none') { say("not a git repository — files reads the node's TASK- commits"); return 2 }
   const sh = shallowState(P.root)
   if (sh === 'broken') { say('git rev-parse --is-shallow-repository failed — nothing was listed'); return 2 }

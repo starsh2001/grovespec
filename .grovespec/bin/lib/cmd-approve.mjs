@@ -19,7 +19,7 @@
 import { duplicateNestedKeys, nestedValue, splitLines, topValue, listItemCount, setFmValue, completionProblems } from './core.mjs'
 import { writeAtomic } from './project.mjs'
 import { taskEvidenceDigest, specDigest, treeDigest } from './cmd-pin.mjs'
-import { dirtyResultSubject, git, repoState, ignoredState, resultSealBreach } from './git.mjs'
+import { dirtyResultSubject, git, repoState, ignoredState, resultSealBreach, gitFailure } from './git.mjs'
 import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDigest, validateCompletedPacket } from './source-evidence.mjs'
 import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
 import { waitState } from './cmd-wait.mjs'
@@ -239,7 +239,7 @@ export function cmdApprove (P, n, human) {
 
   if (label === 'result') {
     const rs = repoState(P.root)
-    if (rs === 'broken') { say(`${n}: git did not answer (missing or failing git) — a result approval binds to history that cannot be read right now`); return 2 }
+    if (rs === 'broken') { say(`${n}: git did not answer (${gitFailure()}) — a result approval binds to history that cannot be read right now`); return 2 }
     if (rs === 'none') { say(`${n}: not a git repository — a result approval is bound to the reviewed commit`); return 2 }
     // Checked here too, not only at the seal: a record pinned before this check existed
     // already carries the foreign commit, and comparing it to that same foreign HEAD is

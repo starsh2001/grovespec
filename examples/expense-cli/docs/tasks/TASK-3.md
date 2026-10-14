@@ -31,11 +31,11 @@ Records one new expense. `add <YYYY-MM-DD> <category> <amount> [note]` → build
 (Consumes storage — see `blocked_by: [TASK-2]`. The parent is in tree.md, not here.)
 
 ## AC
-- [x] ≥3 args → builds a record and appends it via storage
-- [x] <3 args → usage + return `1`
-- [x] success → prints the category·amount and returns `0`
-- [ ] (gap) non-numeric `amount` crashes at `int()` — undefined in the contract
-- [ ] (gap) `date` format isn't validated — any string is stored — undefined in the contract
+- ≥3 args → builds a record and appends it via storage
+- <3 args → usage + return `1`
+- success → prints the category·amount and returns `0`
+- (gap) non-numeric `amount` crashes at `int()` — undefined in the contract
+- (gap) `date` format isn't validated — any string is stored — undefined in the contract
 
 ## Subtasks
 - [x] parse args → record → storage.add_record (add.py)

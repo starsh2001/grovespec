@@ -10,8 +10,8 @@
 // This command is the deterministic floor of that step: it answers whether a retro
 // is OWED and prints the milestone's measured numbers; the prose, the cold wave and the
 // record belong to grovespec-retro (the skill). Owed = any `TASK-N:` cycle commit
-// after the newest retro record's anchor (or ever, when no record exists) — the
-// retro's own commit is not TASK-shaped, so a closed retro never owes itself.
+// after the newest retro record's anchor (or since GroveSpec arrived, when no record
+// exists) — the retro's own commit is not TASK-shaped, so a closed retro never owes itself.
 //
 // TERMINATION SAFETY: a retro never reopens a node and never blocks `done` — a
 // capable reviewer asked again always returns something, so a closing review that
@@ -20,7 +20,7 @@
 // route the terminal to plan — the milestone stays closed; the NEXT milestone gains a reason
 // to open.
 import { readdirSync } from 'node:fs'
-import { git, repoState, shallowState, showPrefix, log, TASK_COMMIT, SKILL_COMMIT } from './git.mjs'
+import { git, repoState, shallowState, showPrefix, log, TASK_COMMIT, SKILL_COMMIT, gitFailure } from './git.mjs'
 import { freshSignals } from './cmd-fresh.mjs'
 import { readWaits } from './cmd-wait.mjs'
 
@@ -69,20 +69,34 @@ export function retroOwed (P) {
     const ours = new Set(own.out.split('\n').filter(Boolean))
     commits = commits.filter(c => ours.has(c.h))
   }
+  let adopted = null
   if (last.anchor !== null) {
     const r = git(P.root, ['rev-list', `${last.anchor}..HEAD`])
     if (!r.ok) return { owed: false, n: last.n, anchor: last.anchor, broken: `git rev-list failed — is the anchor ${last.anchor.slice(0, 7)} still reachable?` }
     const after = new Set(r.out.split('\n').filter(Boolean))
     commits = commits.filter(c => after.has(c.h))
+  } else {
+    // No retro yet: the first milestone begins where GroveSpec arrived — the oldest
+    // commit touching .grovespec/ — not at the repository's first commit. An adopted
+    // project with years of history counted all of it "in the milestone".
+    const first = git(P.root, ['rev-list', '--topo-order', '--reverse', 'HEAD', '--', '.grovespec'])
+    if (!first.ok) return { owed: false, n: last.n, anchor: null, broken: 'git rev-list failed' }
+    adopted = first.out.split('\n').find(Boolean) ?? null
+    if (adopted !== null) {
+      const r = git(P.root, ['rev-list', 'HEAD', '--not', `${adopted}^@`])
+      if (!r.ok) return { owed: false, n: last.n, anchor: null, broken: 'git rev-list failed' }
+      const after = new Set(r.out.split('\n').filter(Boolean))
+      commits = commits.filter(c => after.has(c.h))
+    }
   }
   const work = commits.filter(c => TASK_COMMIT.test(c.s))
-  return { owed: work.length > 0, n: last.n, anchor: last.anchor, work, inMilestone: commits, broken: null }
+  return { owed: work.length > 0, n: last.n, anchor: last.anchor, adopted, work, inMilestone: commits, broken: null }
 }
 
 export function cmdRetro (P) {
   const rs = repoState(P.root)
   if (rs === 'none') { say('not a git repository — retro measures the milestone from its commits'); return 2 }
-  if (rs === 'broken') { say('git did not answer (missing or failing git) — nothing was measured'); return 2 }
+  if (rs === 'broken') { say(`git did not answer (${gitFailure()}) — nothing was measured`); return 2 }
   if (shallowState(P.root) === 'shallow') { say('shallow clone — the milestone\'s history is cut; unshallow it (git fetch --unshallow), then re-run'); return 2 }
   const o = retroOwed(P)
   if (o.broken !== null) { say(`retro: cannot decide — ${o.broken}`); return 2 }
@@ -112,7 +126,7 @@ export function cmdRetro (P) {
   const sig = freshSignals(P)
   const freshLine = sig.broken !== null ? `unreadable (${sig.broken})` : `${sig.dirty.length} uncommitted · ${sig.offband.length} out-of-band commit(s)`
 
-  say(`retro: owed — TASK- work landed since ${o.anchor === null ? 'the beginning (no retro yet)' : `retro-${o.n} (anchor ${o.anchor.slice(0, 7)})`}`)
+  say(`retro: owed — TASK- work landed since ${o.anchor !== null ? `retro-${o.n} (anchor ${o.anchor.slice(0, 7)})` : o.adopted !== null ? `GroveSpec arrived (${o.adopted.slice(0, 7)} — no retro yet)` : 'the beginning (no retro yet)'}`)
   say(`the milestone, measured:`)
   say(`  nodes worked: ${perNode.size} — ${[...perNode.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}(${v})`).join(' · ')}`)
   say(`  commits: ${o.work.length} TASK cycle · ${steps} gate/step — ${o.work.length + steps} of ${o.inMilestone.length} total in the milestone`)

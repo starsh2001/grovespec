@@ -57,9 +57,19 @@ export function git (root, args) {
   } catch (e) {
     // code null = git never ran (missing binary, spawn failure) — distinct from git
     // running and answering non-zero; repoState needs the difference.
+    lastFailure = e.code === 'ENOENT' ? 'git not found: ENOENT'
+      : e.code === 'EPERM' || e.code === 'EACCES' ? `not allowed to run git: ${e.code}, a sandbox may be blocking it`
+      : typeof e.code === 'string' ? `could not run git: ${e.code}`
+      : `git exited ${e.status}${String(e.stderr ?? '').trim() ? `: ${String(e.stderr).trim().split('\n')[0]}` : ''}`
     return { ok: false, out: String(e.stdout ?? ''), err: String(e.stderr ?? ''), code: e.status ?? null }
   }
 }
+
+// Why the last failed git call failed, for the "git did not answer" messages. One phrase
+// for every cause misled a session: a sandbox refused to spawn git (EPERM), the message
+// said "missing or failing git", and init stopped over a git that was installed.
+let lastFailure = ''
+export const gitFailure = () => lastFailure || 'missing or failing git'
 
 // Three answers, never two: 'repo' · 'none' (git ITSELF says this is not a repository)
 // · 'broken' (git missing, crashing, or a corrupt repository). Collapsing broken into
