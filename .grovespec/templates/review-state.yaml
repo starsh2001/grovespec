@@ -8,9 +8,9 @@ find_streak: 2               # N - find closes after N CONSECUTIVE waves confirm
                              # resets the live counter; re-finds and record-only items don't.
 plan_streak: 2               # M - a fix plan is applied only after M consecutive clean cold
                              # reviews of that plan (result cycles; spec fixes are lighter).
-max_rounds: 30               # escalation trigger on `round` (total spawned passes), not the terminator
+max_rounds: 30               # escalation trigger on FIND waves (rounds[] phase find), not the terminator
 
-round: 1                     # total spawned passes: find waves + plan reviews + confirmations
+round: 1                     # total spawned passes (numbers the round files); only find waves spend max_rounds
 no_new_streak: 0             # LIVE counter - consecutive completed find waves with no NEW
                              # must-fix finding. Reset to 0 by a new must-fix; NOT advanced by
                              # an aborted/incomplete wave or an unresolved candidate.

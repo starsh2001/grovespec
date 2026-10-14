@@ -40,8 +40,8 @@ verify:
   find_streak: 2     # N — find closes after N CONSECUTIVE waves that confirm no NEW must-fix
                      # finding (a new one resets the counter to 0; re-finds and record-only
                      # items don't count either way — reviewers.md §The cycle).
-  max_rounds: 30     # the escalation trigger, not the terminator — the CYCLE ends when the
-                     # find streak is met and every confirmed must-fix item is closed.
+  max_rounds: 30     # the escalation trigger on FIND waves, not the terminator — the CYCLE ends when
+                     # the find streak is met and every confirmed must-fix item is closed.
   # Reviewer model — OPTIONAL. Omit → every reviewer inherits the session model (the portable default).
   # RECOMMENDED split if you customize: keep the broad finders on a cheap model (they drive recall), and lift only
   # the deepest-reasoning lens to a stronger one (it sets the ceiling). Use model ids your host accepts:
@@ -62,7 +62,8 @@ review:
   find_streak: 2     # N — same rule as verify: consecutive no-new-must-fix waves that end find.
   plan_streak: 2     # M — a fix PLAN is applied only after M consecutive clean cold reviews of
                      # that plan (editing the plan resets its counter — grovespec-fix).
-  max_rounds: 30     # the escalation trigger, not the terminator (reaching it is never a pass).
+  max_rounds: 30     # the escalation trigger on FIND waves, not the terminator (reaching it is never a pass;
+                     # a fix whose confirmation fails twice in a row escalates that item alone).
   # Reviewer model — OPTIONAL. Omit → every reviewer inherits the session model (the portable default).
   # RECOMMENDED split if you customize: cheap model for the broad finders (recall), a stronger one only on the
   # lenses that need deep reasoning (ceiling). Use model ids your host accepts:

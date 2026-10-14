@@ -98,30 +98,49 @@ function exactChildPath (P, file) {
   return dir.replace(/\\/g, '/')
 }
 
+// A coordinate is a numbered heading (`4`, `5.4` -- the section under `## 4` / `### 5.4`)
+// or a line range (`L636-758`, v0.23.0). Headings alone left any document numbered
+// otherwise unciteable: a 105 KB regulation headed by article names (`## Article 8 (...)`)
+// was linked by 0 of 41 nodes, and every cold packet carried only the agent's summary of
+// it. A ref record is frozen, so its lines never drift; the index Topic column carries the
+// meaning.
 function parseLocation (raw, at = 'source location') {
-  if (typeof raw !== 'string') fail(`${at} must be a numbered Markdown heading`)
-  const v = nfc(raw.trim()).replace(/^\u00a7/, '')
+  if (typeof raw !== 'string') fail(`${at} must be a numbered heading (4, 5.4) or a line range (L636-758)`)
+  const t = nfc(raw.trim())
+  if (/^L[0-9]/.test(t)) {
+    const m = t.match(/^L([1-9]\d*)[-~\u2013]L?([1-9]\d*)$/)
+    const start = m ? Number(m[1]) : NaN; const end = m ? Number(m[2]) : NaN
+    if (!m || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) {
+      fail(`${at} '${raw}' must be a line range L<first>-<last> (for example L636-758), first <= last`)
+    }
+    return { kind: 'lines', number: `L${start}-${end}`, location: `L${start}-${end}`, start, end }
+  }
+  const v = t.replace(/^\u00a7/, '')
   if (!/^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*))*$/.test(v) ||
       v.split('.').some(part => !Number.isSafeInteger(Number(part)))) {
-    fail(`${at} '${raw}' must be canonical numeric segments (for example 4 or 5.4)`)
+    fail(`${at} '${raw}' must be canonical numeric segments (for example 4 or 5.4) or a line range (L636-758)`)
   }
   const depth = v.split('.').length + 1
   if (depth > 6) fail(`${at} '${raw}' is deeper than Markdown's six heading levels`)
-  return { number: v, location: `\u00a7${v}`, depth }
+  return { kind: 'heading', number: v, location: `\u00a7${v}`, depth }
 }
 
 function parseScopeToken (raw) {
   if (typeof raw !== 'string') fail('source coordinates must be strings')
   const at = raw.lastIndexOf('@')
-  if (at <= 0 || at === raw.length - 1) fail(`source coordinate '${raw}' must be file.md@4 (or a dotted heading such as @5.4)`)
+  if (at <= 0 || at === raw.length - 1) fail(`source coordinate '${raw}' must be file.md@4 (a dotted heading such as @5.4, or a line range such as @L636-758)`)
   return { file: normalizeRefFile(raw.slice(0, at)), ...parseLocation(raw.slice(at + 1)) }
 }
 
 const scopeToken = s => `${s.file}@${s.number}`
+const coordOf = row => ({ file: row.file, ...parseLocation(row.location) })
 
+// Within a file: headings first, in numeric order, then line ranges by first line.
 function scopeSort (a, b) {
   const f = a.file === b.file ? 0 : (a.file < b.file ? -1 : 1)
   if (f !== 0) return f
+  if (a.kind !== b.kind) return a.kind === 'heading' ? -1 : 1
+  if (a.kind === 'lines') return a.start - b.start || a.end - b.end
   const aa = a.number.split('.').map(Number); const bb = b.number.split('.').map(Number)
   for (let i = 0; i < Math.max(aa.length, bb.length); i++) {
     if (aa[i] === undefined) return -1
@@ -142,9 +161,11 @@ export function normalizeScopeArgs (args, { allowEmpty = false } = {}) {
     seen.add(key)
     for (let j = 0; j < i; j++) {
       const prior = parsed[j]
-      if (prior.file === s.file && (s.location.startsWith(`${prior.location}.`) || prior.location.startsWith(`${s.location}.`))) {
-        fail(`overlapping source coordinates '${prior.file}@${prior.location}' and '${s.file}@${s.location}'`)
-      }
+      if (prior.file !== s.file || prior.kind !== s.kind) continue // a heading beside a range: checked on the read lines (buildSourcePacket)
+      const overlap = s.kind === 'lines'
+        ? s.start <= prior.end && prior.start <= s.end
+        : s.location.startsWith(`${prior.location}.`) || prior.location.startsWith(`${s.location}.`)
+      if (overlap) fail(`overlapping source coordinates '${prior.file}@${prior.location}' and '${s.file}@${s.location}'`)
     }
   }
   return parsed
@@ -162,16 +183,16 @@ function refsField (taskText, at) {
   if (hits.length !== 1) fail(`${at}: frontmatter 'refs' appears ${hits.length} times`)
   const hit = hits[0]
   const m = hit.line.match(/^refs: (\[.*\])$/)
-  if (!m) fail(`${at}:${hit.n}: refs must be the canonical flow list 'refs: []' or 'refs: [spec.md@4, spec.md@5.4]'`)
+  if (!m) fail(`${at}:${hit.n}: refs must be the canonical flow list 'refs: []' or 'refs: [spec.md@4, spec.md@5.4, rules.md@L636-758]'`)
   const raw = m[1]
   if (raw === '[]') return { present: true, mode: 'explicit', scope: [] }
   const body = raw.slice(1, -1)
   if (body === '' || body.split(', ').some(token => token === '')) {
-    fail(`${at}:${hit.n}: refs must be the canonical flow list 'refs: []' or 'refs: [spec.md@4, spec.md@5.4]'`)
+    fail(`${at}:${hit.n}: refs must be the canonical flow list 'refs: []' or 'refs: [spec.md@4, spec.md@5.4, rules.md@L636-758]'`)
   }
   const tokens = body.split(', ')
-  if (tokens.some(token => !/^[^\s,@\[\]]+@(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*))*$/u.test(token))) {
-    fail(`${at}:${hit.n}: refs contains a non-canonical coordinate token — use file.md@4 (no quotes, \u00a7, or token whitespace)`)
+  if (tokens.some(token => !/^[^\s,@\[\]]+@(?:(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*))*|L[1-9]\d*-[1-9]\d*)$/u.test(token))) {
+    fail(`${at}:${hit.n}: refs contains a non-canonical coordinate token — use file.md@4 or file.md@L636-758 (no quotes, \u00a7, or token whitespace)`)
   }
   let scope
   try { scope = normalizeScopeArgs(tokens) } catch (e) {
@@ -212,7 +233,7 @@ function unquoteCell (value) {
   return v.length >= 2 && v.startsWith('`') && v.endsWith('`') ? v.slice(1, -1) : v
 }
 
-function currentIndexRows (P) {
+function indexCatalog (P) {
   // The catalog is metadata rather than a selectable source, but it obeys the same
   // realpath containment rule; a symlinked index outside ref cannot authorize reads.
   const indexPath = exactChildPath(P, 'index.md')
@@ -243,6 +264,7 @@ function currentIndexRows (P) {
     fail(`${indexPath} has a malformed Topic | File | Location table separator`)
   }
   const rows = []
+  const skipped = []
   for (let i = header + 2; i < lines.length; i++) {
     const entry = lines[i]
     if (!entry.headingEligible || entry.fenced || entry.line.trim() === '') break
@@ -258,16 +280,31 @@ function currentIndexRows (P) {
     const file = normalizeRefFile(fileRaw, `${indexPath}:${entry.n} File`)
     let location
     try { location = parseLocation(locationRaw, `${indexPath}:${entry.n} Location`).location } catch (e) {
-      // Clearly prose-like legacy locations ("Commands / Today") predate numeric
-      // coordinates and cannot authorize one, so they are skipped.  Anything beginning
-      // like this protocol's syntax is a broken authority row and must fail closed:
-      // `§five`, `§ 5`, `5.04`, and `5x` never disappear as if they were unrelated.
-      if (e instanceof SourceEvidenceError && !/^(?:\u00a7|[0-9])/u.test(nfc(locationRaw.trim()))) continue
+      // Clearly prose-like legacy locations ("Commands / Today") predate coordinates and
+      // cannot authorize one, so they are skipped -- and named: `validate` reports every
+      // skipped row (v0.23.0), since a catalog whose rows all read as prose authorizes
+      // nothing while every check stays green.  Anything beginning like this protocol's
+      // syntax is a broken authority row and must fail closed: `§five`, `§ 5`, `5.04`,
+      // `5x` and `L636` never disappear as if they were unrelated.
+      if (e instanceof SourceEvidenceError && !/^(?:\u00a7|[0-9]|L[0-9])/u.test(nfc(locationRaw.trim()))) {
+        skipped.push({ n: entry.n, location: oneSpace(locationRaw) })
+        continue
+      }
       throw e
     }
     rows.push({ topic: oneSpace(topicRaw), file, location })
   }
-  return rows
+  return { path: indexPath, rows, skipped }
+}
+
+const currentIndexRows = P => indexCatalog(P).rows
+
+// The catalog rows whose Location reads as prose, for `validate`'s notice: no Task can
+// cite them.  Null when the project keeps no catalog; a broken catalog throws.
+export function skippedIndexRows (P) {
+  if (P.read(P.refIndexPath()) === null) return null
+  const { path, skipped } = indexCatalog(P)
+  return { path, skipped }
 }
 
 function canonicalCurrentIndexRoster (P) {
@@ -279,10 +316,7 @@ function canonicalCurrentIndexRoster (P) {
     seen.add(key)
   }
   return rows.sort((a, b) => {
-    const byScope = scopeSort(
-      { file: a.file, number: a.location.slice(1) },
-      { file: b.file, number: b.location.slice(1) }
-    )
+    const byScope = scopeSort(coordOf(a), coordOf(b))
     return byScope || (a.topic === b.topic ? 0 : (a.topic < b.topic ? -1 : 1))
   })
 }
@@ -299,11 +333,20 @@ function assertCurrentScope (P, scope, currentRows = canonicalCurrentIndexRoster
     // Task covers one exact child heading (`§5.4`).  Dot-boundary ancestry is current;
     // textual prefixing is not (`§5` never admits `§50`).  When several catalog rows
     // are ancestors, the most-specific one is authoritative.
-    const matches = [...current.values()].filter(r => r.file === s.file &&
-      (r.location === s.location || s.location.startsWith(`${r.location}.`)))
+    // A line range is current inside a catalog range that contains it; the narrowest
+    // containing row is the authoritative one.  Headings and ranges never vouch for
+    // each other -- which lines a heading spans is the document's to say, not the map's.
+    const c = coordOf(s)
+    const matches = [...current.values()].filter(r => {
+      if (r.file !== s.file) return false
+      if (c.kind === 'heading') return r.location === s.location || s.location.startsWith(`${r.location}.`)
+      const rc = coordOf(r)
+      return rc.kind === 'lines' && rc.start <= c.start && c.end <= rc.end
+    })
     if (!matches.length) fail(`source coordinate '${key}' is not at or below a current row in ${P.refIndexPath()}`)
-    const max = Math.max(...matches.map(r => r.location.length))
-    const best = matches.filter(r => r.location.length === max)
+    const specificity = r => c.kind === 'heading' ? r.location.length : -(coordOf(r).end - coordOf(r).start)
+    const max = Math.max(...matches.map(specificity))
+    const best = matches.filter(r => specificity(r) === max)
     if (best.length !== 1) fail(`source coordinate '${key}' has an ambiguous most-specific current row in ${P.refIndexPath()}`)
   }
 }
@@ -350,7 +393,27 @@ function sectionEntries (text, scope, file) {
     const h = lines[i].headingEligible ? headingOf(lines[i].line) : null
     if (h && h.depth <= scope.depth) { end = i; break }
   }
-  return { selected: headingOf(lines[start].line), entries: lines.slice(start + 1, end) }
+  const span = { from: lines[start].n, to: end < lines.length ? lines[end].n - 1 : lines[lines.length - 1].n }
+  return { selected: headingOf(lines[start].line), entries: lines.slice(start + 1, end), span }
+}
+
+// A line range selects no heading: its first lines read under the heading that encloses
+// the range (or under the range itself, before any heading), and a heading inside it
+// nests on that path the way a section's subheadings do.
+function rangeEntries (text, scope, file) {
+  const total = splitLines(text).length
+  if (scope.end > total) fail(`${file}@${scope.location}: the file has ${total} line(s)`)
+  const lines = visibleMarkdownLines(text, file)
+  const stack = []
+  for (const entry of lines) {
+    if (entry.n >= scope.start) break
+    const h = entry.headingEligible ? headingOf(entry.line) : null
+    if (!h) continue
+    while (stack.length && stack[stack.length - 1].depth >= h.depth) stack.pop()
+    stack.push({ depth: h.depth, title: h.title })
+  }
+  const entries = lines.filter(entry => entry.n >= scope.start && entry.n <= scope.end)
+  return { stack, entries, span: { from: scope.start, to: scope.end } }
 }
 
 function logicalBlocks (sourceLines, initialHeading = '') {
@@ -422,9 +485,19 @@ function materialForSection (P, scope) {
   const path = exactChildPath(P, scope.file)
   const text = P.read(path)
   if (text === null) fail(`cannot read ref source '${scope.file}'`)
-  const { selected, entries } = sectionEntries(text, scope, scope.file)
-  const stack = [{ depth: selected.depth, title: selected.title }]
-  const headings = [{ depth: selected.depth, title: selected.title, path: selected.title }]
+  let stack, headings, entries, span, opening
+  if (scope.kind === 'lines') {
+    const range = rangeEntries(text, scope, scope.file)
+    stack = range.stack; entries = range.entries; span = range.span
+    headings = []
+    opening = stack.length ? stack[stack.length - 1].title : scope.location
+  } else {
+    const section = sectionEntries(text, scope, scope.file)
+    entries = section.entries; span = section.span
+    stack = [{ depth: section.selected.depth, title: section.selected.title }]
+    headings = [{ depth: section.selected.depth, title: section.selected.title, path: section.selected.title }]
+    opening = section.selected.title
+  }
   const annotated = []
   for (const entry of entries) {
     const h = entry.headingEligible ? headingOf(entry.line) : null
@@ -438,7 +511,7 @@ function materialForSection (P, scope) {
       annotated.push({ ...entry, heading: stack.map(x => x.title).join(' > ') })
     }
   }
-  const candidates = logicalBlocks(annotated, selected.title).flatMap(block =>
+  const candidates = logicalBlocks(annotated, opening).flatMap(block =>
     sentenceClauses(block.text).map(text => ({
       heading: block.heading,
       text,
@@ -459,7 +532,7 @@ function materialForSection (P, scope) {
   }
   const fences = entries.filter(entry => entry.fenceBoundary)
     .map(entry => ({ kind: entry.fenceBoundary, text: entry.fenceText }))
-  return { headings, fences, candidates, clauses }
+  return { headings, fences, candidates, clauses, span }
 }
 
 function legacyCitations (taskText, at) {
@@ -610,6 +683,17 @@ export function buildSourcePacket (P, target, scopeInput = undefined) {
   }
   const scope = assigned.scope
   const materials = scope.map(s => ({ scope: s, material: materialForSection(P, s) }))
+  // Same-kind pairs were refused by their syntax (normalizeScopeArgs); a heading beside a
+  // line range overlaps or not by the lines it actually reads.
+  for (let i = 0; i < materials.length; i++) {
+    for (let j = 0; j < i; j++) {
+      const a = materials[j]; const b = materials[i]
+      if (a.scope.file !== b.scope.file || a.scope.kind === b.scope.kind) continue
+      if (a.material.span.from <= b.material.span.to && b.material.span.from <= a.material.span.to) {
+        fail(`overlapping source coordinates '${a.scope.file}@${a.scope.location}' and '${b.scope.file}@${b.scope.location}' -- they read the same lines`)
+      }
+    }
+  }
   const clauses = materials.flatMap(x => x.material.clauses)
   const roster = materials.map(({ scope, material }) => ({
     file: scope.file,
@@ -734,14 +818,18 @@ function packetFence (briefText, at = 'round brief') {
   return { lines, start, end }
 }
 
-// amend's one legitimate packet mutation: a documentation-only Task edit moves the
-// spec digest and nothing else, so the packet is rewritten with that field updated
-// (fence body re-serialized; the prose lines around the fence are kept, written
-// back LF-terminated).
-export function briefWithPacketSpecDigest (briefText, packet, next, at = 'round brief') {
+// The brief with its one packet replaced (fence body re-serialized; the prose lines
+// around the fence are kept, written back LF-terminated) -- `source --refresh`.
+export function briefWithPacket (briefText, packet, at = 'round brief') {
   const { lines, start, end } = packetFence(briefText, at)
-  const body = JSON.stringify({ ...packet, spec_digest: next }, null, 2).split('\n')
+  const body = JSON.stringify(packet, null, 2).split('\n')
   return lines.slice(0, start + 1).concat(body, lines.slice(end)).join('\n') + '\n'
+}
+
+// amend's one legitimate packet mutation: a documentation-only Task edit moves the
+// spec digest and nothing else, so the packet is rewritten with that field updated.
+export function briefWithPacketSpecDigest (briefText, packet, next, at = 'round brief') {
+  return briefWithPacket(briefText, { ...packet, spec_digest: next }, at)
 }
 
 export function parseSourcePacket (briefText, at = 'round brief') {

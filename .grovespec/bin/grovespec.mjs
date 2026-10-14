@@ -2,6 +2,7 @@
 // grovespec — deterministic checks for a GroveSpec project.
 //   validate   format + graph coherence + status↔evidence (exit non-zero on any problem)
 //   status     each node's status + which are unblocked + what waits on the human, + next
+//              (--json: the same model machine-readable, + the wait/candidate ledgers + retro owed)
 //   check      [TASK-N] is this node ready to work? / list the ready nodes
 //   next [--auto]  the ONE step to run now. Human gates are skipped; --auto (the driver's
 //              auto mode) offers a CLEAN sealed gate as a machine-takeable step instead
@@ -22,6 +23,7 @@
 //   followups  every parked non-blocking finding across all gate records + the brownfield
 //              backlogs — the aggregate surface grovespec-plan structures into the next milestone
 //   source ID [coordinates…]  emit the assigned canonical ref-clause packet for a spec find round
+//              (--check: pin's packet checks on the cycle's find brief · --refresh: rebuild it after a Task edit)
 //   pin ID     bind the gate to the bytes: spec digest at approve, commit+digest at done
 //   id         the next node id, derived (highest ever seen + 1 — ids are never reused:
 //              a merged-away node's number would hand its commits to the new node), and
@@ -85,16 +87,16 @@ const rest = process.argv.slice(3)
 
 // The one spelling of the command surface (tests/doccheck.sh pins it against the
 // dispatch table, the header comment and README — edit them together).
-const USAGE = 'grovespec — validate | status | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups | source TASK-N [file.md@4…] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|release <TASK-N|tree>] | lang | locale | interview [claude|codex] | hooks install|remove|status | uninstall [--purge] | amend TASK-N | recheck [declare|close|open …] | retro | impact TASK-N | tree | version\n'
+const USAGE = 'grovespec — validate | status [--json] | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups | source TASK-N [file.md@4…|--check|--refresh] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|release <TASK-N|tree>] | lang | locale | interview [claude|codex] | hooks install|remove|status | uninstall [--purge] | amend TASK-N | recheck [declare|close|open …] | retro | impact TASK-N | tree | version\n'
 
 // The argv gate: an unknown flag or a surplus argument is a typo'd INTENTION and exits 2 —
 // `approve TASK-1 --humman` used to be silently accepted and recorded a MACHINE decision
 // where a human one was meant. Missing arguments still fall through to each command's own
 // usage line (those messages are pinned contracts). Table: cmd → [max positionals, flags].
 const AV = {
-  validate: [0], status: [0], check: [1], next: [0, ['--auto', 'auto']],
+  validate: [0], status: [0, ['--json']], check: [1], next: [0, ['--auto', 'auto']],
   approve: [1, ['--human']], reopen: [2], ratify: [Infinity], wait: [Infinity], diff: [1], files: [1],
-  test: [1], fresh: [0], followups: [0], source: [Infinity], pin: [1], id: [0], claim: [2], lang: [0], locale: [0],
+  test: [1], fresh: [0], followups: [0], source: [Infinity, ['--check', '--refresh']], pin: [1], id: [0], claim: [2], lang: [0], locale: [0],
   interview: [1], hooks: [1], uninstall: [0, ['--purge']], retro: [0], amend: [1], recheck: [Infinity], impact: [1], tree: [0], version: [0]
 }
 // No command takes two flags, and none takes the same one twice — `next --auto --auto`
@@ -113,7 +115,7 @@ if (AV[cmd] !== undefined) {
 // A refusal is exit 2 with the path: no wait, no automatic reclaim (lib/lock.mjs).
 // (id and claim write only the repository-shared state, under that state's own short
 // lock — lib/shared.mjs — so they are not in this table: run.lock is one checkout's.)
-const MUTATES = { approve: () => true, ratify: () => true, reopen: () => true, pin: () => true, test: () => arg !== '', wait: () => arg !== '', hooks: () => arg !== 'status', uninstall: () => true, amend: () => true, recheck: () => arg !== '' }
+const MUTATES = { approve: () => true, ratify: () => true, reopen: () => true, pin: () => true, test: () => arg !== '', wait: () => arg !== '', hooks: () => arg !== 'status', uninstall: () => true, amend: () => true, recheck: () => arg !== '', source: () => rest.includes('--refresh') }
 
 // Commands that answer ABOUT the runtime or the environment, never about the project's
 // content — the four that stay reachable across a format boundary (a skewed project
@@ -177,7 +179,7 @@ if (badArg !== null) {
   try {
     switch (cmd) {
       case 'validate': ec = cmdValidate(new Project()); break
-      case 'status': ec = cmdStatus(new Project()); break
+      case 'status': ec = cmdStatus(new Project(), rest.includes('--json')); break
       case 'check': ec = cmdCheck(new Project(), arg); break
       case 'next': ec = cmdNext(new Project(), arg === '--auto' || arg === 'auto'); break
       case 'approve': ec = cmdApprove(new Project(), arg, rest.includes('--human')); break

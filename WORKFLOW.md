@@ -96,7 +96,7 @@ Shared rules:
 - **Fresh eyes**: a reviewer doesn't see how it was built — only the target + criteria, going in with "find flaws; default to 'there's a problem'." Reviewers are **subagents with empty context**, run in parallel.
 - **Different roles**: many identical reviewers see only the same weakness — mix different eyes.
 - **find_streak** (how many consecutive no-new-must-fix waves end find), **plan_streak** (how many consecutive clean plan reviews a fix needs before it is applied), and **scale** (reviewer count per wave by reach/risk: `skip`·`light`·`standard`·`full`) all come from `config.yaml` (`verify:` / `review:`) — *not restated here, so they can't drift*. What blocks vs. what is merely recorded is fixed by category (reviewers.md §Categories), not configured.
-- **Classification at every wave boundary**: each wave's finds get their category (and their strikes) as the wave closes — a contested class goes to one cold defender, never a guess. **Stop safety**: a max round count escalates to the human; reaching it is never a pass.
+- **Classification at every wave boundary**: each wave's finds get their category (and their strikes) as the wave closes — a contested class goes to one cold defender, never a guess. **Stop safety**: a find-wave budget, and a fix whose confirmation fails twice in a row, escalate to the human; reaching a cap is never a pass.
 
 **verify — is the *spec* good?** (cold spec lenses: consumer-impersonator · gap-finder · coherence · non-expert · breaker)
 - **Consumer impersonation**: "I'm a node that will use this" — anywhere you'd have to guess is a contract hole.
@@ -117,7 +117,7 @@ Shared rules:
 A Task holds *concept* only — **it does not record what the code looks like** (that's read from the code). It's YAML frontmatter + fixed sections (`Overview · Requirements · Contract · AC · Subtasks · Change Log`); the exact format is fixed in `.grovespec/templates/FORMATS.md` (the parser contract), with a fill-in template at `.grovespec/templates/task.md` — not reprinted here.
 
 - Position (who the parent is) is held by tree.md — a Task doesn't record its parent. **tree.md holds every node**, including the not-yet-detailed `sketch` nodes (greenfield, the whole tree is laid out at init).
-- Source ownership is held by frontmatter `refs`: a canonical list of current numbered headings under `paths.ref`, or explicit `[]`. It is assigned at the tree level and consumed mechanically by spec verify; a caller-written summary cannot silently replace it.
+- Source ownership is held by frontmatter `refs`: a canonical list of current coordinates under `paths.ref` — numbered headings or line ranges — or explicit `[]`. It is assigned at the tree level and consumed mechanically by spec verify; a caller-written summary cannot silently replace it.
 - A skeleton's **decomposition** (its children + each child's contract clause) is sketched at init and **confirmed against the build at implement** (recorded in the Change Log).
 - "Which code changed how" is held by git — **every step and decision turn ends by committing what it wrote** (`FORMATS.md` "Commits"): *implement*/*fix* in **`TASK-N:`-prefixed commits** (the mechanical diff boundary *review* reads), everything else in step-named commits (`grow TASK-3: …` · `plan #N: …` · `init: …` · `approve TASK-3: …`) that stay outside that anchor; "why it changed" by the Change Log.
 - Headers and field names are English; the *content* is written in `config.language`.

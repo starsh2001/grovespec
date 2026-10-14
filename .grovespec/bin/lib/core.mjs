@@ -756,8 +756,8 @@ export const LEGACY_GRADE_FIELDS = ['severity', 'proposed', 'gate1', 'gate2', 'g
 // used to walk test → pin → approve to done; the skills prescribed the conditions but
 // nothing recomputed them. Scope: NEW-FORMAT records only (find_streak present) — a
 // decided legacy record was written under its own cycle's rules and stays readable.
-// `round == max_rounds` passes when everything else holds (the budget is spent exactly);
-// only round PAST the budget is refused — reaching a cap is never itself a pass.
+// The find waves spent against max_rounds passes when everything else holds (the budget is
+// spent exactly); only waves PAST the budget are refused — reaching a cap is never a pass.
 export function completionProblems (text) {
   const has = key => splitLines(text).some(line => new RegExp(`^${key}[ \\t]*:`).test(line))
   if (!has('find_streak') || topValue(text, 'status') !== 'passed') return []
@@ -776,11 +776,35 @@ export function completionProblems (text) {
       out.push(`found[${i + 1}]${id === '' ? '' : ` (${id})`} is still pending classification — an unresolved candidate cannot be part of a pass`)
     }
   })
-  const r = Number(topValue(text, 'round')); const mx = Number(topValue(text, 'max_rounds'))
-  if (Number.isFinite(r) && Number.isFinite(mx) && mx > 0 && r > mx) {
-    out.push(`round ${r} is past max_rounds ${mx} — beyond the budget a cycle escalates, it does not pass`)
+  const w = findWaves(text); const mx = Number(topValue(text, 'max_rounds'))
+  if (Number.isFinite(w) && Number.isFinite(mx) && mx > 0 && w > mx) {
+    out.push(`${w} find waves are past max_rounds ${mx} — beyond the budget a cycle escalates, it does not pass`)
   }
   return out
+}
+
+// The round budget (v0.23.0): max_rounds is spent by FIND waves only. It used to count
+// every spawned pass, and a node with many confirmed defects spent it arithmetically while
+// converging — each item costs a plan review or two and a confirmation — so four measured
+// gates ran past it (one escalated with every item closed) and one budget was hand-raised
+// to 68. `round` still numbers every pass (it names the round files). A record whose
+// rounds carry no phase predates the split; its total is the only count it has.
+export function findWaves (text) {
+  const unq = s => s.replace(/^(['"])(.*)\1$/, '$2').trim()
+  const rounds = listItems(text, 'rounds')
+  if (!rounds.some(it => unq(itemValue(it, 'phase')) !== '')) return Number(topValue(text, 'round'))
+  return rounds.filter(it => unq(itemValue(it, 'phase')) === 'find').length
+}
+
+// A fix that does not converge escalates alone: the current item's last two confirmations
+// both failed. (`fix` is how some records spell a confirmation pass.)
+export function itemStuck (text) {
+  const unq = s => s.replace(/^(['"])(.*)\1$/, '$2').trim()
+  const cur = unq(topValue(text, 'current_item'))
+  if (cur === '') return false
+  const tries = listItems(text, 'rounds').filter(it => unq(itemValue(it, 'item')) === cur &&
+    ['confirm', 'fix'].includes(unq(itemValue(it, 'phase'))))
+  return tries.length >= 2 && tries.slice(-2).every(it => unq(itemValue(it, 'outcome')) === 'fail')
 }
 
 // config value: an INDENTED `key: value` line (first hit anywhere — the flat paths:

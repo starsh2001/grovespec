@@ -3,16 +3,17 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createHash } from 'node:crypto'
-import { cfgValue, sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, strictYamlProblems, MUST_FIX_CATEGORIES, RECORD_CATEGORIES, LEGACY_GRADE_FIELDS, completionProblems, frontmatterBoundaryProblem, readabilityFindings } from './core.mjs'
+import { cfgValue, findWaves, itemStuck, sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, strictYamlProblems, MUST_FIX_CATEGORIES, RECORD_CATEGORIES, LEGACY_GRADE_FIELDS, completionProblems, frontmatterBoundaryProblem, readabilityFindings } from './core.mjs'
 import { Project, treeGateMsg, scriptDir, FORMAT } from './project.mjs'
 import { taskEvidenceDigest, specDigest, treeDigest } from './cmd-pin.mjs'
 import { lastTest } from './cmd-approve.mjs'
 import { git, repoState, ignoredState, ignoredUnder, shallowState, showPrefix, ancestorState, canonicalOidState, dirtyResultSubject, resultSealBreach, log, touched, trackedPaths, allSubjects, allTouchedPaths, gitFailure } from './git.mjs'
-import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDigest, taskRefAssignment, validateCompletedPacket, validateTaskRefsSyntax } from './source-evidence.mjs'
+import { SourceEvidenceError, assertFindRound, parseSourcePacket, skippedIndexRows, sourceScopeDigest, taskRefAssignment, validateCompletedPacket, validateTaskRefsSyntax } from './source-evidence.mjs'
 import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
 import { readWaits, waitState, waitsPath } from './cmd-wait.mjs'
 import { hooksState, HOOK_MARK } from './cmd-hooks.mjs'
-import { readCands, candsPath } from './cmd-recheck.mjs'
+import { readCands, candsPath, recheckState } from './cmd-recheck.mjs'
+import { retroOwed } from './cmd-retro.mjs'
 import { sharedContext, readState, writeState, withSharedLock, STATE_REMEDY } from './shared.mjs'
 
 const say = s => process.stdout.write(s + '\n')
@@ -354,18 +355,21 @@ export function cmdValidate (P) {
     if (topValue(text, 'status') === 'passed' && listItemCount(text, 'open_issues') > 0) {
       prob(`${rf}  status: passed but open_issues is not empty`)
     }
-    // `escalated` has ONE definition — the cycle ran past its round budget and a human
-    // must rule. A record wearing it inside the budget contradicts itself, and the cost
-    // is a false stop: `next` refuses to take the gate and the auto loop ends, while the
-    // real next step (fix the open issues) was available all along. Measured — a review
-    // wrote `escalated` at round 3 of 15 because judge had confirmed defects, which is
-    // the ordinary `reviewed` + `open_issues` → `grovespec-fix` path.
+    // `escalated` has two definitions, both a human's to rule: find spent its max_rounds
+    // waves without closing, or the current item failed its confirmation twice in a row
+    // (v0.23.0). A record wearing it otherwise contradicts itself, and the cost is a false
+    // stop: `next` refuses to take the gate and the auto loop ends, while the real next
+    // step (fix the open issues) was available all along. Measured — a review wrote
+    // `escalated` at round 3 of 15 because judge had confirmed defects, which is the
+    // ordinary `reviewed` + `open_issues` → `grovespec-fix` path.
     if (topValue(text, 'status') === 'escalated') {
-      const r = Number(topValue(text, 'round')); const mx = Number(topValue(text, 'max_rounds'))
-      // `r < mx`, not `<=`: spending the budget exactly (round == max_rounds) is the
-      // legitimate escalation — rounds remaining is what makes the word false.
-      if (Number.isFinite(r) && Number.isFinite(mx) && mx > 0 && r < mx) {
-        prob(`${rf}  status: escalated at round ${r} with max_rounds ${mx} — ${mx - r} round(s) still budgeted, and escalation means the budget ran out. Confirmed defects are '${targetType === 'result' ? 'reviewed' : 'in-progress'}' + open_issues (→ ${targetType === 'result' ? 'grovespec-fix' : 'the fix phase of this cycle'}); raise max_rounds only by naming what the next round would learn`)
+      const w = findWaves(text); const mx = Number(topValue(text, 'max_rounds'))
+      // `w < mx`, not `<=`: spending the budget exactly is the legitimate escalation.
+      if (Number.isFinite(w) && Number.isFinite(mx) && mx > 0 && w < mx && !itemStuck(text)) {
+        const oldCount = Number(topValue(text, 'round')) >= mx
+          ? ` (it escalated under the old count, which spent the budget on fix passes too — set status back to ${targetType === 'result' ? 'in-progress and carry on with the review' : 'in-progress and carry on'})`
+          : ''
+        prob(`${rf}  status: escalated after ${w} find wave(s) of max_rounds ${mx}, and no item failed its confirmation twice in a row — escalation means find spent its budget or one fix does not converge${oldCount}. Confirmed defects are '${targetType === 'result' ? 'reviewed' : 'in-progress'}' + open_issues (→ ${targetType === 'result' ? 'grovespec-fix' : 'the fix phase of this cycle'}); raise max_rounds only by naming what the next find wave would learn`)
       }
     }
     v = topValue(text, 'approved_by')
@@ -790,6 +794,14 @@ export function cmdValidate (P) {
       }
     }
   }
+  // Catalog rows whose Location reads as prose are skipped by every reader, so no Task can
+  // cite them — and nothing said so: one project's whole regulation was indexed that way
+  // ("Part 2 Article 8 (L636~L758)") while validate stayed green (v0.23.0).
+  let skippedRows = null
+  try { skippedRows = skippedIndexRows(P) } catch (e) {
+    if (!(e instanceof SourceEvidenceError)) throw e
+    skippedRows = { broken: e.message }
+  }
 
   for (const t of ids) {
     const tt = P.read(P.taskPath(t))
@@ -949,6 +961,12 @@ export function cmdValidate (P) {
     say(`notice: ${streakNotices.length} running cycle(s) with a lower find_streak than the project's config:`)
     for (const m of streakNotices) say(`  ${m}`)
   }
+  if (skippedRows?.broken) say(`notice: the ref catalog cannot be read — ${skippedRows.broken}; every spec verify that cites a ref refuses until it is repaired`)
+  else if (skippedRows?.skipped.length) {
+    const sk = skippedRows.skipped
+    const shown = sk.slice(0, 3).map(r => `:${r.n} '${r.location}'`).join(', ')
+    say(`notice: ${sk.length} row(s) of ${skippedRows.path.slice(P.root.length + 1)} have a Location that is not a coordinate, so no Task can cite them — write a numbered heading (4, 5.4) or a line range (L636-758) there; the Topic column carries the label: ${shown}${sk.length > 3 ? ` (+${sk.length - 3} more)` : ''}`)
+  }
   if (refNotices.length) {
     say(`notice: ${refNotices.length} sketch/draft node(s) that the next spec verify will refuse as they stand — it reads each one's ref assignment through grovespec source; settle it before that gate (an older install's layout is the usual cause):`)
     for (const m of refNotices) say(`  ${m}`)
@@ -995,42 +1013,97 @@ export function cmdValidate (P) {
 }
 
 // ===================== status =====================
-export function cmdStatus (P) {
+// One model, two renderings: the text below, and `status --json` (v0.23.0) — what a
+// dashboard reads instead of importing this runtime's modules from a bundle pinned at a
+// version path, which every release had to move. Both come from the one per-node
+// classification here, so they cannot disagree.
+function statusModel (P) {
   const gate = P.treeGatePending()
-  if (gate) say(`! ${treeGateMsg(P)}`)
   // The sideways-dependency ledger colors the per-node lines: an asleep node is not
   // runnable and must not read as one. Unreadable ledger = say so and keep going —
   // status informs, validate owns the verdict.
   const ws = waitState(P)
-  for (const m of ws.problems) say(`! ${m}`)
-  let nexts = ''
-  for (const t of P.treeIds()) {
-    const st = P.statusOf(t); const ub = P.unblocked(t); const rl = P.roleOf(t)
-    const fu = P.followupCounts(t)
+  const nodes = P.treeIds().map(t => {
+    const st = P.statusOf(t); const ub = P.unblocked(t)
     const asleep = ws.problems.length ? null : ws.asleepOn(t)
-    if (st === 'done') {
-      if (rl === 'skeleton') say(`${pad(t, 8)} done        (children already sketched → work them; grow only to add beyond the spec${fu.length ? `; followups noted: ${fu.join(' · ')} via revise/verify` : ''})`)
-      else if (fu.length) say(`${pad(t, 8)} done        (followups noted: ${fu.join(' · ')} via revise/verify)`)
-      else say(`${pad(t, 8)} done`)
-    } else if (gate) say(`${pad(t, 8)} ${pad(st, 12)} (awaiting the tree gate)`)
-    else if (ub !== 'yes') say(`${pad(t, 8)} ${pad(st, 12)} (${ub.slice(3)})`)
-    else if (asleep !== null) say(`${pad(t, 8)} ${pad(st, 12)} (waiting on ${asleep.to} — declared ${asleep.declared})`)
-    else if (P.humanWaits(t).some(w => w.kind === 'escalated')) say(`${pad(t, 8)} ${pad(st, 12)} (waiting on you — below)`)
+    const waits = P.humanWaits(t)
+    let state; let next = null
+    if (st === 'done') state = 'done'
+    else if (gate) state = 'awaiting-tree-gate'
+    else if (ub !== 'yes') state = 'blocked'
+    else if (asleep !== null) state = 'asleep'
+    else if (waits.some(w => w.kind === 'escalated')) state = 'waiting-on-human'
     // A sealed clean gate is a step, not a wait (v0.18.0): nothing in it is the
     // person's to decide, so the next driver turn takes it on the record.
-    else if (P.humanWaits(t).length) { say(`${pad(t, 8)} ${pad(st, 12)} → approve (sealed clean gate, nothing to decide — grovespec approve ${t})`); nexts += ` ${t}` }
-    else { say(`${pad(t, 8)} ${pad(st, 12)} → ${P.nextAction(t)}`); nexts += ` ${t}` }
+    else if (waits.length) { state = 'approve'; next = 'approve' } else { state = 'runnable'; next = P.nextAction(t) }
+    return {
+      id: t,
+      name: P.nameOf(t),
+      status: st,
+      role: P.roleOf(t),
+      parent: P.parentOf(t) || null,
+      state,
+      next,
+      blocked: ub === 'yes' ? null : ub.slice(3),
+      asleepOn: asleep === null ? null : { to: asleep.to, declared: asleep.declared, need: asleep.need },
+      escalations: waits.filter(w => w.kind === 'escalated').map(w => w.text),
+      unratified: P.unratified(t),
+      followups: P.followupCounts(t)
+    }
+  })
+  const b = P.backlogCounts()
+  return {
+    gate,
+    ws,
+    nodes,
+    treeEscalated: gate && P.reviewStatus(`${P.reviewDir}/tree.verify.yaml`) === 'escalated',
+    backlog: b,
+    // Every node done — parked work must not be invisible at the terminal line.
+    planDue: !gate && nodes.length > 0 && nodes.every(n => n.status === 'done') && b.total > 0
+  }
+}
+
+export function cmdStatus (P, json = false) {
+  const m = statusModel(P)
+  if (json) {
+    const rc = recheckState(P)
+    const retro = retroOwed(P)
+    say(JSON.stringify({
+      protocol: 'grovespec-status/v1',
+      treeGate: m.gate ? { kind: P.treeGateKind(), awaitingHuman: P.treeAwaitingHuman(), escalated: m.treeEscalated } : null,
+      nodes: m.nodes.map(n => ({ ...n, followups: Object.fromEntries(n.followups.map(f => { const [lane, count] = f.split(' '); return [lane, Number(count)] })) })),
+      next: m.gate ? [] : m.nodes.filter(n => n.next !== null).map(n => n.id),
+      waits: { problems: m.ws.problems, live: m.ws.live.map(e => ({ from: e.from, to: e.to, need: e.need, declared: e.declared })) },
+      recheck: { broken: rc.broken, open: rc.open.map(e => ({ ...e, armed: P.statusOf(e.from) === 'done' })) },
+      retro: { owed: retro.owed, n: retro.n, anchor: retro.anchor, adopted: retro.adopted ?? null, broken: retro.broken },
+      backlog: m.backlog,
+      planDue: m.planDue
+    }, null, 2))
+    return 0
+  }
+  if (m.gate) say(`! ${treeGateMsg(P)}`)
+  for (const msg of m.ws.problems) say(`! ${msg}`)
+  for (const n of m.nodes) {
+    const t = n.id; const fu = n.followups
+    if (n.state === 'done') {
+      if (n.role === 'skeleton') say(`${pad(t, 8)} done        (children already sketched → work them; grow only to add beyond the spec${fu.length ? `; followups noted: ${fu.join(' · ')} via revise/verify` : ''})`)
+      else if (fu.length) say(`${pad(t, 8)} done        (followups noted: ${fu.join(' · ')} via revise/verify)`)
+      else say(`${pad(t, 8)} done`)
+    } else if (n.state === 'awaiting-tree-gate') say(`${pad(t, 8)} ${pad(n.status, 12)} (awaiting the tree gate)`)
+    else if (n.state === 'blocked') say(`${pad(t, 8)} ${pad(n.status, 12)} (${n.blocked})`)
+    else if (n.state === 'asleep') say(`${pad(t, 8)} ${pad(n.status, 12)} (waiting on ${n.asleepOn.to} — declared ${n.asleepOn.declared})`)
+    else if (n.state === 'waiting-on-human') say(`${pad(t, 8)} ${pad(n.status, 12)} (waiting on you — below)`)
+    else if (n.state === 'approve') say(`${pad(t, 8)} ${pad(n.status, 12)} → approve (sealed clean gate, nothing to decide — grovespec approve ${t})`)
+    else say(`${pad(t, 8)} ${pad(n.status, 12)} → ${n.next}`)
   }
   // Rulings parked on the human, split out — so "nothing ready" can never hide an
   // escalation that is actually waiting on the user.
   const waiting = []
-  if (gate && P.reviewStatus(`${P.reviewDir}/tree.verify.yaml`) === 'escalated') {
+  if (m.treeEscalated) {
     const kind = P.treeGateKind() === 'fidelity' ? 'survey fidelity' : 'decomposition'
     waiting.push(`${pad('tree', 8)} ${kind} verify escalated — needs a human ruling (${P.reviewDir}/tree.verify.yaml)`)
   }
-  for (const t of P.treeIds()) {
-    for (const w of P.humanWaits(t)) if (w.kind === 'escalated') waiting.push(`${pad(t, 8)} ${w.text}`)
-  }
+  for (const n of m.nodes) for (const text of n.escalations) waiting.push(`${pad(n.id, 8)} ${text}`)
   if (waiting.length) {
     say('waiting on human:')
     for (const w of waiting) say(`  ${w}`)
@@ -1040,28 +1113,23 @@ export function cmdStatus (P) {
   // of the report. Nor "no human has looked" — a gate whose cycle carried the person's own
   // rulings was still printed that way; what the record knows is only that the person
   // has not ratified it.
-  const unratified = P.treeIds().map(t => [t, P.unratified(t)]).filter(([, l]) => l.length)
+  const unratified = m.nodes.filter(n => n.unratified.length)
   if (unratified.length) {
-    say(`taken by the machine on the cold verdict, not yet ratified by you (${unratified.length}): ${unratified.map(([t, l]) => `${t} ${l.join('·')}`).join(', ')} — grovespec ratify <id>… records your own look`)
+    say(`taken by the machine on the cold verdict, not yet ratified by you (${unratified.length}): ${unratified.map(n => `${n.id} ${n.unratified.join('·')}`).join(', ')} — grovespec ratify <id>… records your own look`)
   }
   // Live waits are open obligations — while one exists the build is not "all done",
   // whatever the per-node statuses say (the frozen node cannot reach done asleep).
-  if (ws.problems.length === 0 && ws.live.length) {
+  if (m.ws.problems.length === 0 && m.ws.live.length) {
     say('live waits (the turn follows the newest declaration):')
-    for (const e of ws.live) {
+    for (const e of m.ws.live) {
       const landed = P.statusOf(e.to) === 'done' ? ' — target is done: resume and resolve' : ''
       say(`  ${e.from} → ${e.to}  declared ${e.declared} — ${e.need}${landed}`)
     }
   }
-  if (gate) { say(`next: grovespec-verify the tree (the ${P.treeGateKind() === 'fidelity' ? 'survey fidelity' : 'decomposition'} gate)`); return 0 }
+  if (m.gate) { say(`next: grovespec-verify the tree (the ${P.treeGateKind() === 'fidelity' ? 'survey fidelity' : 'decomposition'} gate)`); return 0 }
+  const nexts = m.nodes.filter(n => n.next !== null).map(n => ` ${n.id}`).join('')
   if (nexts !== '') say(`next:${nexts}`)
-  else {
-    // Every node done — parked work must not be invisible at the terminal line.
-    const b = P.backlogCounts()
-    if (b.total > 0 && P.treeIds().length > 0 && P.treeIds().every(t => P.statusOf(t) === 'done')) {
-      say(`next: plan — parked work awaits: ${backlogLine(b)} (grovespec-plan)`)
-    }
-  }
+  else if (m.planDue) say(`next: plan — parked work awaits: ${backlogLine(m.backlog)} (grovespec-plan)`)
   return 0
 }
 

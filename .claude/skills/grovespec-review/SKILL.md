@@ -70,8 +70,8 @@ Run the cycle — **find → fix** (`reviewers.md` §The cycle):
 - **fix loop** — `grovespec-fix` closes the list **one item at a time**: plan → cold plan review (`plan_streak` consecutive clean) → apply → ONE cold confirmation scoped to that item's own diff + its use-sites. A failed confirmation returns to that item's plan; an out-of-scope discovery becomes its own item (must-fix) or a record entry — the current item never silently widens, and find never re-opens. **Every item closed → terminal pass** (each item's own confirmation already was the check; there is no batch re-review).
 - **Record-only floor** — when everything left is `improvement` / `harmless-bug`, the gate **passes**: those are recorded, never blocking. §1's evidence duty must be met at both its deadlines — every non-`(gap)` AC item's test was present before find, and by now (the terminal) it **passes** — that duty is the spine's, not a finding this floor weighs.
 - **A node whose own test scaffolding grew this cycle is a smell** — helpers·fixtures added to defend the node's *tests* rather than its behavior are to **cut**, not to review deeper.
-- `round` (find waves + plan reviews + confirmations) exceeds `max_rounds` → `status: escalated`, issues to the human, **not** done. Reaching the budget is never a pass, and the budget is never quietly raised to avoid escalating.
-- **Raising `max_rounds` requires naming what the next round would *learn*.** Can't name it → escalate or close; not one more round.
+- Find waves exceed `max_rounds` → `status: escalated`, issues to the human, **not** done. Reaching the budget is never a pass, and the budget is never quietly raised to avoid escalating. (Plan reviews and confirmations don't spend it — a fix that won't converge escalates per item, `grovespec-fix` §5.)
+- **Raising `max_rounds` requires naming what the next find wave would *learn*.** Can't name it → escalate or close; not one more round.
 
 ## 3. Verdict
 Lane outcomes in this step:
