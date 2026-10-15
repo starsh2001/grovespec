@@ -1,10 +1,15 @@
-// fresh — out-of-band signals: changes to src/tests that did not go through the skills.
+// fresh — out-of-band signals: changes to the project that did not go through the skills.
+// The watched scope is the whole project except what GroveSpec owns and what the agent
+// hosts keep (Project.ownPaths, v0.24.0) — the product is code and the resources beside
+// it. Watching src/tests alone let an art or config change made outside the skills go
+// unrecorded while the result seal already covered it.
 // A REPORT, not a gate: a human may hot-fix deliberately; the answer is grovespec-revise
 // (reconcile spec ↔ code), so validate stays green and this command surfaces the list.
 // Exit 1 when signals exist (CI can watch it); the skills surface it, never block on it.
-import { git, porcelainPaths, repoState, shallowState, log, touched, mergeHashes, TASK_COMMIT, SKILL_COMMIT, gitFailure } from './git.mjs'
+import { git, porcelainPaths, repoState, shallowState, log, mergeHashes, TASK_COMMIT, SKILL_COMMIT, gitFailure } from './git.mjs'
 
 const say = s => process.stdout.write(s + '\n')
+const PLAN_COMMIT = /^plan #[0-9]+: /
 
 // ── grading (v0.15.0) ─────────────────────────────────
 // Not every out-of-band change carries the same interest rate. One that touches a
@@ -15,17 +20,40 @@ const say = s => process.stdout.write(s + '\n')
 // call instead of leaving it to an agent's or a person's judgment at absorption
 // time. The hook (bin/hook-route.mjs) mirrors these two helpers at edit time.
 
-// Owner = the most recent `TASK-N:` cycle commit touching the file (before `at`,
-// when given — grading a commit asks who owned the file when it landed).
-function ownerOf (P, rel, at) {
-  const range = at ? [`${at}~1`] : []
-  const r = git(P.root, ['log', '--format=%s', '--max-count=300', ...range, '--', rel])
+// Every commit HEAD reaches, oldest first, with the files it touched — ONE git call
+// (v0.24.0). fresh asked git once per commit (and once per file for its owner), which
+// was tolerable over src/tests; the watched scope now covers resources too, and on a
+// real project with art commits that cost minutes, each git start nearly a second.
+// null when git log fails.
+function historyFiles (P) {
+  const r = git(P.root, ['log', '--reverse', '--format=%x01%H%x02%s', '--name-only', '-z', '--diff-merges=first-parent', 'HEAD'])
   if (!r.ok) return null
-  for (const s of r.out.split('\n')) {
-    const m = s.match(/^(TASK-\d+): /)
-    if (m) return m[1]
+  const out = []
+  for (const chunk of r.out.split('\x01')) {
+    const cut = chunk.indexOf('\x02')
+    if (cut === -1) continue
+    const rest = chunk.slice(cut + 1)
+    const end = rest.indexOf('\0')
+    out.push({
+      h: chunk.slice(0, cut),
+      s: end === -1 ? rest : rest.slice(0, end),
+      files: end === -1 ? [] : rest.slice(end + 1).replace(/^\n/, '').split('\0').filter(Boolean)
+    })
   }
-  return null
+  return out
+}
+
+// Owner = the most recent `TASK-N:` cycle commit touching the file — now, or (for a
+// graded commit) just before that commit landed. `wanted` names the commits whose
+// before-owners are needed.
+function ownerIndex (hist, wanted) {
+  const now = new Map(); const at = new Map()
+  for (const c of hist) {
+    if (wanted.has(c.h)) at.set(c.h, new Map(c.files.map(f => [f, now.get(f) ?? null])))
+    const m = c.s.match(/^(TASK-\d+): /)
+    if (m) for (const f of c.files) now.set(f, m[1])
+  }
+  return { now, at }
 }
 
 // Backticked identifier-shaped names from the Task's Contract section — the
@@ -79,8 +107,9 @@ export function freshSignals (P) {
   if (sh === 'shallow') return { dirty: [], offband: [], adoption: null, repo: true, nested: false, areas: [], broken: 'shallow clone — classification over cut history would under-report; unshallow it (git fetch --unshallow)' }
 
   if (P.pathProblems.length) return { dirty: [], offband: [], adoption: null, repo: true, nested: false, areas: [], broken: 'config paths are unresolvable (run grovespec validate)' }
-  const rel = p => p.startsWith(`${P.root}/`) ? p.slice(P.root.length + 1) : null
-  const areas = [rel(P.srcDir), rel(P.testsDir)].filter(x => x !== null)
+  const own = P.ownPaths()
+  const outsideOwn = g => g !== '' && !own.some(o => g === o || g.startsWith(`${o}/`))
+  const areas = ['the project outside GroveSpec\'s own files']
 
   // git reports paths relative to the REPO root; a project nested deeper (a monorepo
   // subdir, a fixture inside a bigger repo) sees its own files behind that prefix.
@@ -88,11 +117,7 @@ export function freshSignals (P) {
   if (!pr.ok) return { dirty: [], offband: [], adoption: null, repo: true, areas, nested: false, broken: 'git rev-parse --show-prefix failed' }
   const pfx = pr.out.trim()                              // '' exactly at the toplevel
   const nested = pfx !== ''
-  const inAreas = f => {
-    if (!f.startsWith(pfx)) return false
-    const g = f.slice(pfx.length)
-    return areas.some(a => g === a || g.startsWith(`${a}/`))
-  }
+  const inAreas = f => f.startsWith(pfx) && outsideOwn(f.slice(pfx.length))
 
   // -uall: an untracked directory folds to one `?? dir/` line by default, and the
   // fold hid nested untracked files from the area filter (same hole dirtyUnder had).
@@ -104,7 +129,7 @@ export function freshSignals (P) {
   // ordinary life (none of its commits TASK-prefixed) would all read as this project's
   // signals — and a project checked into a bigger repo would see its `next` change as
   // that repo's history grows. Nested projects keep the uncommitted signals above.
-  if (nested) return { dirty, offband: [], adoption: null, repo: true, areas, nested, broken: null }
+  if (nested) return { dirty, offband: [], adoption: null, repo: true, areas, nested, outsideOwn, broken: null }
 
   // The adoption anchor — where history stops being baseline and starts owing TASK-
   // attribution. Primary: the commit that first brings `.grovespec` in (survives squash
@@ -122,49 +147,66 @@ export function freshSignals (P) {
   if (adoption !== null) {
     const r = git(P.root, ['rev-list', `${adoption}..HEAD`])
     if (!r.ok) return { dirty, offband: [], adoption, repo: true, areas, nested, broken: 'git rev-list failed' }
-    const after = new Set(r.out.split('\n').filter(Boolean))
+    let after = new Set(r.out.split('\n').filter(Boolean))
+    // A planning pass reconciles what came before it (v0.24.0): plan collects `fresh` and
+    // disposes of every signal — absorbed through a reopen, or dropped — and its own
+    // `plan #N:` commit is the record that it did. Counted from adoption, a reconciled
+    // commit stayed a signal for good, and an all-done tree routed to plan again after
+    // every plan. So the newest plan after adoption is where counting starts; uncommitted
+    // changes are signals whatever the anchor.
+    const plan = all.find(c => after.has(c.h) && PLAN_COMMIT.test(c.s)) ?? null
+    if (plan !== null) {
+      const pr2 = git(P.root, ['rev-list', `${plan.h}..HEAD`])
+      if (!pr2.ok) return { dirty, offband: [], adoption, repo: true, areas, nested, broken: 'git rev-list failed' }
+      after = new Set(pr2.out.split('\n').filter(Boolean))
+    }
+    const anchor = plan !== null ? `${plan.s.match(/^plan #[0-9]+/)[0]} ${plan.h.slice(0, 7)}` : `adoption ${adoption.slice(0, 7)}`
     // Merge commits are not classified: their content arrived via the branch's own
     // commits, which this very loop already answers for — counting the merge again
     // reported TASK-attributed work as out-of-band. (A conflict resolution's own
     // hand-content is invisible here — a stated limit, same as the nested case.)
     const merges = mergeHashes(P.root)
     if (merges === null) return { dirty, offband: [], adoption, repo: true, areas, nested, broken: 'git rev-list --merges failed' }
+    const hist = historyFiles(P)
+    if (hist === null) return { dirty, offband: [], adoption, repo: true, areas, nested, broken: 'git log --name-only failed (git >= 2.31 required)' }
+    const filesOf = new Map(hist.map(c => [c.h, c.files]))
     // Attribution is by the documented commit grammar, both shapes: the `TASK-N:`
     // cycle anchor AND the skills' step/gate/decision shapes (SKILL_COMMIT) — a
     // `review TASK-N:` commit is the skills' own writing, not a hand edit.
     for (const c of all) {
       if (!after.has(c.h) || merges.has(c.h) || TASK_COMMIT.test(c.s) || SKILL_COMMIT.test(c.s)) continue
-      const tf = touched(P.root, c.h)
-      if (tf === null) return { dirty, offband: [], adoption, repo: true, areas, nested, broken: `git show failed at ${c.h.slice(0, 7)} (git >= 2.31 required)` }
-      if (tf.some(inAreas)) offband.push(c)
+      if ((filesOf.get(c.h) ?? []).some(inAreas)) offband.push({ ...c, files: filesOf.get(c.h) })
     }
+    return { dirty, offband, adoption, anchor, planned: plan !== null, repo: true, areas, nested, outsideOwn, hist, broken: null }
   }
-  return { dirty, offband, adoption, repo: true, areas, nested, broken: null }
+  return { dirty, offband, adoption, anchor: null, planned: false, repo: true, areas, nested, outsideOwn, hist: [], broken: null }
 }
 
 export function cmdFresh (P) {
   const sig = freshSignals(P)
   if (sig.broken !== null) { say(`fresh: cannot classify history — ${sig.broken}; nothing was reported (a git failure is not a clean pass)`); return 2 }
   if (!sig.repo) { say('not a git repository — fresh compares history against the skills\' commits'); return 2 }
-  const { dirty, offband, adoption, areas, nested } = sig
+  const { dirty, offband, adoption, anchor, planned, nested, outsideOwn, hist } = sig
 
   if (dirty.length === 0 && offband.length === 0) {
-    if (nested) say(`fresh: clean under ${areas.join(' · ')} — uncommitted only (nested in a larger repository; committed history is not classified here)`)
-    else say(`fresh: clean — every change under ${areas.join(' · ')} went through the skills' commits${adoption === null ? ' (no adoption anchor yet — no committed .grovespec, no TASK- commit)' : ''}`)
+    if (nested) say('fresh: clean — uncommitted only (nested in a larger repository; committed history is not classified here)')
+    else say(`fresh: clean — every change to the project${planned ? ` since ${anchor} (the plan reconciled what came before)` : ''} went through the skills' commits (GroveSpec's own files and the agent hosts' aside)${adoption === null ? ' (no adoption anchor yet — no committed .grovespec, no TASK- commit)' : ''}`)
     return 0
   }
-  say('fresh: out-of-band signals — changes to src/tests that did not go through the skills')
-  const inArea = p => areas.some(a => p === a || p.startsWith(`${a}/`))
+  say('fresh: out-of-band signals — changes to the project that did not go through the skills')
+  const inArea = outsideOwn
+  const idx = nested ? null : ownerIndex(hist ?? [], new Set(offband.map(c => c.h)))
   if (dirty.length) {
-    say(`uncommitted under ${areas.join(' · ')}:`)
+    say('uncommitted:')
     for (const l of dirty) {
       say(`  ${l}`)
       if (nested) continue // paths carry the outer repo's prefix — owners aren't ours to name
       const owners = new Map()
       for (const p of porcelainPaths(l).filter(inArea)) {
-        const o = ownerOf(P, p)
+        // An untracked file has no history to own it — nothing to grade.
+        const o = l.startsWith('??') ? null : (idx?.now.get(p) ?? null)
         if (owners.has(o)) continue
-        if (l.startsWith('??')) owners.set(o, P.read(`${P.root}/${p}`)) // a new file's whole text is its change
+        if (o === null) owners.set(o, '')
         // --unified=0: grade the CHANGED lines only — default context lines made a
         // neighbouring contract name read as touched (measured on the first smoke).
         else { const d = git(P.root, ['diff', '--unified=0', 'HEAD', '--', p]); owners.set(o, changedOnly(d.ok ? d.out : null)) }
@@ -173,14 +215,14 @@ export function cmdFresh (P) {
     }
   }
   if (offband.length) {
-    say(`commits outside the skills touching ${areas.join(' · ')} (since adoption ${adoption.slice(0, 7)}):`)
+    say(`commits outside the skills (since ${anchor}${planned ? ', which reconciled what came before' : ''}):`)
     for (const c of offband) {
       say(`  ${c.h.slice(0, 7)} ${c.s}`)
-      const tf = touched(P.root, c.h) ?? []
+      const tf = c.files
       const show = git(P.root, ['show', c.h, '--format=', '--unified=0'])
       const patch = changedOnly(show.ok ? show.out : null)
       const owners = new Map()
-      for (const p of tf.filter(inArea)) { const o = ownerOf(P, p, c.h); if (!owners.has(o)) owners.set(o, patch) }
+      for (const p of tf.filter(inArea)) { const o = idx?.at.get(c.h)?.get(p) ?? null; if (!owners.has(o)) owners.set(o, patch) }
       for (const g of gradeLines(P, owners)) say(g)
     }
   }

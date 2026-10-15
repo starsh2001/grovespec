@@ -4,6 +4,7 @@
 import { existsSync, statSync, readFileSync, readdirSync, writeFileSync, renameSync, chmodSync, rmSync } from 'node:fs'
 import { dirname, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { specDigest } from './source-evidence.mjs'
 import {
   fmValue, treeRows, blockedIds, schValue, cfgValue, topValue, listItemCount,
   listItems, itemValue, splitLines, duplicateFrontmatterKeys, duplicateTopKeys,
@@ -148,6 +149,8 @@ export class Project {
     this.reviewDir = cfg('review', '.grovespec/review/')
     this.findingsPath = cfg('findings', 'docs/findings.md')
     this.restructuringPath = cfg('restructuring', 'docs/restructuring.md')
+    // Interjected work set aside for the next milestone (v0.24.0) — the third backlog.
+    this.requestsPath = cfg('requests', 'docs/requests.md')
     // Read for its RULES, not its contents: nothing here opens ref/, but plan and grow
     // write the frozen intent records there. A path this runtime never validated could
     // send them outside the project entirely (`ref: ../outside-ref/`) — every
@@ -163,7 +166,7 @@ export class Project {
     const inside = (a, b) => a === b || a.startsWith(`${b}/`)
     for (const [key, p] of [['tasks', this.tasksDir], ['tree', this.treePath], ['brief', this.briefPath],
       ['conventions', this.convPath], ['src', this.srcDir], ['tests', this.testsDir],
-      ['findings', this.findingsPath], ['restructuring', this.restructuringPath], ['ref', this.refDir]]) {
+      ['findings', this.findingsPath], ['restructuring', this.restructuringPath], ['requests', this.requestsPath], ['ref', this.refDir]]) {
       const r = asRel(this.reviewDir); const o = asRel(p)
       if (inside(o, r) || inside(r, o)) {
         this.pathProblems.push(`paths.review: '${r}' overlaps paths.${key}: '${o}' — everything under the review dir is held out of the cycle diff, so an overlap would hide ${key === 'src' || key === 'tests' ? 'real code' : `the ${key} artifact`} from the cold reviewers under a "gate record" count; give the review dir a region of its own`)
@@ -364,13 +367,15 @@ export class Project {
           // The fixed-handling class a planning pass groups by; legacy records carry
           // severity instead, shown as-is until the node next reopens.
           category: itemValue(it, 'category'),
-          severity: itemValue(it, 'severity')
+          severity: itemValue(it, 'severity'),
+          what: itemValue(it, 'what'),
+          text: it
         })
       }
     }
     return out
   }
-  // Unchecked `- [ ]` items in a brownfield backlog file (findings.md / restructuring.md).
+  // Unchecked `- [ ]` items in a backlog file (findings.md · restructuring.md · requests.md).
   backlogItemCount (p) {
     const t = this.read(p)
     if (t === null) return 0
@@ -381,7 +386,21 @@ export class Project {
     const followups = this.allFollowups().length
     const findings = this.backlogItemCount(this.findingsPath)
     const restructuring = this.backlogItemCount(this.restructuringPath)
-    return { followups, findings, restructuring, total: followups + findings + restructuring }
+    const requests = this.backlogItemCount(this.requestsPath)
+    return { followups, findings, restructuring, requests, total: followups + findings + restructuring + requests }
+  }
+
+  // What GroveSpec itself owns or a host keeps for itself, relative to the root: the
+  // runtime and its records, the ledger documents, the agent hosts' directories and
+  // instruction files, and the repository's own git settings. Everything else in the project is the product — code and the
+  // resources beside it — and `fresh` and the routing hook watch all of it (v0.24.0;
+  // they watched src/tests only, so an art or config change made outside the skills
+  // went unrecorded while the result seal already covered it).
+  ownPaths () {
+    const rel = p => p.slice(this.root.length + 1)
+    return ['.grovespec', rel(this.tasksDir), rel(this.treePath), rel(this.briefPath), rel(this.convPath),
+      rel(this.refDir), rel(this.findingsPath), rel(this.restructuringPath), rel(this.requestsPath),
+      rel(this.reviewDir), ...HOST_PATHS]
   }
 
   forget () { this.#cache.clear() }        // after a write, re-read from disk
@@ -463,10 +482,18 @@ export class Project {
     }
     return 'yes'
   }
+  // A draft reopened to change what it does, whose Overview→AC has not moved since the
+  // reopen: it still says the old thing, so grow writes the change before verify reads it.
+  needsGrow (tid) {
+    if (this.statusOf(tid) !== 'draft') return false
+    const marked = topValue(this.read(this.verifyYamlPath(tid)) ?? '', 'reopened_spec_digest')
+    const task = this.read(this.taskPath(tid))
+    return marked !== '' && task !== null && specDigest(task) === marked
+  }
   nextAction (tid) {
     switch (this.statusOf(tid)) {
       case 'sketch': return 'grow (detail → draft)'
-      case 'draft': return 'verify'
+      case 'draft': return this.needsGrow(tid) ? 'grow (rewrite the reopened spec → verify)' : 'verify'
       case 'approved': return 'implement'
       case 'implemented': return 'review'
       case 'reviewed': return 'fix (if issues) else review → seal → done'
@@ -478,6 +505,8 @@ export class Project {
     }
   }
 }
+
+export const HOST_PATHS = ['.git', '.gitignore', '.gitattributes', '.claude', '.codex', '.agents', '.vscode', '.idea', 'CLAUDE.md', 'AGENTS.md']
 
 export const GATE_MSG = 'decomposition gate pending — sketch nodes exist but the tree has not passed its cold verify. Run grovespec-verify on the TREE first (fix → human approval); node work (grow/verify/implement) starts after that.'
 export const SURVEY_MSG = 'survey fidelity gate pending — this tree was mapped from existing code but never cold-verified against it. Run grovespec-verify on the TREE first (accuracy check → human approval); node work (revise/grow) starts after that.'

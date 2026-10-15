@@ -87,7 +87,7 @@ const rest = process.argv.slice(3)
 
 // The one spelling of the command surface (tests/doccheck.sh pins it against the
 // dispatch table, the header comment and README — edit them together).
-const USAGE = 'grovespec — validate | status [--json] | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups | source TASK-N [file.md@4…|--check|--refresh] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|release <TASK-N|tree>] | lang | locale | interview [claude|codex] | hooks install|remove|status | uninstall [--purge] | amend TASK-N | recheck [declare|close|open …] | retro | impact TASK-N | tree | version\n'
+const USAGE = 'grovespec — validate | status [--json] | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups [TASK-N] | source TASK-N [file.md@4…|--check|--refresh] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|end|release <TASK-N|tree>] | lang | locale | interview [claude|codex] | hooks install|remove|status | uninstall [--purge] | amend TASK-N [--simple <verdict>] | recheck [declare|close|open …] | retro | impact TASK-N | tree | version\n'
 
 // The argv gate: an unknown flag or a surplus argument is a typo'd INTENTION and exits 2 —
 // `approve TASK-1 --humman` used to be silently accepted and recorded a MACHINE decision
@@ -96,8 +96,8 @@ const USAGE = 'grovespec — validate | status [--json] | check [TASK-N] | next 
 const AV = {
   validate: [0], status: [0, ['--json']], check: [1], next: [0, ['--auto', 'auto']],
   approve: [1, ['--human']], reopen: [2], ratify: [Infinity], wait: [Infinity], diff: [1], files: [1],
-  test: [1], fresh: [0], followups: [0], source: [Infinity, ['--check', '--refresh']], pin: [1], id: [0], claim: [2], lang: [0], locale: [0],
-  interview: [1], hooks: [1], uninstall: [0, ['--purge']], retro: [0], amend: [1], recheck: [Infinity], impact: [1], tree: [0], version: [0]
+  test: [1], fresh: [0], followups: [1], source: [Infinity, ['--check', '--refresh']], pin: [1], id: [0], claim: [2], lang: [0], locale: [0],
+  interview: [1], hooks: [1], uninstall: [0, ['--purge']], retro: [0], amend: [Infinity, ['--simple']], recheck: [Infinity], impact: [1], tree: [0], version: [0]
 }
 // No command takes two flags, and none takes the same one twice — `next --auto --auto`
 // and `next --auto auto` (aliases of one flag) are both a surplus token, not emphasis.
@@ -190,7 +190,7 @@ if (badArg !== null) {
       case 'files': ec = cmdFiles(new Project(), arg); break
       case 'test': ec = cmdTest(new Project(), arg); break
       case 'fresh': ec = cmdFresh(new Project()); break
-      case 'followups': ec = cmdFollowups(new Project()); break
+      case 'followups': ec = cmdFollowups(new Project(), arg); break
       case 'source': ec = cmdSource(new Project(), rest); break
       case 'pin': ec = cmdPin(new Project(), arg); break
       case 'lang': ec = cmdLang(new Project()); break
@@ -203,7 +203,7 @@ if (badArg !== null) {
         break
       }
       case 'retro': ec = cmdRetro(new Project()); break
-      case 'amend': ec = cmdAmend(new Project(), arg); break
+      case 'amend': ec = cmdAmend(new Project(), arg, rest.includes('--simple') ? rest.slice(1).filter(a => a !== '--simple').join(' ') : (rest.length > 1 ? '' : null)); break
       case 'recheck': ec = cmdRecheck(new Project(), rest); break
       case 'id': ec = cmdId(new Project()); break
       case 'claim': ec = cmdClaim(new Project(), rest); break

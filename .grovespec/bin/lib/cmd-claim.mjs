@@ -25,6 +25,18 @@
 // (`grovespec claim tree <step>`): two of them at once edit the same ledger files from
 // two branches. It follows the live-claim rules; plan · recheck · retro release it as
 // their last act, and `approve tree --human` releases it when the tree gate is decided.
+//
+// The step mark (v0.24.0) is a different fact: which step is running in THIS checkout
+// right now. A claim spans a node's steps, so it cannot tell a step mid-way from the gap
+// between two — and that gap is where interjected work (a request outside any GroveSpec
+// step, while the milestone is open) may land without polluting a step's working tree or
+// its seal. A step's claim writes the mark; its close ends it (`claim end` after the
+// step's commit, or the approve / amend / release that closes it); the next step's claim
+// overwrites one a stopped session left. One file per worktree and project, beside the
+// shared state but outside it, so no other worktree's runtime reads a new field.
+import { createHash } from 'node:crypto'
+import { mkdirSync, readFileSync, unlinkSync } from 'node:fs'
+import { writeAtomic } from './project.mjs'
 import {
   sharedContext, readState, writeState, withSharedLock, liveWorktrees, currentBranch, samePath,
   headCommit, commitState, isAncestor, refContains, STATE_REMEDY
@@ -127,11 +139,37 @@ export function claimState (P) {
 
 const USAGE = 'usage: grovespec claim [list]                 — who holds which node (and the tree) of this project\n' +
   '       grovespec claim <TASK-N|tree> [step]   — this worktree takes (or keeps) it; every node step, and every tree-wide step, runs it first\n' +
+  '       grovespec claim end                    — the step running in this checkout has ended (its commit is made)\n' +
   '       grovespec claim release <TASK-N|tree>  — end a claim or a done mark: this worktree\'s own, or one a stopped worktree left\n'
+
+const fold = s => (process.platform === 'win32' || process.platform === 'darwin') ? s.toLowerCase() : s
+const markPath = ctx => `${ctx.dir}/step-${createHash('sha256').update(`${fold(ctx.worktree)}\0${ctx.project}`).digest('hex').slice(0, 16)}.json`
+
+// The step running in this checkout: { node, step, since }, or null (none, or no repo).
+export function stepMark (root) {
+  const ctx = sharedContext(root)
+  if (ctx.state !== 'repo') return null
+  try {
+    const m = JSON.parse(readFileSync(markPath(ctx), 'utf8'))
+    return typeof m?.node === 'string' && typeof m?.step === 'string' && typeof m?.since === 'string' ? m : null
+  } catch { return null }
+}
+// Ends the mark (only the given node's, when one is named); returns what it ended.
+export function endStepMark (root, node = null) {
+  const m = stepMark(root)
+  if (m === null || (node !== null && m.node !== node)) return null
+  try { unlinkSync(markPath(sharedContext(root))) } catch { return null }
+  return m
+}
 
 export function cmdClaim (P, args) {
   const [a = '', b = ''] = args
   if ((a === '' || a === 'list') && b === '') return listClaims(P)
+  if (a === 'end' && b === '') {
+    const m = endStepMark(P.root)
+    say(m === null ? 'no step is running in this checkout — nothing to end' : `step ended: ${m.node} ${m.step} (since ${m.since}) — interjected work may land now`)
+    return 0
+  }
   if (a === 'release' && (ID.test(b) || b === 'tree')) return releaseClaim(P, b)
   if ((ID.test(a) || a === 'tree') && (b === '' || STEP.test(b))) return takeClaim(P, a, b)
   say(USAGE.trimEnd())
@@ -188,6 +226,10 @@ function takeClaim (P, t, step) {
   if (r.refused) { say(r.refused); return 2 }
   const v = r.value
   if (v.broken) { say(`cannot claim ${t} — ${v.broken}`); return 2 }
+  if ((v.kept || v.taken) && step !== '') {
+    mkdirSync(ctx.dir, { recursive: true })
+    writeAtomic(markPath(ctx), JSON.stringify({ node: t, step, since }) + '\n')
+  }
   if (v.heldBy) {
     say(`${t} is held by another worktree: ${holderText(v.heldBy)}`)
     say(`a session there is working ${t === 'tree' ? 'a tree-wide step' : 'this node'} — leave it to that worktree${t === 'tree' ? '' : ' (grovespec next here picks other work)'}. Releasing it is the person's call, once that worktree has stopped working it: grovespec claim release ${t}`)
@@ -239,6 +281,7 @@ function releaseClaim (P, t) {
   if (r.refused) { say(r.refused); return 2 }
   const v = r.value
   if (v.broken) { say(`cannot release ${t} — ${v.broken}`); return 2 }
+  endStepMark(P.root, t)
   if (v.none) { say(`${t}: no claim is held — nothing to release`); return 0 }
   if (v.c.done !== undefined) {
     say(`released: ${t}'s done mark (${doneText(v.c)}) — a worktree that has not merged that commit may start the node again`)

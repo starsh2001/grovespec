@@ -14,6 +14,7 @@ import { readWaits, waitState, waitsPath } from './cmd-wait.mjs'
 import { hooksState, HOOK_MARK } from './cmd-hooks.mjs'
 import { readCands, candsPath, recheckState } from './cmd-recheck.mjs'
 import { retroOwed } from './cmd-retro.mjs'
+import { stepMark } from './cmd-claim.mjs'
 import { sharedContext, readState, writeState, withSharedLock, STATE_REMEDY } from './shared.mjs'
 
 const say = s => process.stdout.write(s + '\n')
@@ -1055,6 +1056,9 @@ function statusModel (P) {
   return {
     gate,
     ws,
+    // The step running in this checkout (the step mark — cmd-claim): interjected work waits
+    // for it, and only between steps may it land (FORMATS.md "Interjected work").
+    step: stepMark(P.root),
     nodes,
     treeEscalated: gate && P.reviewStatus(`${P.reviewDir}/tree.verify.yaml`) === 'escalated',
     backlog: b,
@@ -1071,6 +1075,7 @@ export function cmdStatus (P, json = false) {
     say(JSON.stringify({
       protocol: 'grovespec-status/v1',
       treeGate: m.gate ? { kind: P.treeGateKind(), awaitingHuman: P.treeAwaitingHuman(), escalated: m.treeEscalated } : null,
+      step: m.step,
       nodes: m.nodes.map(n => ({ ...n, followups: Object.fromEntries(n.followups.map(f => { const [lane, count] = f.split(' '); return [lane, Number(count)] })) })),
       next: m.gate ? [] : m.nodes.filter(n => n.next !== null).map(n => n.id),
       waits: { problems: m.ws.problems, live: m.ws.live.map(e => ({ from: e.from, to: e.to, need: e.need, declared: e.declared })) },
@@ -1083,6 +1088,7 @@ export function cmdStatus (P, json = false) {
   }
   if (m.gate) say(`! ${treeGateMsg(P)}`)
   for (const msg of m.ws.problems) say(`! ${msg}`)
+  if (m.step !== null) say(`step running in this checkout: ${m.step.node} ${m.step.step} (since ${m.step.since}) — interjected work waits for it`)
   for (const n of m.nodes) {
     const t = n.id; const fu = n.followups
     if (n.state === 'done') {
@@ -1139,6 +1145,7 @@ function backlogLine (b) {
   if (b.followups) parts.push(`followups ${b.followups}`)
   if (b.findings) parts.push(`findings ${b.findings}`)
   if (b.restructuring) parts.push(`restructuring ${b.restructuring}`)
+  if (b.requests) parts.push(`requests ${b.requests}`)
   return parts.join(' · ')
 }
 
@@ -1158,12 +1165,24 @@ const FOLLOWUP_GROUPS = [
   ['legacy', 'pre-0.13 grades — reclassify by category when the node next reopens']
 ]
 
-export function cmdFollowups (P) {
+export function cmdFollowups (P, n = '') {
   // The SAME unquoting `validate` applies (both quote forms) — one spelling of a value
   // cannot mean two things to two readers of the same bytes (measured: a single-quoted
   // field landed a fully valid item in the wrong group here).
   const unq = s => s.replace(/^(['"])(.*)\1$/, '$2').trim()
   const all = P.allFollowups()
+  // One node's notes (v0.24.0): its own record list, and every other gate's item that names
+  // it — read when that node is grown or implemented, which is when such a note can still
+  // change what gets built. Before this, a note naming another node waited for a plan.
+  if (n !== '') {
+    if (!/^TASK-[0-9]+$/.test(n)) { say('usage: grovespec followups [TASK-N]'); return 2 }
+    const names = new RegExp(`\\b${n}\\b`)
+    const mine = all.filter(f => f.tid === n || names.test(f.text))
+    if (!mine.length) { say(`no followups name ${n}`); return 0 }
+    say(`followups for ${n} (${mine.length}) — its own record list, and notes other gates left naming it:`)
+    for (const f of mine) say(`  ${pad(f.tid, 8)} ${pad(f.lane, 7)} [${unq(f.category) || unq(f.severity) || '(unclassified)'}] ${unq(f.family)}${unq(f.what) ? ` — ${unq(f.what)}` : ''}`)
+    return 0
+  }
   const groupOf = f => {
     const cat = unq(f.category)
     if (MUST_FIX_CATEGORIES.includes(cat)) return 'routed'
@@ -1181,6 +1200,7 @@ export function cmdFollowups (P) {
   const b = P.backlogCounts()
   if (b.findings) say(`findings backlog: ${b.findings} unchecked (${P.findingsPath})`)
   if (b.restructuring) say(`restructuring backlog: ${b.restructuring} unchecked (${P.restructuringPath})`)
+  if (b.requests) say(`requests backlog: ${b.requests} unchecked — set aside for the next milestone (${P.requestsPath})`)
   if (b.total === 0) { say('no parked work — every followups list is empty, no backlog items'); return 0 }
   say(`total: ${backlogLine(b)} — grovespec-plan structures these into the next milestone; nothing here is worked without your pick`)
   return 0

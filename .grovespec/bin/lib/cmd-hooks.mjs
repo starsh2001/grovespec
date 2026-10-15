@@ -75,7 +75,7 @@ function setConfigHooks (P, value) {
     text = text.replace(/^hooks[ \t]*:.*$/m, `hooks: ${value}`)
   } else {
     if (!text.endsWith('\n')) text += '\n'
-    text += `\n# Edit-routing hook — advisory context on src/tests edits (grovespec hooks install|remove|status).\n# 'off' silences an installed hook without touching ${FILES}. on | off.\nhooks: ${value}\n`
+    text += `\n# Edit-routing hook — advisory context on edits to the product (grovespec hooks install|remove|status).\n# 'off' silences an installed hook without touching ${FILES}. on | off.\nhooks: ${value}\n`
   }
   writeAtomic(P.configPath, text)
   return null

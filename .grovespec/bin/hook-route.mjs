@@ -3,9 +3,13 @@
 //
 // Registered by `grovespec hooks install` as a PostToolUse hook — Claude Code's
 // Edit|Write and Codex's apply_patch (v0.20.0; one patch may touch several files,
-// each routed on its own). On an edit under paths.src/paths.tests it computes what an agent
-// would otherwise have to judge — which node owns this file, and whether the edit
-// text touches that node's Contract surface — and injects the answer as context.
+// each routed on its own). On an edit to the product — the project outside GroveSpec's own
+// files and the agent hosts' (Project.ownPaths; src/tests alone until v0.24.0) — it
+// computes what an agent would otherwise have to judge — which node owns this file, and
+// whether the edit text touches that node's Contract surface — and injects the answer.
+// And when no GroveSpec step is running in this checkout (the step mark — cmd-claim) while
+// the milestone is open, the edit is interjected work, and it says so once: ask the
+// person now or next milestone (FORMATS.md "Interjected work").
 // The agent RATIFIES a routing decision; it never has to derive one (the same
 // mechanization line as v0.14.1 markers and v0.14.2 reading rules: a judgment an
 // agent can fumble moves into the runtime).
@@ -119,19 +123,24 @@ async function main () {
   const core = await import(new URL('./lib/core.mjs', import.meta.url).href)
   const pathValue = (key, dflt) => canon(unq(core.cfgValue(cfg, 'paths', key))) || canon(dflt)
   if (core.topValue(cfg, 'hooks') === 'off') return
+  const { HOST_PATHS } = await import(new URL('./lib/project.mjs', import.meta.url).href)
 
   const rootAbs = resolve(root)
-  const src = pathValue('src', 'src')
-  const tests = pathValue('tests', 'tests')
   const tasksDir = pathValue('tasks', 'docs/tasks')
+  const requests = pathValue('requests', 'docs/requests.md')
+  const own = ['.grovespec', tasksDir, pathValue('tree', 'docs/tree.md'), pathValue('brief', 'docs/brief.md'),
+    pathValue('conventions', 'docs/conventions.md'), pathValue('ref', 'docs/ref'), pathValue('findings', 'docs/findings.md'),
+    pathValue('restructuring', 'docs/restructuring.md'), requests, pathValue('review', '.grovespec/review'), ...HOST_PATHS]
   const ko = core.topValue(cfg, 'language') === 'ko'
   const advice = []
+  let product = false
   for (const t of targets) {
     // apply_patch paths are relative to the session's cwd; Claude's are absolute.
     const abs = resolve(ev.cwd ?? process.cwd(), t.file)
     if (!abs.startsWith(rootAbs + sep)) continue
     const rel = abs.slice(rootAbs.length + 1).split(sep).join('/')
-    if (![src, tests].some(a => rel === a || rel.startsWith(`${a}/`))) continue
+    if (own.some(a => rel === a || rel.startsWith(`${a}/`))) continue
+    product = true
 
     // Owner = the most recent `TASK-N:` cycle commit that touched this file. A file
     // in several nodes' footprints routes to its latest owner — the heuristic is
@@ -179,9 +188,33 @@ async function main () {
           : `GroveSpec: this file belongs to done node ${who}, and this edit touches its Contract surface (\`${hit}\`). If the contract changes, open it with grovespec-revise — before a consumer reads it. If not, proceed.`)
     advice.push({ rel, msg })
   }
+  // Interjected work: a product edit while the milestone is open and no step is running
+  // here. Said once per event, before any per-file line.
+  if (product) {
+    const { stepMark } = await import(new URL('./lib/cmd-claim.mjs', import.meta.url).href)
+    let open = null
+    if (stepMark(root) === null) {
+      let tree = ''
+      try { tree = readFileSync(`${root}/${pathValue('tree', 'docs/tree.md')}`, 'utf8') } catch { tree = '' }
+      for (const r of core.treeRows(tree)) {
+        let text = ''
+        try { text = readFileSync(`${root}/${tasksDir}/${r.tid}.md`, 'utf8') } catch { continue }
+        const st = core.fmValue(text, 'status')
+        if (st !== 'done') { open = `${r.tid} ${st}`; break }
+      }
+    }
+    if (open !== null) {
+      advice.unshift({
+        rel: '',
+        msg: ko
+          ? `GroveSpec: 이 체크아웃에서 돌고 있는 GroveSpec 단계가 없고 마일스톤이 진행 중입니다(${open}). 단계 밖의 이 편집은 끼어든 작업입니다 — 사람에게 '지금'인지 '다음 마일스톤'인지 물으세요. 지금이면 따로 커밋합니다(fresh 가 기록하고 다음 plan 이 정리합니다. 결과 봉인을 기다리는 노드가 있으면 그 승인부터). 다음 마일스톤이면 이 편집을 되돌리고 요청을 ${requests} 에 적습니다. (FORMATS.md "Interjected work")`
+          : `GroveSpec: no GroveSpec step is running in this checkout and the milestone is open (${open}). An edit outside a step is interjected work — ask the person: now or next milestone. Now: commit it on its own (fresh records it and the next plan reconciles it; if a node's result seal is pending, it is approved first). Next milestone: undo this edit and write the request into ${requests}. (FORMATS.md "Interjected work")`
+      })
+    }
+  }
   if (advice.length === 0) return
-  // One file reads as before; several (one patch) each say which file they mean.
-  const msg = advice.length === 1 ? advice[0].msg : advice.map(a => `${a.rel} — ${a.msg}`).join('\n')
+  // One line reads as before; several (one patch) each say which file they mean.
+  const msg = advice.length === 1 ? advice[0].msg : advice.map(a => a.rel === '' ? a.msg : `${a.rel} — ${a.msg}`).join('\n')
   out({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: msg } })
 }
 

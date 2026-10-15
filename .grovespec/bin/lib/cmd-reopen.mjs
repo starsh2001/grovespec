@@ -11,14 +11,24 @@
 //     every prior verdict to the reader whose blankness it existed to protect. On a
 //     draft reopen the contract changed: the next cycle's caller prunes entries whose
 //     written reason leaned on the old contract (reviewers.md) — kept here, judged there.
-//   · the record's own config header (target · level · find_streak · plan_streak · max_rounds).
-// Everything else — rounds, open_issues, followups, narrative — lives on in git history.
+//   · the record's own config header (target · level · find_streak · plan_streak · max_rounds);
+//   · followups (v0.24.0) — the record list is what the person picks from at the next plan,
+//     and a reopen wiped it: the notes the last cycle kept for them vanished with the cycle.
+//     Only classified items carry over; a legacy-shaped one (grade fields, no category)
+//     would have to be reclassified on an in-progress record, so it stays in history.
+// Everything else — rounds, open_issues, narrative — lives on in git history.
+// A draft reopen also records the spec it reopened (`reopened_spec_digest`, v0.24.0): until
+// Overview→AC moves, `next` routes the draft to grow, which writes the change, not to
+// verify. Reopened drafts that still said the old thing — a brownfield survey's map in 11
+// of 13 and 8 of 9 measured reopens — sent verify to author the plan's change itself. A
+// node with no verify record yet (a mapped node never gated) gets one here to carry it.
 // A draft reopen drops spec_digest + task_evidence_digest +
 // source_evidence_digest/source_evidence_round as one old seal: neither the old Task
 // binding nor the old source packet enters the fresh cycle;
 // prose (why it reopened) is the revise skill's job — this command owns only the state.
-import { topValue, setFmValue, cfgValue } from './core.mjs'
+import { topValue, setFmValue, cfgValue, listItems, itemValue } from './core.mjs'
 import { writeAtomic } from './project.mjs'
+import { specDigest } from './source-evidence.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
@@ -67,13 +77,15 @@ function freshCycle (P, text, keep = {}) {
     .filter(([, v]) => v !== '')
     .map(([k, v]) => `${k}: ${v}`)
   const adjudications = blockOf(text, 'adjudications') ?? 'adjudications: []'
+  const classified = listItems(text, 'followups').filter(it => itemValue(it, 'category').replace(/^(['"])(.*)\1$/, '$2').trim() !== '')
+  const followups = classified.length ? ['followups:', ...classified].join('\n') : 'followups: []'
   // Some cycles keep the condensed shape list under its own `do_not_raise:` key —
   // same substance (a boundary, not evidence), so it survives the same way.
   const doNotRaise = blockOf(text, 'do_not_raise')
   const out = head.concat([
     '', 'round: 0', 'no_new_streak: 0', 'status: in-progress', 'approved_by: pending',
     ...kept.length ? kept : [],
-    '', 'rounds: []', '', 'open_issues: []', '', 'followups: []', '', adjudications,
+    '', 'rounds: []', '', 'open_issues: []', '', followups, '', adjudications,
     ...doNotRaise ? ['', doNotRaise] : [],
     ''
   ]).join('\n')
@@ -146,10 +158,11 @@ export function cmdReopen (P, n, target, { hint = true } = {}) {
 
   const resets = []
   const vt = P.read(P.verifyYamlPath(n))
-  if (target === 'draft' && vt !== null) {
-    const fresh = freshCycle(P, vt)
+  if (target === 'draft') {
+    const base = vt ?? `target: ${P.taskPath(n).slice(P.root.length + 1)}\ntarget_type: spec\nlevel: standard\n`
+    const fresh = freshCycle(P, base, { reopened_spec_digest: specDigest(taskText) ?? '' })
     writeAtomic(P.verifyYamlPath(n), fresh.text)
-    resets.push(`verify cycle reset (adjudications kept; ${fresh.counters})`)
+    resets.push(vt === null ? `verify cycle started (${fresh.counters})` : `verify cycle reset (adjudications kept; ${fresh.counters})`)
   }
   const rt = P.read(P.reviewYamlPath(n))
   if (rt !== null) {
@@ -161,6 +174,6 @@ export function cmdReopen (P, n, target, { hint = true } = {}) {
   P.forget()
 
   say(`reopened: ${n} ${st} → ${target}${resets.length ? ` — ${resets.join(' · ')}` : ''}`)
-  if (hint) say(`  a fresh cycle starts here; record why in the Change Log (grovespec-revise owns the prose)`)
+  if (hint) say(`  a fresh cycle starts here; record why in the Change Log (grovespec-revise owns the prose)${target === 'draft' ? ' — until its Overview→AC is rewritten, next routes it to grow' : ''}`)
   return 0
 }

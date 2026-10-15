@@ -22,6 +22,7 @@ Detail exactly **one** node, and only when its parent is **`done`** (so you writ
 
 ### 1. Pick what to detail
 - **Initial build**: the next `sketch` node whose parent is `done` — `grovespec check` lists it (`sketch → grow (detail → draft)`). Confirm the parent is `done` mechanically; **never detail under a non-`done` parent** (bottom-up drift).
+- **A reopened draft**: `next` names grow for a `draft` whose Overview→AC has not moved since it was reopened — plan, revise or recheck reopened it to change what it does, and it still says the old thing. Read why in its Change Log (and the plan's record), then rewrite Overview→AC to the new behavior in §3, keeping what still holds and keeping `refs`. It stays `draft`; verify runs next. If the reason turns out to need no spec change, delete the `reopened_spec_digest:` line from its verify record and say why in the Change Log.
 - **Expansion**: the user points at a new capability not in the tree. Create a new Task under a `done` parent and add its id to `tree.md` — **the id comes from `node .grovespec/bin/grovespec.mjs id`, never counted by eye**: it skips every number that left a trace (tree · files · records, plus commit subjects and task-file paths across every reachable ref), so a merged-away node's commits can't leak into the new node's diff. Give the Task the exact current source headings in `refs`, or explicit `refs: []` when the capability intentionally has no ref source. (Belongs under a not-yet-`done` parent? Add it as a `sketch`, not a draft — see the callout above.)
 
 **Claim it:** `node .grovespec/bin/grovespec.mjs claim TASK-N grow` — non-zero = **stop** and report what it printed.
@@ -30,6 +31,7 @@ Detail exactly **one** node, and only when its parent is **`done`** (so you writ
 - **The node's sketch** (its one-line responsibility + rough I/O) and **exactly the headings its frontmatter `refs` assigns** — the intent source the full contract is written from. Check those coordinates against `ref/index.md`, which points at each topic's current record; never rediscover a broader/narrower scope from prose. `refs: []` means this node is intentionally no-ref, so ground it in the parent/brief instead. A field-absent Task is legacy: use only its explicit `ref/<file> §N` citations; do not guess when there are none.
 - The parent's **Contract** + this node's place in it (which clause it fills).
 - The risks in `brief.md` this node touches; the terms·rules in `conventions.md`.
+- The notes other gates left about this node: `node .grovespec/bin/grovespec.mjs followups TASK-N`.
 
 Don't pile up a long context. The truth is on disk; re-read when you need it.
 
@@ -40,7 +42,7 @@ Fill the Task out fully: keep the `id`, **preserve `refs` exactly**, and set `st
 - **`role` is a hypothesis** (skeleton if it'll hold children — greenfield, those children are already sketched under it; feature if a leaf). Confirmed at implement.
 - **If it's a skeleton, it still builds *its own* structural glue** — capture (in AC/Subtasks) what *this* node assembles: the container/dispatch its children slot into. A draft whose AC/Subtasks are *only* "the children" means implement builds nothing → verify will FAIL it. (The **root**: when you detail its sketch, its deliverable is the base env + an empty runnable shell — write its AC as a smoke test + a base-env Subtask; the stack is chosen at the root's implement. → METHODOLOGY "Skeleton role".)
 - **Mark the spec's gaps** as AC items prefixed `(gap)` (`FORMATS.md`) — don't invent behavior the spec doesn't state. **A gap you already know needs the person's ruling is asked now, in this step** (`FORMATS.md` "Ask as soon as you know") — a behavior or policy the node can't be built without; `(gap)` is for what is deliberately left undefined. A non-empty `refs` heading made entirely of `(gap)` content is still sourced scope; preserve it instead of changing the Task to `refs: []`. verify probes each in-scope gap: it gets resolved with the user, or survives as an adjudicated `accepted-gap`.
-- **`tdd`**: default `true`. Set `false` only for nodes that resist up-front tests (exploratory prototype · UI · hardware-dependent), and then `tdd_skip_reason` is required.
+- **`tdd`**: default `true`. Set `false` only for nodes that resist up-front tests (exploratory prototype · UI · hardware-dependent), and then `tdd_skip_reason` is required. **A mapped node reopened to change what it does** still carries the survey's `tdd: false` (code documented after the fact) — ask the person now whether the changed behavior gets automated tests, recommending yes wherever a test can pin it.
 - **`blocked_by`** = the shared/cross-tree nodes this one consumes (often `[]`); *not* the parent (that's in tree.md). (Already set on the sketch — confirm it.)
 - **Measurable NFR targets** (latency·throughput·error-rate) go in the AC as checkable items.
 

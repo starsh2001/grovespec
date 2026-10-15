@@ -25,6 +25,7 @@ paths:
   ref: docs/ref/
   findings: docs/findings.md          # brownfield backlog — node-level bugs·duplications·doc↔code mismatches. Optional: created only if non-empty.
   restructuring: docs/restructuring.md # brownfield backlog — tree-level structural debt. Optional: created only if non-empty.
+  requests: docs/requests.md          # interjected work put off to the next milestone (FORMATS.md "Interjected work"). Optional.
   src: src/                 # where implemented code goes
   tests: tests/             # where tests go
   review: .grovespec/review/  # cold-review state (<id>.verify.yaml + <id>.review.yaml per node)

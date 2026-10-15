@@ -23,7 +23,7 @@ import { dirtyResultSubject, git, repoState, ignoredState, resultSealBreach, git
 import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDigest, validateCompletedPacket } from './source-evidence.mjs'
 import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
 import { waitState } from './cmd-wait.mjs'
-import { releaseOnDone, releaseTree } from './cmd-claim.mjs'
+import { releaseOnDone, releaseTree, endStepMark } from './cmd-claim.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 const hasTop = (text, key) => splitLines(text).some(line => new RegExp(`^${key}[ \\t]*:`).test(line))
@@ -167,6 +167,7 @@ function approveTree (P, human) {
   say('tree approved by you — the decomposition gate is open; the per-node build begins')
   // The tree-wide step ends with its gate (v0.19.0): this worktree's tree claim goes.
   for (const line of releaseTree(P)) say(line)
+  endStepMark(P.root, 'tree')
   return 0
 }
 
@@ -292,6 +293,8 @@ export function cmdApprove (P, n, human) {
   // Done HERE (v0.19.0): this worktree's claim becomes a done mark for the worktrees that
   // have not got this commit yet, or simply ends. Said, never allowed to undo the decision.
   if (target === 'done') for (const line of releaseOnDone(P, n)) say(line)
+  // The gate decision closes the step that sealed it (the step mark — cmd-claim).
+  endStepMark(P.root, n)
   return 0
 }
 

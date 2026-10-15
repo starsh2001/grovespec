@@ -10,7 +10,7 @@ import { git, inRepo } from './git.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
-function testCommand (P) {
+export function testCommand (P) {
   // Strip the quotes only when the value is actually quoted ("" or "pytest -q") —
   // a bare command ENDING in a quote (`node -e "…"`) must come through untouched.
   const v = cfgValue(P.configText, 'review', 'test')

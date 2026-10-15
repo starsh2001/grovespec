@@ -31,7 +31,7 @@ const say = s => process.stdout.write(s + '\n')
 function stepFor (P, tid) {
   switch (P.statusOf(tid)) {
     case 'sketch': return 'grovespec-grow'
-    case 'draft': return 'grovespec-verify'
+    case 'draft': return P.needsGrow(tid) ? 'grovespec-grow' : 'grovespec-verify'
     case 'approved': return 'grovespec-implement'
     case 'implemented': return 'grovespec-review'
     case 'fixed': return 'grovespec-review'
@@ -244,7 +244,7 @@ export function cmdNext (P, auto) {
       say(`next: retro — every node is done, and ${ro.work.length} TASK commit(s) landed since ${ro.anchor === null ? 'the milestone began' : `retro-${ro.n}`}; the milestone owes its closing look before the next plan (grovespec-retro)`)
       return 0
     }
-    // Parked work (followups · brownfield backlogs · fresh hand-edits) routes to the
+    // Parked work (followups · the backlogs, interjected requests included · fresh hand-edits) routes to the
     // next planning pass — the driver must never end silently on top of known work.
     // fresh is asked only here: the terminal is the one spot a hand-edit could
     // otherwise slip out of the loop for good.
@@ -263,13 +263,14 @@ export function cmdNext (P, auto) {
     const unq = s => s.replace(/^(['"])(.*)\1$/, '$2').trim()
     const recordOnly = P.allFollowups().filter(f => RECORD_CATEGORIES.includes(unq(f.category))).length
     const fuWork = auto ? b.followups - recordOnly : b.followups
-    if (fuWork + b.findings + b.restructuring + fresh > 0) {
+    if (fuWork + b.findings + b.restructuring + b.requests + fresh > 0) {
       const stop = treeHeld('a planning pass (grovespec-plan)')
       if (stop !== null) return stop
       const parts = []
       if (fuWork) parts.push(`followups ${fuWork}`)
       if (b.findings) parts.push(`findings ${b.findings}`)
       if (b.restructuring) parts.push(`restructuring ${b.restructuring}`)
+      if (b.requests) parts.push(`requests ${b.requests}`)
       if (fresh) parts.push(`fresh ${fresh}`)
       say(`next: plan — every node is done, parked work awaits: ${parts.join(' · ')}${auto && recordOnly ? ` (+ ${recordOnly} record-only item(s), on your pick)` : ''} (grovespec-plan)`)
       return 0

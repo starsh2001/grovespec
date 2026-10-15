@@ -25,6 +25,7 @@ The node must be **`approved`** (cold-verified, its gate taken on the record) an
 ### 1. Pre-check (before writing)
 - **Look up risks**: any risk in `brief.md` this node touches? Go in knowing it.
 - **Check conventions**: the relevant terms·rules in `conventions.md`.
+- **Read the notes other gates left about this node**: `node .grovespec/bin/grovespec.mjs followups TASK-N`.
 - **Search existing code (grep) — most important**:
   1. Pull the *key words* from what this node does.
   2. Search the code + `tasks/` for those words.
