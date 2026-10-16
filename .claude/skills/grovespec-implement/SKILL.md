@@ -9,7 +9,9 @@ Turning an **`approved`** spec into *code*. (Verifying the spec is `grovespec-ve
 
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
 
-> **Decisions: recommend + leave a way out.** When you ask the user to decide (tech stack, library, approach…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (the AskUserQuestion tool's *Other*, or an explicit free-form choice in an inline list). Don't force a closed pick.
+> **Decisions: recommend + leave a way out.** When you ask the user to decide (tech stack, library, approach…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (ask through the host's question tool — its *Other* is that answer; `FORMATS.md` "A decision, not a stage"). Don't force a closed pick.
+
+> **Runs happen on the person's machine.** A test, the product or a measurement that drives their mouse, keyboard or windows, or changes their settings or services, runs only with their OK, every time; a test you write that does is named in `conventions.md` (`FORMATS.md` "The person's machine").
 
 ## Session
 Thin — read only this node's Task and the *relevant* code. Don't pile up a long working context.

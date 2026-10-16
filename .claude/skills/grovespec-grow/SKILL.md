@@ -13,7 +13,7 @@ Turning **one node's `sketch` into a full `draft`** — writing its Contract·AC
 
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
 
-> **Decisions: recommend + leave a way out.** When you ask the user to decide (an approach, a contract choice…): **mark your recommended option `(추천)`** — the one you would actually choose (`FORMATS.md` "A decision, not a stage") — with a one-line why, and **always allow a free-form answer** (the AskUserQuestion tool's *Other*, or an explicit free-form choice in an inline list). Don't force a closed pick.
+> **Decisions: recommend + leave a way out.** When you ask the user to decide (an approach, a contract choice…): **mark your recommended option `(추천)`** — the one you would actually choose (`FORMATS.md` "A decision, not a stage") — with a one-line why, and **always allow a free-form answer** (ask through the host's question tool — its *Other* is that answer). Don't force a closed pick.
 
 ## One principle: one node, under a done parent
 Detail exactly **one** node, and only when its parent is **`done`** (so you write its contract against a real, built parent, not a guess). **Don't (re)define this node's *own* children here** — greenfield they're already sketched in the tree (from init); their contracts get detailed later, each after *this* node is `done`. (For an expansion node with no sketched children, whether it needs any is confirmed at *its* implement, as a brownfield-style decomposition.)

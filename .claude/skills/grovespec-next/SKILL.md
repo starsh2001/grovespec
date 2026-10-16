@@ -19,7 +19,7 @@ The rule and the shape of the ask are one paragraph in `FORMATS.md` "The step re
 
 ## Two modes
 
-**Ask — the default.** Every decision stops for the person: the step skill asks it in the four-part shape, and when the turn ends with it unanswered, the loop ends on it (§4). Nothing else stops the loop — not a clean gate, not a step's new-session recommendation, not a parked followup.
+**Ask — the default.** Every decision stops for the person: the step skill asks it in the four-part shape through the host's question tool, and the loop waits for the answer — only an ask written into the closing, on a host with no question tool, ends the loop (§4). Nothing else stops the loop — not a clean gate, not a step's new-session recommendation, not a parked followup.
 
 **Auto — only when the user asks for it in *this* invocation** ("그냥 진행해", "자동으로", `next auto`). Never a remembered setting. Then use `next --auto`, and the step skill is told to **take a decision that carries a recommended option** — as recommended, recording what was taken and why — and to stop only at **a question with no defensible recommendation** (a name, a policy, a constraint the project genuinely hasn't decided).
 
@@ -30,7 +30,7 @@ In both modes:
 - **A step resumes where its record stands — a new run never restarts a cycle.** A review/fix cycle's state file carries its phase, current item, and counters; the step skill continues from them. A new session is a new context, not a new sweep.
 - **The record list is not the loop's queue.** `followups` (improvements · harmless bugs) never becomes work because the loop had nothing else to do — a gate that closed with only record-list items left is a **pass**, and the only route from that list into the build is the user picking an item at a planning pass. In ask mode that pick *is* a decision, so the terminal routes to `grovespec-plan`; in auto mode nobody is there to pick, and the runtime agrees: with every node done and only record-category items parked, `next --auto` answers *nothing runnable* (naming the list). Routed must-fix work, unclassified legacy items, the brownfield backlogs and fresh signals still route to plan in every mode.
 
-Say the mode in the invocation when you call a step skill: **ask** — put every decision to the user in the four-part shape, and take a gate with nothing to decide on the record (`approve`, machine) in that same turn; **auto** — take marked recommendations and record what was taken, stop on a question with no recommendation. In neither mode ask for approval of a gate that has nothing to decide.
+Say the mode in the invocation when you call a step skill: **ask** — put every decision to the user in the four-part shape, and take a gate with nothing to decide on the record (`approve`, machine) in that same turn; **auto** — take marked recommendations and record what was taken (never the person's OK to touch their machine — `FORMATS.md` "The person's machine"), stop on a question with no recommendation. In neither mode ask for approval of a gate that has nothing to decide.
 
 ## 1. Check the floor
 `node .grovespec/bin/grovespec.mjs validate` — non-zero → **stop**: state the problems, then close with `NOTHING_TO_WORK — validate: <the first problem>`. This is the **one** place that token is written without a `next` answer to read it from — the floor is broken, so the machine's own answer can't be trusted, and re-entering the loop would just hit the same wall. Never build on a broken tree; automation multiplies the damage.
@@ -65,7 +65,7 @@ Then the last line — **read it off the `grovespec next` you just ran, don't de
 | `nothing runnable — …` | exactly `NOTHING_TO_WORK — <the reason it gave>` |
 | anything else (`next: TASK-N …` · `next: tree …` · `next: recheck …` · `next: retro …` · `next: plan …`) | **no final line at all** — end with that `next: …` so the loop keeps going |
 
-One exception, and only this one: **a decision you put to the user is still unanswered when your turn ends** (a step skill's four-part ask in ask mode, or in auto mode a question with no recommended option). Then close with `NOTHING_TO_WORK — waiting on you: <the issue>` even though `next` still names a step. **Answered questions don't count** — a blocking question tool that already returned the answer leaves nothing to wait for; keep going.
+One exception, and only this one: **a decision you put to the user is still unanswered when your turn ends** — asked in your closing because the host has no question tool (a step skill's four-part ask in ask mode, or in auto mode a question with no recommended option). Then close with `NOTHING_TO_WORK — waiting on you: <the issue>` even though `next` still names a step. **A question asked through the host's question tool never ends on the token** — a blocking tool already returned its answer, and an async one's answer comes back as your next message; keep going from it.
 
 Three things that are **not** reasons to stop, because each has already been handled:
 - **A step skill recommending a new session.** They all do, and they are right to — but `@new` in the loop *is* that new session. The recommendation is addressed to a person driving by hand.

@@ -42,7 +42,7 @@ You review for a **competent implementer/consumer** who will research, make reas
   - **Bounded.** Every process an experiment starts gets a time limit when it starts, and a memory limit where it can grow (a loop, a load, a flood).
   - **Owned.** Touch only what you created — your copy, your processes and containers, your files. Never stop, delete or restart what you did not start: another session's container, a shared service, whatever a wildcard happens to match.
   - **Cleaned up.** Before you report, stop what you started and delete your copy.
-  - **The person's machine is theirs.** Driving the mouse, keyboard or windows, or changing the registry, system settings or services (Docker, WSL included), waits for the person's OK: say what you will touch and for how long, then act once they agree. When a defect can only be shown that way, ask — never skip it, never do it unasked.
+  - **The person's machine is theirs.** Driving its mouse, keyboard or windows, or changing its registry, settings or services, waits for the person's OK every time — never skipped, never done unasked (`FORMATS.md` "The person's machine").
 
 ## The cycle — find → fix
 One gate = one cycle of two phases. **Find repeats until it stops producing; fix closes what find confirmed, one item at a time, and never re-opens the sweep.** The state file's counters (`no_new_streak` · `plan_clear_streak`) are what a resumed session continues from — a new session never restarts a phase the record shows in progress.

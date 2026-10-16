@@ -9,7 +9,7 @@ Changing a node that already **passed a gate** — a `done` node, or an `approve
 
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
 
-> **Decisions: recommend + leave a way out.** When you ask the user to decide (split·merge·move, how to change…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (the AskUserQuestion tool's *Other*, or an explicit free-form choice in an inline list). Don't force a closed pick.
+> **Decisions: recommend + leave a way out.** When you ask the user to decide (split·merge·move, how to change…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (ask through the host's question tool — its *Other* is that answer; `FORMATS.md` "A decision, not a stage"). Don't force a closed pick.
 
 **Claim the node first:** `node .grovespec/bin/grovespec.mjs claim TASK-N revise` — non-zero = **stop** and report what it printed.
 

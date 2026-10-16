@@ -9,7 +9,7 @@ The planning pass. `init` records what *is* (config; brownfield: the surveyed tr
 
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
 
-> **Decisions: recommend + leave a way out.** Every disposition you put to the user marks a recommended option `(추천)` — the one you would actually choose (`FORMATS.md` "A decision, not a stage") — with a one-line why, and always allows a free-form answer (AskUserQuestion's *Other*). Don't force a closed pick.
+> **Decisions: recommend + leave a way out.** Every disposition you put to the user marks a recommended option `(추천)` — the one you would actually choose (`FORMATS.md` "A decision, not a stage") — with a one-line why, and always allows a free-form answer (ask through the host's question tool — its *Other* is that answer). Don't force a closed pick.
 
 ## Which mode — decided by the project's state
 Run `node .grovespec/bin/grovespec.mjs next` (or look): **the tree is empty** → plan #0. **Every node is done + parked work exists** → plan #N. Anything else — nodes mid-build — is not plan's moment: the build cycle (`grow`/`verify`/`implement`/`review`) owns it; say so and stop.

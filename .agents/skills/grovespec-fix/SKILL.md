@@ -42,7 +42,7 @@ A blocking answer must walk **a concrete path**: the current repro conditions or
 - If the issue says a **test was hollow or wrong**, fix the test (and the behavior it should have caught) — not just the code.
 - **If the issue means the *spec* is wrong** (the contract, not the code) — stop: that's `grovespec-revise` (a contract change propagates to consumers), not a silent code patch here.
 - Fix exactly what the plan says — no drive-by refactors, no second item folded in. Put the net line delta (`+N/−N`) in the commit body.
-- **Your own measuring** — a repro, a timing, a screen check — follows `reviewers.md`'s experiment rules (§Spawning): bounded, owned, cleaned up, and the person's machine only with their OK.
+- **Your own runs** — the suite, a repro, a timing, a screen check — follow `reviewers.md`'s experiment rules (§Spawning): bounded, owned, cleaned up; the person's machine only with their OK, every time (`FORMATS.md` "The person's machine").
 - **Commit the item as `TASK-N: fix <item-id> — <summary>`** (the `TASK-N:` prefix keeps the diff boundary mechanical — `FORMATS.md`). Include the record + this item's round files in the commit — a gate's evidence outside git is one clean-up away from gone.
 
 ### 5. Confirm the item — one cold round, this item's scope only
