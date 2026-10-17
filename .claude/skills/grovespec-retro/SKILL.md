@@ -7,7 +7,7 @@ description: The milestone's closing look — when every node is done, ONE cross
 
 The one look that crosses node boundaries — for the defect class no node-scoped gate can see (why and the measured case: METHODOLOGY §6) — run **once per milestone**, so its cost scales with milestones, not nodes.
 
-> **Language**: read `config.language` (`node .grovespec/bin/grovespec.mjs lang`) and write every reply and the record in it. These files are English; your output is not.
+> **Language**: read `config.language` (`node .grovespec/bin/grovespec.mjs lang`) and write every reply and the record in it. These files are English; your output is not. **What a retro closes is a *milestone*** in every language and in everything you write — replies, the record's headings, the commit. *Round* is only a review round: where an earlier `retro-N.md` or plan record calls the milestone a round, don't copy their word.
 
 > **Termination safety — the one rule that must survive every edit of this file.** A capable reviewer asked again always returns *something*, so a closing review that could veto completion is a completion that never comes. The retro **never reopens a node, never blocks `done`, never runs a fix**: its must-fix findings become `- [ ]` items in the standing backlogs (`findings.md` / `restructuring.md`), which the terminal already routes to the next plan. The milestone stays closed; the next milestone gains its reasons.
 

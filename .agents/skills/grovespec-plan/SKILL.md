@@ -7,7 +7,7 @@ description: The planning pass — decides what to build next, then ends at the 
 
 The planning pass. `init` records what *is* (config; brownfield: the surveyed tree); **plan decides what to build next** — from intent (plan #0) or from what the last milestone parked (plan #N) — and every plan ends at the **tree gate** (cold verify + human approval) before any node is built.
 
-> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
+> **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not. **The unit a plan opens is a *milestone*** in every language and in everything you write — replies, the new record's file name and headings, `ref/index.md`, the commit. *Round* is only a review round: where this project's older records call the milestone a round, don't copy their word.
 
 > **Decisions: recommend + leave a way out.** Every disposition you put to the user marks a recommended option `(추천)` — the one you would actually choose (`FORMATS.md` "A decision, not a stage") — with a one-line why, and always allows a free-form answer (ask through the host's question tool — its *Other* is that answer). Don't force a closed pick.
 
@@ -43,7 +43,7 @@ The project is at "every node done + a backlog" (a finished milestone — which 
 
 After either mode: `grovespec next` drives again — plan opened the doors; it never builds. **Plan edits no node's code**, and its write scope is: `ref/` (new record + index) · `brief.md` · `tree.md` · new sketch Tasks · affected Tasks' `refs` · reopen commands · adjudication entries in review files · backlog checkoffs.
 
-**Commit as `plan #0: <summary>`** / `plan #N: <summary>` — everything the pass wrote: the `ref/` record + index, `brief.md`, `tree.md`, the new sketch Tasks, every affected Task's `refs`, the adjudication edits, the backlog checkoffs, **and the `reopen` results** (the status-flipped Task files + their reset gate records — the same bytes revise commits when it runs the same command). Never a `TASK-N: ` prefix (that anchor belongs to a node's code cycle — `FORMATS.md` "Commits"). Then release the tree — `node .grovespec/bin/grovespec.mjs claim release tree` — unless the pass ends at the tree gate (step 7): the tree verify keeps the claim, and `approve tree --human` ends it.
+**Commit as `plan #0: <summary>`** / `plan #N: <summary>` — everything in that write scope, **the `reopen` results included** (the status-flipped Task files + their reset gate records — the same bytes revise commits when it runs the same command). Never a `TASK-N: ` prefix (that anchor belongs to a node's code cycle — `FORMATS.md` "Commits"). Then release the tree — `node .grovespec/bin/grovespec.mjs claim release tree` — unless the pass ends at the tree gate (step 7): the tree verify keeps the claim, and `approve tree --human` ends it.
 
 ## What plan is not
 - **Not a gate bypass.** A disposition cannot close an open issue — open issues belong to the fix/verify loop that owns them.
