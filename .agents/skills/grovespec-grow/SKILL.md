@@ -22,7 +22,7 @@ Detail exactly **one** node, and only when its parent is **`done`** (so you writ
 
 ### 1. Pick what to detail
 - **Initial build**: the next `sketch` node whose parent is `done` — `grovespec check` lists it (`sketch → grow (detail → draft)`). Confirm the parent is `done` mechanically; **never detail under a non-`done` parent** (bottom-up drift).
-- **A reopened draft**: `next` names grow for a `draft` whose Overview→AC has not moved since it was reopened — plan, revise or recheck reopened it to change what it does, and it still says the old thing. Read why in its Change Log (and the plan's record), then rewrite Overview→AC to the new behavior in §3, keeping what still holds and keeping `refs`. It stays `draft`; verify runs next. If the reason turns out to need no spec change, delete the `reopened_spec_digest:` line from its verify record and say why in the Change Log.
+- **A reopened draft**: `next` names grow for a `draft` that plan, revise or recheck reopened to change what it does, until a grow has run since that reopen. Read why in its Change Log (and the plan's record), then rewrite Overview→AC to the new behavior in §3, keeping what still holds and keeping `refs` — whatever touched it meanwhile (a tree gate's fix) included. It stays `draft`; verify runs next. If the change is already written (a revise wrote it before reopening) or needs no spec change, say so in one Change-Log line: your `grow TASK-N:` commit is what tells `next` the grow ran.
 - **Expansion**: the user points at a new capability not in the tree. Create a new Task under a `done` parent and add its id to `tree.md` — **the id comes from `node .grovespec/bin/grovespec.mjs id`, never counted by eye**: it skips every number that left a trace (tree · files · records, plus commit subjects and task-file paths across every reachable ref), so a merged-away node's commits can't leak into the new node's diff. Give the Task the exact current source headings in `refs`, or explicit `refs: []` when the capability intentionally has no ref source. (Belongs under a not-yet-`done` parent? Add it as a `sketch`, not a draft — see the callout above.)
 
 **Claim it:** `node .grovespec/bin/grovespec.mjs claim TASK-N grow` — non-zero = **stop** and report what it printed.
@@ -32,6 +32,7 @@ Detail exactly **one** node, and only when its parent is **`done`** (so you writ
 - The parent's **Contract** + this node's place in it (which clause it fills).
 - The risks in `brief.md` this node touches; the terms·rules in `conventions.md`.
 - The notes other gates left about this node: `node .grovespec/bin/grovespec.mjs followups TASK-N`.
+- A defect you find in another node while reading for this one — one only a contract change closes — is asked on the spot (`FORMATS.md` "A defect only a contract change closes"), never left as a Change-Log line for a retro.
 
 Don't pile up a long context. The truth is on disk; re-read when you need it.
 
@@ -45,6 +46,7 @@ Fill the Task out fully: keep the `id`, **preserve `refs` exactly**, and set `st
 - **`tdd`**: default `true`. Set `false` only for nodes that resist up-front tests (exploratory prototype · UI · hardware-dependent), and then `tdd_skip_reason` is required. **A mapped node reopened to change what it does** still carries the survey's `tdd: false` (code documented after the fact) — ask the person now whether the changed behavior gets automated tests, recommending yes wherever a test can pin it.
 - **`blocked_by`** = the shared/cross-tree nodes this one consumes (often `[]`); *not* the parent (that's in tree.md). (Already set on the sketch — confirm it.)
 - **Measurable NFR targets** (latency·throughput·error-rate) go in the AC as checkable items.
+- **AC items are plain list items, no checkbox** — even where the sketch or a sibling node still shows `- [ ]` (an older layout); the spec seal covers AC.
 
 ### 4. Done → verify next
 The node is now a full `draft`. **Next is `grovespec-verify <this node>`** — the cold multi-persona check of the draft, then its gate (`draft` → `approved`). grow does **no** review and sets **no** approval; that is verify's job, kept separate so the reviewers stay cold.

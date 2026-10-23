@@ -5,10 +5,11 @@ import { existsSync, statSync, readFileSync, readdirSync, writeFileSync, renameS
 import { dirname, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { specDigest } from './source-evidence.mjs'
+import { grownSince } from './git.mjs'
 import {
   fmValue, treeRows, blockedIds, schValue, cfgValue, topValue, listItemCount,
   listItems, itemValue, splitLines, duplicateFrontmatterKeys, duplicateTopKeys,
-  duplicateNestedKeys, duplicateListItemKeys, frontmatterBoundaryProblem
+  duplicateNestedKeys, duplicateListItemKeys, frontmatterBoundaryProblem, MUST_FIX_CATEGORIES
 } from './core.mjs'
 
 // Status order — how far a node has advanced; evidence requirements key off this.
@@ -382,12 +383,17 @@ export class Project {
     return splitLines(t).filter(l => /^[ \t]*- \[ \]/.test(l)).length
   }
   // Everything parked for a later planning pass: followups + the brownfield backlogs.
+  // `routed` is the must-fix share of the followups — real defects parked for a contract
+  // change — counted apart so they never sink into the record list (measured: 8 among
+  // 990, one an easy abuse, unseen for two weeks).
   backlogCounts () {
-    const followups = this.allFollowups().length
+    const all = this.allFollowups()
+    const followups = all.length
+    const routed = all.filter(f => MUST_FIX_CATEGORIES.includes(f.category.replace(/^(['"])(.*)\1$/, '$2').trim())).length
     const findings = this.backlogItemCount(this.findingsPath)
     const restructuring = this.backlogItemCount(this.restructuringPath)
     const requests = this.backlogItemCount(this.requestsPath)
-    return { followups, findings, restructuring, requests, total: followups + findings + restructuring + requests }
+    return { followups, routed, findings, restructuring, requests, total: followups + findings + restructuring + requests }
   }
 
   // What GroveSpec itself owns or a host keeps for itself, relative to the root: the
@@ -482,13 +488,22 @@ export class Project {
     }
     return 'yes'
   }
-  // A draft reopened to change what it does, whose Overview→AC has not moved since the
-  // reopen: it still says the old thing, so grow writes the change before verify reads it.
+  // A draft reopened to change what it does goes to grow until grow has run since that
+  // reopen — a `grow TASK-N:` commit after it (v0.25.0). v0.24.0 read it off the spec
+  // instead ("grow while Overview→AC has not moved"), and other writers moved it: a tree
+  // gate fixing reopened drafts' Requirements sent 3 of 4 straight to verify, which then
+  // wrote the plan's change itself; a revise that wrote the change before reopening left
+  // a spec that never moved, so grow had nothing to write and the mark was deleted by hand
+  // to move on. Without git, or when git cannot answer, the spec reading stands.
   needsGrow (tid) {
     if (this.statusOf(tid) !== 'draft') return false
-    const marked = topValue(this.read(this.verifyYamlPath(tid)) ?? '', 'reopened_spec_digest')
+    const vp = this.verifyYamlPath(tid)
+    const marked = topValue(this.read(vp) ?? '', 'reopened_spec_digest')
+    if (marked === '') return false
+    const grown = grownSince(this.root, vp, tid, marked)
+    if (grown !== null) return !grown
     const task = this.read(this.taskPath(tid))
-    return marked !== '' && task !== null && specDigest(task) === marked
+    return task !== null && specDigest(task) === marked
   }
   nextAction (tid) {
     switch (this.statusOf(tid)) {

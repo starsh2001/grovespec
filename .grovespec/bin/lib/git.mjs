@@ -337,6 +337,31 @@ export function log (root) {
   })
 }
 
+// Has grow run on a node since the reopen that wrote `reopened_spec_digest: <mark>` into
+// its verify record (v0.25.0)? true · false · null (no repository, or git could not
+// answer — the caller falls back to its own reading). The reopen is the newest commit that
+// changed how often the mark occurs in the record (pickaxe; the spec seal clears the mark,
+// so each reopen adds it afresh), and a grow is a `grow TASK-N: ` commit after it — the
+// commit grammar fresh attributes by. A mark not yet in HEAD is a reopen still in the
+// working tree: nothing has grown since it.
+export function grownSince (root, recordPath, tid, mark) {
+  if (repoState(root) !== 'repo') return null
+  const rel = recordPath.startsWith(`${root}/`) ? recordPath.slice(root.length + 1) : recordPath
+  const head = git(root, ['show', `HEAD:./${rel}`])
+  if (!head.ok) return /does not exist|exists on disk, but not in|invalid object name|bad revision|unknown revision/i.test(head.err) ? false : null
+  const line = `reopened_spec_digest: ${mark}`
+  if (!head.out.split('\n').some(l => l.replace(/\r$/, '') === line)) return false
+  // The whole line, never the bare value: the mark is the spec digest, and the seal's own
+  // `spec_digest:` line carries the same value — a reopen that swaps one for the other
+  // leaves the bare value's count unchanged and is invisible to the pickaxe.
+  const at = git(root, ['log', '-1', '--format=%H', `-S${line}`, '--', `:(literal)${rel}`])
+  if (!at.ok) return null
+  if (at.out.trim() === '') return false
+  const after = git(root, ['log', '--format=%s', `${at.out.trim()}..HEAD`])
+  if (!after.ok) return null
+  return after.out.split('\n').some(s => s.startsWith(`grow ${tid}: `))
+}
+
 // Every trace an id can leave in history, across ALL reachable refs — not just the
 // current branch's ancestry, and not just commit subjects. Two things carry an id:
 // the subject of a convention commit (`TASK-N: …`, and the step shapes `grow/verify/

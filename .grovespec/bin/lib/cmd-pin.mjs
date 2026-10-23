@@ -278,7 +278,10 @@ export function cmdPin (P, n) {
       source_evidence_round: sourceSeal.round
     }
     if (topValue(vt, 'approved_by') === '') kv.approved_by = 'pending'
-    writeAtomic(vp, upsertTop(vt, kv))
+    // The reopen mark is spent once the reopened spec is sealed again (v0.25.0). Dropping it
+    // here lets the next reopen add it afresh — how `next` finds that reopen in history even
+    // when the spec bytes, and so the mark's value, repeat.
+    writeAtomic(vp, upsertTop(vt, kv).split('\n').filter(l => !/^reopened_spec_digest[ \t]*:/.test(l)).join('\n'))
     P.forget()
     say(`pinned: ${n} spec_digest ${digest.slice(0, 12)}… + task_evidence_digest ${taskDigest.slice(0, 12)}… + source evidence round ${sourceSeal.round} ${sourceSeal.digest.slice(0, 12)}… → ${vp}`)
     return 0

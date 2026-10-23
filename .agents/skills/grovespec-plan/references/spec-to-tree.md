@@ -36,7 +36,7 @@ For each node, fill the Task **thinly**, `status: sketch`:
 - **name** + a **one-line responsibility** — it is the title line and the lede (`# TASK-N · <name>`, then one `>` line), and the Overview restates it in two or three sentences. A sketch is mostly lede: that one line is what the tree gate reads.
 - **Rough I/O** in the Contract section — a sentence on what it roughly takes / gives. **Not** the full takes·gives·guarantees; that's grow's job. A `[→ detail at grow]` marker is fine.
 - **Note the spec's gaps** — where the spec is silent, say so (it becomes a `(gap)` AC item when grow details it — `FORMATS.md`). Don't invent.
-- Leave AC/Subtasks mostly empty (grow writes them from the spec when it details the node).
+- Leave AC/Subtasks mostly empty (grow writes them from the spec when it details the node) — an AC placeholder is a plain item, no checkbox.
 - **Actors & entities** the spec names (employee · hire-date · team) — note which node will *own* each, so the closure isn't lost (verify's C1 + grow check it later).
 - **`refs`** — the exact current `file@numbered-heading` coordinates assigned to this node. Resolve them through `ref/index.md` now; do not leave grow to rediscover the scope from prose later. If one heading genuinely feeds multiple nodes, list it on each and make the responsibility split visible in the sketches so D1 can verify that overlap rather than guessing.
 

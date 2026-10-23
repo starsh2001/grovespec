@@ -26,7 +26,7 @@ Two things, both bounded to **this one node**, so cost never scales with the cod
 ## State
 Result reviews have two finding lanes, split by **category** (`reviewers.md` §Categories — fixed handling, no severity to argue):
 - `open_issues` holds the **must-fix** findings in the current diff (crash · requirement-unmet · normal-use-bug · easy-abuse · security-hole) that keep this code gate open. The fix phase works them **one at a time**.
-- `followups` is the **record list**: `improvement` · `harmless-bug`, plus a must-fix that belongs to another gate (`kind: contract-gap`). It is never an automatic work queue — nothing here re-enters the build without the user's pick (`validate` enforces the lane split).
+- `followups` is the **record list**: `improvement` · `harmless-bug`, plus a must-fix only a contract change closes (`kind: contract-gap` — another node's, or this node's own Contract), which is asked *now or next milestone* on the spot, before the seal (`FORMATS.md` "A defect only a contract change closes"). It is never an automatic work queue — nothing here re-enters the build without the user's pick (`validate` enforces the lane split).
 - Every open finding needs `kind` + `family` + `category` + `condition`/`impact` (and `requirement` for requirement-unmet). The same `family` may appear only once across `open_issues` + `followups`.
 - If the flaw is in this cycle's diff or in the text this cycle is reviewing, classify it as `kind: defect` even if the eventual repair also needs a later spec/contract revise. Do not move a current-target defect to `followups` just because a spec edit would also help.
 

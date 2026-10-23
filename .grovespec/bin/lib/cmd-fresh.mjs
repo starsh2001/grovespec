@@ -182,6 +182,29 @@ export function freshSignals (P) {
   return { dirty, offband, adoption, anchor: null, planned: false, repo: true, areas, nested, outsideOwn, hist: [], broken: null }
 }
 
+// Parked work the newest planning pass already ruled on (v0.25.0). A plan dispositions the
+// whole parked list it is shown — adopt, drop, or keep parked — and its `plan #N:` commit is
+// the record that it did. Before this, a list the person had just chosen to keep parked sent
+// `next` straight back to plan: "keep it all for later" came back as the same questions four
+// minutes on, and a request kept for later as the same question at every plan. Returns that
+// plan's anchor when nothing parked has moved since — the backlog files and the gate records
+// (where followups live), committed or not; null when there is no plan yet, something moved,
+// or git cannot tell, which routes to plan as before.
+export function planSaw (P) {
+  if (repoState(P.root) !== 'repo') return null
+  const all = log(P.root)
+  if (all === null) return null
+  const plan = all.find(c => PLAN_COMMIT.test(c.s))
+  if (plan === undefined) return null
+  const paths = [P.reviewDir, P.findingsPath, P.restructuringPath, P.requestsPath]
+    .map(p => `:(literal)${p.slice(P.root.length + 1)}`)
+  const moved = git(P.root, ['log', '-1', '--format=%H', `${plan.h}..HEAD`, '--', ...paths])
+  if (!moved.ok || moved.out.trim() !== '') return null
+  const dirty = git(P.root, ['status', '--porcelain', '--untracked-files=all', '--', ...paths])
+  if (!dirty.ok || dirty.out.trim() !== '') return null
+  return `${plan.s.match(/^plan #[0-9]+/)[0]} ${plan.h.slice(0, 7)}`
+}
+
 export function cmdFresh (P) {
   const sig = freshSignals(P)
   if (sig.broken !== null) { say(`fresh: cannot classify history — ${sig.broken}; nothing was reported (a git failure is not a clean pass)`); return 2 }

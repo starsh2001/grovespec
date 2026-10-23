@@ -1,6 +1,7 @@
 // reopen — revise's state transition, atomic and mechanical: a node that already passed a
 // gate goes back to draft (spec/contract changed → re-verify) or approved (spec valid,
-// code changes → re-implement), and its gate records start a FRESH cycle — a past cycle's `passed` is
+// code changes → re-implement), a node mid-cycle whose spec must change goes back to draft,
+// and its gate records start a FRESH cycle — a past cycle's `passed` is
 // history, never current evidence (that masquerade is how a reopened node used to look
 // "already verified"). What survives the reset:
 //   · reviewed_commit — the closed cycle's boundary, which `diff` uses as the next
@@ -18,7 +19,8 @@
 //     would have to be reclassified on an in-progress record, so it stays in history.
 // Everything else — rounds, open_issues, narrative — lives on in git history.
 // A draft reopen also records the spec it reopened (`reopened_spec_digest`, v0.24.0): until
-// Overview→AC moves, `next` routes the draft to grow, which writes the change, not to
+// a grow has run since that reopen (v0.25.0 — a `grow TASK-N:` commit after it; the spec
+// seal clears the mark), `next` routes the draft to grow, which writes the change, not to
 // verify. Reopened drafts that still said the old thing — a brownfield survey's map in 11
 // of 13 and 8 of 9 measured reopens — sent verify to author the plan's change itself. A
 // node with no verify record yet (a mapped node never gated) gets one here to carry it.
@@ -136,20 +138,33 @@ export function cmdReopen (P, n, target, { hint = true } = {}) {
   if (taskText === null) { say(`no such node: ${n}`); return 2 }
   const st = P.statusOf(n)
   // reopen regresses a node past a gate it has ALREADY passed — that is what turns the old
-  // verdict into stale evidence needing a fresh cycle. Two statuses qualify: `done` (the
-  // result gate) and `approved` (the spec gate — sealed and human-decided, so editing that
-  // spec is exactly what validate's digest check refuses to let pass unnoticed; refusing to
-  // reopen it left that edit with no legal route at all). `sketch`/`draft` are
-  // pre-commitment — edit them in place. `implemented`/`reviewed`/`fixed` sit mid-cycle:
-  // their gate has not closed, so they continue it.
-  if (st !== 'done' && st !== 'approved') {
-    say(`${n}: reopen regresses a node past a gate it passed (done · approved) — it is '${st}': pre-commitment, so edit it in place, or mid-cycle, so let its gate finish`)
+  // verdict into stale evidence needing a fresh cycle: `done` (the result gate) and
+  // `approved` (the spec gate — sealed and decided; refusing to reopen it left an edit to
+  // that spec with no legal route at all). `sketch`/`draft` are pre-commitment — edit them
+  // in place. `implemented`/`reviewed`/`fixed` sit mid-cycle, and a cycle that can close
+  // continues — but one whose must-fix needs this node's own Contract changed cannot: fix
+  // may not edit the spec and approve refuses open issues, so refusing here left only
+  // "route it as a contract-gap and pass done with the defect" (v0.25.0, measured in three
+  // projects in one week: a person's "fix it now" became the next milestone, and a
+  // known-wrong sentence was copied into another node's header meanwhile). The same gate's
+  // second hole after `approved`, so the premise changes, not the case: a mid-cycle node
+  // reopens to draft. Its open cycle is abandoned — rounds and open issues stay in git
+  // history and are named below for revise's Change-Log line — and `reviewed_commit` keeps
+  // the last sealed boundary, so the next cycle's diff still holds the abandoned code.
+  const MID_CYCLE = ['implemented', 'reviewed', 'fixed']
+  if (st !== 'done' && st !== 'approved' && !MID_CYCLE.includes(st)) {
+    say(`${n}: reopen regresses a node past a gate it passed (done · approved), or abandons a cycle in flight (implemented · reviewed · fixed) — it is '${st}': pre-commitment, so edit it in place`)
     return 2
   }
   // An approved node has only the spec gate behind it, so `approved` as a target would reset
-  // nothing while reporting a change that did not happen.
+  // nothing while reporting a change that did not happen. A mid-cycle node's code cycle is
+  // already open: a change to its code alone is that cycle's own work (grovespec-fix).
   if (st === 'approved' && target !== 'draft') {
     say(`${n}: an approved node reopens to draft only — the spec gate is the one behind it (asked for '${target}')`)
+    return 2
+  }
+  if (MID_CYCLE.includes(st) && target !== 'draft') {
+    say(`${n}: a node mid-cycle (${st}) reopens to draft only — a change to its code alone is the open cycle's own work (grovespec-fix); reopen here is for a spec that must change (asked for '${target}')`)
     return 2
   }
 
@@ -165,6 +180,9 @@ export function cmdReopen (P, n, target, { hint = true } = {}) {
     resets.push(vt === null ? `verify cycle started (${fresh.counters})` : `verify cycle reset (adjudications kept; ${fresh.counters})`)
   }
   const rt = P.read(P.reviewYamlPath(n))
+  const abandoned = MID_CYCLE.includes(st) && rt !== null
+    ? listItems(rt, 'open_issues').map(it => itemValue(it, 'id').replace(/^(['"])(.*)\1$/, '$2').trim()).filter(Boolean)
+    : []
   if (rt !== null) {
     const fresh = freshCycle(P, rt, { reviewed_commit: topValue(rt, 'reviewed_commit') })
     writeAtomic(P.reviewYamlPath(n), fresh.text)
@@ -174,6 +192,7 @@ export function cmdReopen (P, n, target, { hint = true } = {}) {
   P.forget()
 
   say(`reopened: ${n} ${st} → ${target}${resets.length ? ` — ${resets.join(' · ')}` : ''}`)
-  if (hint) say(`  a fresh cycle starts here; record why in the Change Log (grovespec-revise owns the prose)${target === 'draft' ? ' — until its Overview→AC is rewritten, next routes it to grow' : ''}`)
+  if (MID_CYCLE.includes(st)) say(`  abandoned: the open ${st} cycle${abandoned.length ? ` and its open issue(s) ${abandoned.join(' · ')}` : ''} — git history keeps ${abandoned.length ? 'them' : 'it'}; write ${abandoned.length ? 'each' : 'why'} into the Change Log. The next cycle's diff still holds this cycle's code.`)
+  if (hint) say(`  a fresh cycle starts here; record why in the Change Log (grovespec-revise owns the prose)${target === 'draft' ? ' — next routes it to grow until a grow has run' : ''}`)
   return 0
 }

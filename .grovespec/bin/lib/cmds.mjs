@@ -14,6 +14,7 @@ import { readWaits, waitState, waitsPath } from './cmd-wait.mjs'
 import { hooksState, HOOK_MARK } from './cmd-hooks.mjs'
 import { readCands, candsPath, recheckState } from './cmd-recheck.mjs'
 import { retroOwed } from './cmd-retro.mjs'
+import { planSaw } from './cmd-fresh.mjs'
 import { stepMark } from './cmd-claim.mjs'
 import { sharedContext, readState, writeState, withSharedLock, STATE_REMEDY } from './shared.mjs'
 
@@ -1053,6 +1054,10 @@ function statusModel (P) {
     }
   })
   const b = P.backlogCounts()
+  const allDone = !gate && nodes.length > 0 && nodes.every(n => n.status === 'done')
+  // Parked work the newest plan already ruled on, untouched since, is not due again
+  // (v0.25.0 — the same reading `next` takes; cmd-fresh planSaw).
+  const planSawIt = allDone && b.total > 0 ? planSaw(P) : null
   return {
     gate,
     ws,
@@ -1062,8 +1067,9 @@ function statusModel (P) {
     nodes,
     treeEscalated: gate && P.reviewStatus(`${P.reviewDir}/tree.verify.yaml`) === 'escalated',
     backlog: b,
+    planSaw: planSawIt,
     // Every node done — parked work must not be invisible at the terminal line.
-    planDue: !gate && nodes.length > 0 && nodes.every(n => n.status === 'done') && b.total > 0
+    planDue: allDone && b.total > 0 && planSawIt === null
   }
 }
 
@@ -1114,6 +1120,8 @@ export function cmdStatus (P, json = false) {
     say('waiting on human:')
     for (const w of waiting) say(`  ${w}`)
   }
+  // Real defects parked for a contract change — apart from the record list they ride in.
+  if (m.backlog.routed) say(`routed must-fix: ${m.backlog.routed} — real defects parked for a contract change, each waiting on its "now" or the next plan (grovespec followups lists them first)`)
   // One line, not one per node: ~120 machine-taken gates across the audited projects
   // were ratified 0 times, and a block per node repeated on every status buried the rest
   // of the report. Nor "no human has looked" — a gate whose cycle carried the person's own
@@ -1136,6 +1144,7 @@ export function cmdStatus (P, json = false) {
   const nexts = m.nodes.filter(n => n.next !== null).map(n => ` ${n.id}`).join('')
   if (nexts !== '') say(`next:${nexts}`)
   else if (m.planDue) say(`next: plan — parked work awaits: ${backlogLine(m.backlog)} (grovespec-plan)`)
+  else if (m.planSaw !== null) say(`parked: ${backlogLine(m.backlog)} — what ${m.planSaw} ruled on, untouched since (grovespec-plan when you want to pick from it again)`)
   return 0
 }
 

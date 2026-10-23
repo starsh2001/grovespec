@@ -20,7 +20,7 @@
 // the SKILL's final line for it, and a runtime that echoed it would stop the loop early.
 import { listItemCount, RECORD_CATEGORIES } from './core.mjs'
 import { treeGateMsg } from './project.mjs'
-import { freshSignals } from './cmd-fresh.mjs'
+import { freshSignals, planSaw } from './cmd-fresh.mjs'
 import { retroOwed } from './cmd-retro.mjs'
 import { waitState } from './cmd-wait.mjs'
 import { recheckState } from './cmd-recheck.mjs'
@@ -263,14 +263,19 @@ export function cmdNext (P, auto) {
     const unq = s => s.replace(/^(['"])(.*)\1$/, '$2').trim()
     const recordOnly = P.allFollowups().filter(f => RECORD_CATEGORIES.includes(unq(f.category))).length
     const fuWork = auto ? b.followups - recordOnly : b.followups
-    if (fuWork + b.findings + b.restructuring + b.requests + fresh > 0) {
+    const parked = fuWork + b.findings + b.restructuring + b.requests
+    const parts = []
+    if (fuWork) parts.push(`followups ${fuWork}`)
+    if (b.findings) parts.push(`findings ${b.findings}`)
+    if (b.restructuring) parts.push(`restructuring ${b.restructuring}`)
+    if (b.requests) parts.push(`requests ${b.requests}`)
+    // Parked work the newest plan already ruled on, untouched since, does not route back to
+    // plan (v0.25.0): keeping it parked was that plan's decision, and asking again at once
+    // looped. fresh counts from that same plan, so any signal here is new work.
+    const saw = parked > 0 && fresh === 0 && sig.broken === null ? planSaw(P) : null
+    if (fresh > 0 || (parked > 0 && saw === null)) {
       const stop = treeHeld('a planning pass (grovespec-plan)')
       if (stop !== null) return stop
-      const parts = []
-      if (fuWork) parts.push(`followups ${fuWork}`)
-      if (b.findings) parts.push(`findings ${b.findings}`)
-      if (b.restructuring) parts.push(`restructuring ${b.restructuring}`)
-      if (b.requests) parts.push(`requests ${b.requests}`)
       if (fresh) parts.push(`fresh ${fresh}`)
       say(`next: plan — every node is done, parked work awaits: ${parts.join(' · ')}${auto && recordOnly ? ` (+ ${recordOnly} record-only item(s), on your pick)` : ''} (grovespec-plan)`)
       return 0
@@ -290,6 +295,10 @@ export function cmdNext (P, auto) {
       : sig.nested ? ' — committed hand-edits not classified (nested in a larger repository; grovespec fresh states the boundary)'
       : sig.adoption === null ? ' — committed hand-edits not classified (no adoption anchor in history; grovespec fresh states the boundary)'
       : ''
+    if (saw !== null) {
+      say(`nothing runnable — every node is done; the parked work (${parts.join(' · ')}) is what ${saw} ruled on, untouched since — grovespec-plan when you want to pick from it again${blind}`)
+      return 1
+    }
     if (auto && recordOnly > 0) {
       say(`nothing runnable — every node is done; the record list holds ${recordOnly} improvement/harmless item(s), worked only on your pick (grovespec-plan when you want them)${blind}`)
       return 1
