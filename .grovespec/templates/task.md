@@ -31,7 +31,7 @@ tdd_skip_reason: ""        # required when tdd: false
   - {the fixture or number that settles it}
 
 ## Subtasks
-<!-- A skeleton/root also builds its OWN structural deliverable (the glue/shell children slot into; the root: base environment + an empty runnable shell) — include that as a step, not only delegating to its children. -->
+<!-- A skeleton/root also builds its OWN structural deliverable (the glue/shell children slot into; the root: base environment + the walking skeleton — one real path through the main components) — include that as a step, not only delegating to its children. -->
 - [ ] {implementation step}
 
 ## Change Log

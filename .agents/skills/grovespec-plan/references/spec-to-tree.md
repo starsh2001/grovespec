@@ -23,7 +23,7 @@ Read from the spec (same rule as `code-to-tree.md`, but from intent not code):
 - library → the public interface
 - pipeline → the stages
 
-Root = the whole app (skeleton), with the entry points under it. (A *trivial single-capability* tool — one command, one job, no sub-features — can instead have a **`feature` root** that builds itself; not every project needs a skeleton root.)
+Root = the whole app (skeleton), with the entry points under it. (A *trivial single-capability* tool — one command, one job, no sub-features — can instead have a **`feature` root** that builds itself; not every project needs a skeleton root.) A skeleton root's own deliverable is the **walking skeleton** (`grovespec-implement`): its sketch names the main components its one path connects.
 
 ### 2. Decompose into skeletons and features (the whole tree)
 Walk the spec top-down. Each distinct capability with its own eventual contract becomes a node.

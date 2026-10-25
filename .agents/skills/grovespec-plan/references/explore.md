@@ -57,6 +57,20 @@ How to draw it out:
 5. **Test the assumptions.** The user's ("does it really need accounts?") and your own. Re-frame the moment a better framing shows up.
 6. **Close on coverage, not on calm — then it's the user's call.** Close when: direction facets are all covered **and** you have enough feature detail to decompose into a tree. A still-blank facet or an unexplored main feature is the *next* thing to draw out, not a thing to wave past. *Then* recommend capturing it (*"I think I've got the whole picture — want me to write the spec and brief?"*). If they'd rather keep going, keep going.
 
+## Show it, measure it
+Both are thrown away as code; what they settled goes into the record this pass writes — a document the person brought stays untouched, so write your own record beside it.
+
+**Show it** — when this pass adds or changes something the person will judge by looking: a screen, a command's output, a generated file or report, a rendered frame. Not for what only restores intended behavior or changes the inside (a bug fix, a refactor, speed), nor where a design the person brought already shows it.
+- **A sample, not a build.** Screens: one self-contained HTML file — no build step, server or install; inline styles and sample data; every screen this pass adds or changes inside it, switched by buttons in the page, not links. A command's output or a generated file: the sample itself, as text. A rendered frame: an image of one, over a real input when one exists. Samples carry the edges the spec names — empty · long · many · error — not only the happy path.
+- **Where:** a folder named after that record (`spec.md` → `{paths.ref}/spec/`) — never under `.grovespec/`, never in product code. Every sample is a file there, a text one too, so one line of the record links it.
+- **Look at it first** wherever you can render it, then ask **"is this what you mean?"** with the sample's path, or the text sample itself, in the question — and **no recommended option**. Rework and show again until it is; what they rejected, and why, goes in the record.
+- **Record it** under the heading of the feature it shows: a line naming the sample and the screen or state (`List screen, empty state: [prototype](spec/prototype.html)`) — a source clause like any other, carried to the node through its `refs`.
+
+**Measure it** — when the scope or the tree leans on an assumption that is uncertain and can be measured now, in minutes: a frame rate on this camera, an accuracy on a sample, whether a library or an API does X, a limit.
+- Run it under `FORMATS.md` "The person's machine" — your own temp directory, bounded, owned, cleaned up; a device (a camera, a microphone) or the person's account is asked about first.
+- Write the assumption · how it was measured · the result · what it means for scope into the record, and delete the code.
+- A result that breaks the scope is put to the person on the spot — it is a scope decision. What cannot be measured now goes into the brief's risks, naming the node that will measure it.
+
 ## Write the outputs
 
 ### 1. The detailed spec → ref/

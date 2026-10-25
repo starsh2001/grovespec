@@ -21,7 +21,7 @@ Working with *no* method has its own failure shape: every session starts from ze
 
 ```
 init (once: setup; brownfield also maps code)
-  → plan #0 (greenfield: intent → whole tree as sketches + source assignment)
+  → plan #0 (greenfield: intent, samples shown → whole tree as sketches + source assignment)
   → verify the decomposition (cold) → human approve
   → per node:  grow (detail) → verify → implement → review ⇄ fix → done
   → revise                     change an already-done node later
@@ -40,10 +40,10 @@ One per step of a node's life — `sketch → draft → approved → implemented
 | Skill | What it does |
 |---|---|
 | `grovespec-init` | Setup (once): the fixed interview → config. On existing code it also *surveys* the codebase into an all-`done` mapped tree + parked backlogs, ending at the survey **fidelity gate** (is the map accurate to the code?). It records what *is* — deciding what to build is plan's. |
-| `grovespec-plan` | The planning pass. #0 (empty tree): draw out the intent → frozen intent record + brief → the whole all-`sketch` tree. #N (all done + parked work): cluster followups·backlogs by family → human-confirmed dispositions (reopen · restructure · consciously drop) → a new dated intent record → reopens/grows the driver picks up. Ends at the tree gate. |
+| `grovespec-plan` | The planning pass. #0 (empty tree): draw out the intent — a throwaway sample of whatever you will judge by looking, a quick measurement of what the scope leans on → frozen intent record + brief → the whole all-`sketch` tree. #N (all done + parked work): cluster followups·backlogs by family → human-confirmed dispositions (reopen · restructure · consciously drop; anything you will see, shown first) → a new dated intent record → reopens/grows the driver picks up. Ends at the tree gate. |
 | `grovespec-grow` | Detail one node's *sketch* into a full *draft* spec (no code), from the intent records — the per-node step of the initial build, and the tool for later expansion. |
 | `grovespec-verify` | Cold, multi-role, parallel review of the **draft spec** → the gate (`draft → approved`), with the person asked only where a decision is theirs. The anti-rubber-stamp gate, spent where a flaw is cheapest. At `full` it also prunes entries this node made stale from `conventions.md` — only `implement` adds there, so nothing else would ever remove. |
-| `grovespec-implement` | Turn an approved spec into code: pre-check → tests first → code → confirm the node's decomposition (`approved → implemented`). |
+| `grovespec-implement` | Turn an approved spec into code: pre-check → tests first → code (the root: a walking skeleton — one real path through the main components) → confirm the node's decomposition (`approved → implemented`). |
 | `grovespec-review` | Run the **tests** + cold-review **only this node's diff** (not the codebase) → confirmed issue list (`implemented → reviewed`). |
 | `grovespec-fix` | Apply the review's issues to this node's code → re-review (`reviewed ⇄ fixed`), until clean → `done`. |
 | `grovespec-revise` | Change a node that already passed a gate (`done`, or an `approved` spec) — behavior (reopen + propagate), structure (split·merge·move), or promote a leaf to a skeleton. |
@@ -62,7 +62,7 @@ docs/
   tree.md            the node tree (ids only)
   conventions.md     glossary · common rules
   tasks/TASK-N.md    one node each: refs source assignment · Overview · Requirements · Contract · AC · Subtasks · Change Log
-  ref/               the frozen intent records (one per planning pass; brownfield: brought-in docs) + a location map that always points at current truth
+  ref/               the frozen intent records (one per planning pass; brownfield: brought-in docs) + a location map that always points at current truth + the samples a person approved, frozen beside their record
 .grovespec/
   config.yaml         paths · review settings · language
   schema              the format contract (machine SoT; FORMATS.md mirrors it)
@@ -141,6 +141,8 @@ Ownership is deliberate, so the docs can't drift apart: the flow and steps are d
 GroveSpec stands on earlier spec-driven work, with thanks. Its *explore* stance is influenced by [OpenSpec](https://github.com/Fission-AI/OpenSpec)'s explore mode. The cold, multi-reviewer gate and the one-node-ahead tree are GroveSpec's own response to the rubber-stamp reviews and spec↔code drift that every spec workflow meets at scale — territory charted by [BMAD-METHOD](https://github.com/bmadcode/bmad-method) and [Spec-Kit](https://github.com/github/spec-kit). Different bets, shared lineage.
 
 ## Status
+
+**v0.26.0 — what you will look at is shown before it is decided; the root wires one real path.** A cold review reads text, and whether a result looks right is the one thing it cannot judge — yet the build showed the person the running product last: on one pipeline project whose spec asked for a minimal end-to-end path first, the first overlay video came about 46 hours after the planning pass. **Samples:** when a planning pass adds or changes something the person will judge by looking — a screen, a command's output, a generated file, a rendered frame — plan shows a throwaway sample (screens as one static HTML page, with the empty, long and error states in it) and asks "is this what you mean?" with no recommended option, before the tree or the disposition table is fixed. The approved sample is frozen beside its intent record, reaches each node through `refs` like any other clause, and never enters the product. An uncertain assumption the scope leans on that a few minutes can settle — a frame rate, an accuracy, whether an API does X — is measured the same way and recorded. **Walking skeleton:** a root built for the first time no longer stands up a shell that only boots; it wires one real path through the main components — screen → API → store, command → store → output, input → zero stages → output — with every child slot empty and no feature logic. Its unattended end-to-end test checks that the path connects, never what an empty slot gives, so the first child to fill a slot does not break it. A cold review of the new rules before release found that last trap and four smaller ones, all closed here. The runtime is unchanged, and records gain only an optional samples folder beside a ref record; a root already built — done or reopened — keeps the deliverable it was built with, and a project's next planning pass shows samples.
 
 **v0.25.1 — the question carries the decision.** A person answered three questions in a row without seeing the explanation written just before each: text written right before a question-tool call can be recorded as a folded thinking block, and the agent cannot tell from inside. v0.20.1 had put a decision's substance in the message body and given the tool only the question and short labels; now the issue, what each option does, the recommended one and any list being approved go into the question itself — the one field every host shows. Wording only.
 
