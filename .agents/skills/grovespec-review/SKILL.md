@@ -86,6 +86,6 @@ Lane outcomes in this step:
 ## When it's done
 On `done`: the node's tests pass, its diff is cold-reviewed clean, and the gate was taken on the record (the machine on the cold verdict — or a person who looked, by `--human` or `ratify`). A `done` skeleton's children can now be grown (`grovespec-grow`); a `done` leaf ends its branch.
 
-> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — a `## … starting` heading to open; `### Result · Open · Your turn · Next` headings to close, warm full sentences). Here, *Open / Your turn* typically carry: open issues · an escalation · fresh signals · unverified NFR targets.
+> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — `## … starting` to open; `### Result · Open · Your turn · Next` to close; warm full sentences, laid out in lists and tables). Here, *Open / Your turn* typically carry: open issues · an escalation · fresh signals · unverified NFR targets.
 
 > **Recommend a new session for the next node** (`grovespec-grow` the next sketch). Each node starts fresh — clean, bounded context is what keeps GroveSpec's cost flat as the tree grows (WORKFLOW §5). *(Driving with `grovespec next` in a loop? `@new` already starts that session — this recommendation is for a person going step by step, and it is never a reason to end the loop.)*

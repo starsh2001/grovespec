@@ -1277,7 +1277,7 @@ export function cmdLang (P) {
 // detected locale instead — see grovespec-init references/setup.md.
 const INTERVIEW = [
   {
-    question: '재검토 횟수 — GroveSpec은 스펙과 코드를 여러 AI가 반복해서 검토해 문제를 찾아요. 무엇을 반드시 고칠지는 문제의 종류로 정해져 있어요(실행 불가·요구사항 미충족·일반 사용 버그·손쉬운 오남용·보안 구멍은 반드시 수정, 개선점·사용에 지장 없는 버그는 기록만). 여기서 정하는 건 하나예요: "새로운 필수 수정 문제가 연속 몇 번 안 나와야 탐색을 끝낼까?" 횟수가 클수록 꼼꼼하지만 그만큼 느리고 비싸요.',
+    question: '**재검토 횟수 — 문제 찾기를 언제 끝낼까요?**\n\nGroveSpec은 스펙과 코드를 여러 AI가 반복해서 검토해 문제를 찾아요. 무엇을 반드시 고칠지는 문제의 종류로 정해져 있어요.\n\n- **반드시 수정:** 실행 불가 · 요구사항 미충족 · 일반 사용 버그 · 손쉬운 오남용 · 보안 구멍\n- **기록만:** 개선점 · 사용에 지장 없는 버그\n\n여기서 정하는 건 하나예요. **새로운 필수 수정 문제가 연속 몇 번 안 나와야 탐색을 끝낼까요?** 횟수가 클수록 꼼꼼하지만 그만큼 느리고 비싸요.',
     header: '재검토 횟수',
     multiSelect: false,
     options: [
@@ -1287,7 +1287,7 @@ const INTERVIEW = [
     ]
   },
   {
-    question: "리뷰어 모델 — 그 검토는 여러 AI가 서로 다른 관점으로 나눠서 해요 (한쪽은 '결과가 맞나', 다른 쪽은 '보안 구멍은 없나'). AI는 똑똑할수록 더 잘 잡지만 그만큼 비싸요. 검토 AI를 전부 같은 걸로 둘까요, 아니면 깊이 파고드는 쪽만 더 센(비싼) 걸로 올릴까요?",
+    question: "**리뷰어 모델 — 검토 AI를 어떻게 둘까요?**\n\n그 검토는 여러 AI가 서로 다른 관점으로 나눠서 해요. 한쪽은 '결과가 맞나'를, 다른 쪽은 '보안 구멍은 없나'를 봐요. AI는 똑똑할수록 더 잘 잡지만 그만큼 비싸요.\n\n**검토 AI를 전부 같은 걸로 둘까요, 아니면 깊이 파고드는 쪽만 더 센(비싼) 걸로 올릴까요?**",
     header: '리뷰어 모델',
     multiSelect: false,
     options: [
@@ -1296,7 +1296,7 @@ const INTERVIEW = [
     ]
   },
   {
-    question: '편집 라우팅 훅 — GroveSpec을 거치지 않은 코드 수정도 나중에 감지되지만(fresh), 훅을 설치하면 편집하는 그 순간 "이 파일은 어느 노드 소유이고, 이 수정이 그 계약에 닿는지"를 계산해 에이전트에게 알려줘요. 아무것도 막지 않는 조언형이고, 이 프로젝트의 .claude/settings.json(Claude Code)과 .codex/hooks.json(Codex)에만 등록돼요. 끄는 건 언제든 config 한 줄(hooks: off), 제거도 명령 하나(grovespec hooks remove)예요.',
+    question: '**편집 라우팅 훅 — 설치할까요?**\n\nGroveSpec을 거치지 않은 코드 수정도 나중에 감지돼요(`fresh`). 훅을 설치하면 편집하는 그 순간 "이 파일은 어느 노드 소유이고, 이 수정이 그 계약에 닿는지"를 계산해 에이전트에게 알려줘요.\n\n- **막지 않아요:** 알려 주기만 하는 조언형이에요.\n- **등록 위치:** 이 프로젝트의 `.claude/settings.json`(Claude Code)과 `.codex/hooks.json`(Codex)뿐이에요.\n- **끄기·제거:** 끄는 건 언제든 config 한 줄(`hooks: off`), 제거도 명령 하나(`grovespec hooks remove`)예요.',
     header: '편집 라우팅 훅',
     multiSelect: false,
     options: [
@@ -1319,7 +1319,7 @@ export function cmdInterview (surface) {
   if (!['', 'claude', 'codex'].includes(surface)) { say('usage: grovespec interview [claude|codex]'); return 2 }
   if (surface === 'codex') {
     say(JSON.stringify(INTERVIEW.map(q => ({
-      title: `${q.question}\n\n${q.options.map(o => `- ${o.label}: ${o.description}`).join('\n')}`,
+      title: `${q.question}\n\n**선택지**\n\n${q.options.map(o => `- **${o.label}:** ${o.description}`).join('\n')}`,
       options: q.options.map(o => o.label)
     })), null, 2))
     return 0

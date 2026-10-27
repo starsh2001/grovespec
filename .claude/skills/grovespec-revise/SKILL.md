@@ -73,7 +73,7 @@ Thin — read only the Task·relevant code of the node you're changing, and (whe
 ## When it's done
 The changed node is `done` again, with the reason in the Change Log. If the contract changed, the consumers have been re-reviewed and are coherent again.
 
-> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — a `## … starting` heading to open; `### Result · Open · Your turn · Next` headings to close, warm full sentences). Here, *Open / Your turn* typically carry: candidates declared and awaiting their recheck · an escalated gate.
+> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — `## … starting` to open; `### Result · Open · Your turn · Next` to close; warm full sentences, laid out in lists and tables). Here, *Open / Your turn* typically carry: candidates declared and awaiting their recheck · an escalated gate.
 
 **Commit the reopening as `revise TASK-N: <summary>`** before the re-run steps begin — the changed Task file(s), every `refs` update, the tree edit if the structure moved, the fresh tree-cycle record when source ownership changed, the candidate declarations (`.grovespec/candidates.yaml`), and the `reopen` result. The step name goes first (`FORMATS.md` "Commits"); the cycle that follows writes its own `TASK-N: ` commits.
 

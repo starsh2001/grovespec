@@ -42,6 +42,26 @@ The artifact is not a data file that a person occasionally tolerates — it is *
 
 Measured, in a real project, before these limits existed: one node's Change Log was **402 of the Task's 762 body lines**, its longest entry **2466 characters** — a single bullet nobody could read, in the section a person opens the file *for*.
 
+## Layout — every page and every message
+
+Everything GroveSpec writes for a person is **laid out in Markdown by section** — every Markdown artifact here, and every message a step says to the person: the step report, a question, a word mid-run. The reader finds each part by its label and reads it once; a wall of text is read by no one, however true each sentence in it is.
+
+- **One section per point.** Each part opens with a heading or, where a heading is too loud — inside a question, a list item, under a `###` slot — a **bold label** opening its line.
+- **Parallel items are a list.** Three or more things of one kind that each carry words of their own — nodes with their work, findings, options, steps — go one per line, never strung through a sentence: "TASK-1: … TASK-3: … TASK-4: …" in one paragraph fails. Bare names may share a line (`TASK-2 · TASK-11`, an order as `TASK-1 → TASK-6`); a sub-point is a nested item.
+- **A comparison is a table.** Items set against the same attributes — options × what each does × what it costs, nodes × what changes, before × after — at most four columns, cells short enough for a phone.
+- **Bold is for what must not be missed** — the decision, the recommendation, a verdict, the deciding number. Labels aside, one or two per section — bold a whole paragraph and nothing stands out.
+- **A paragraph makes one point**, in four sentences at most.
+- **`code` for what is typed or matched literally** — a path, a command, an identifier, a value.
+- **Plain Markdown only** — CommonMark and tables: no HTML, no nested tables. A host that does not render a field shows its source, and plain Markdown still reads there.
+
+**What a parser reads keeps its shape; the layout works around it:**
+- frontmatter, `tree.md`'s list, fenced packets, the gate records' YAML;
+- the fixed `##` sections of a Task, the brief and conventions — a new part inside one is a `###` or a bold label, never another `##`;
+- a ref record's numbered headings, however deep;
+- a `(gap)` opening its item — a label goes after it, never before;
+- `ref/index.md`'s one table;
+- a Change-Log entry's one line — several things are several entries.
+
 
 
 ## tasks/TASK-N.md
@@ -265,7 +285,7 @@ An all-mapped no-ref tree remains code-grounded when either a spec or result rec
 
 ## The step report (what a skill says to the person)
 
-Every step skill **opens and closes in the same shape**, so the person finds the same information in the same place on every run — a human gate only works if the report feeding it reads the same way the tenth time as the first. The headings are fixed English (like every header in this file); the prose between them is written in `config.language`, **warmly and in full sentences** (in the language's respectful-address register — the writing rules at the top of this file), for the same reader as the setup interview — someone who may not code. The artifact rules at the top of this file cut filler because artifacts are re-read; a report is spoken once to *orient a person*, so here the explanation is the payload — never compress it into a telegram line ("R2 pass, no issues" fails this format even when it's true).
+Every step skill **opens and closes in the same shape**, so the person finds the same information in the same place on every run — a human gate only works if the report feeding it reads the same way the tenth time as the first. The headings are fixed English (like every header in this file); the prose between them is written in `config.language`, **warmly and in full sentences** (in the language's respectful-address register — the writing rules at the top of this file), for the same reader as the setup interview — someone who may not code. The artifact rules at the top of this file cut filler because artifacts are re-read; a report is spoken once to *orient a person*, so here the explanation is the payload — never compress it into a telegram line ("R2 pass, no issues" fails this format even when it's true). Full sentences are not a wall, either: the report is laid out like every page (*Layout*), and each item of a list is still a full sentence.
 
 **Written so the reader has never read these docs.** This is the one place GroveSpec asks a person for something, and it is the place its vocabulary leaks hardest — the step has spent its whole run inside check codes, round numbers and lens names, and they come out sounding like words. They are not words to the reader. So:
 - **Never a bare code.** `C4`, `R11`, `F-D`, `PASS`, `normal-use-bug` — none of these reach the person alone. Say what was found and what it means for them. The code is available in the record if they ask.
@@ -273,7 +293,7 @@ Every step skill **opens and closes in the same shape**, so the person finds the
 - **The gate question is asked in the person's terms, about their thing** — what it now does, what it will not do, what they are agreeing to. "Is this the right decomposition?" is the *skill's* question; the person's is "이 구조로 지으면 원하시는 게 나오는지".
 - The test: read your closing aloud to someone who has never heard of GroveSpec. Every sentence they would stop on is a sentence to rewrite.
 
-**A decision, not a stage — what may stop for the person.** A step stops for the person only where a decision is genuinely theirs: **an ambiguous requirement** (the source or the person left it open — a name, a policy, a constraint, a question with no defensible default), **a product behavior or scope choice** (a `(gap)` ruling, a planning disposition, the decomposition), or **accepting an unmet or unverifiable requirement** (a requirement the only fix would narrow or drop, a measurable target nothing can check). A gate that came out clean within the agreed requirements is **not** one: its verdict is recorded (`approved_by: machine` — the cold verdict, never the person's approval) and the flow goes on. Every ask has four parts — **the issue** (what is undecided, in one line) · **the options** · **each option's impact** · **the recommended one** with its one-line why — and always allows a free-form answer. Two asks carry no recommended one, because only the person can answer them: what to build next, and whether a sample the agent made shows what they mean. **Ask through the host's question tool whenever it has one** (`AskUserQuestion` · `request_user_input_async`): the host holds the session for the answer and the step goes on from it, while an ask left in the closing *Your turn* ends the turn — and any loop driving it. Only a host with no question tool, or one that refused the call in this session, asks there — a refusal remembered from another session (a note, a memory) is not one. **The question carries the decision**: write the four parts into the tool's question itself — the issue, what each option does and costs, the recommended one and why, and any list it approves (a disposition table, a tree delta, the nodes a plan reopens) — so a person who sees only the question can decide; the options get short labels. The question is the one field every host shows: an option's `preview` or description may never appear, and text written just before the call may be recorded as a folded thinking block the person never sees. Nothing the decision rests on lives only in an option's field or in the text before the call. **No issue, no ask**: "shall I record this as done?" over nothing to decide is a stage approval, and a stage approval is the rubber stamp this format exists to prevent. The verdicts (the gate records) and the person's decisions (`adjudications`, Change-Log lines, `ratify`) are kept apart — one never stands in for the other.
+**A decision, not a stage — what may stop for the person.** A step stops for the person only where a decision is genuinely theirs: **an ambiguous requirement** (the source or the person left it open — a name, a policy, a constraint, a question with no defensible default), **a product behavior or scope choice** (a `(gap)` ruling, a planning disposition, the decomposition), or **accepting an unmet or unverifiable requirement** (a requirement the only fix would narrow or drop, a measurable target nothing can check). A gate that came out clean within the agreed requirements is **not** one: its verdict is recorded (`approved_by: machine` — the cold verdict, never the person's approval) and the flow goes on. Every ask has four parts — **the issue** (what is undecided, in one line) · **the options** · **each option's impact** · **the recommended one** with its one-line why — and always allows a free-form answer. Two asks carry no recommended one, because only the person can answer them: what to build next, and whether a sample the agent made shows what they mean. **Ask through the host's question tool whenever it has one** (`AskUserQuestion` · `request_user_input_async`): the host holds the session for the answer and the step goes on from it, while an ask left in the closing *Your turn* ends the turn — and any loop driving it. Only a host with no question tool, or one that refused the call in this session, asks there — a refusal remembered from another session (a note, a memory) is not one. **The question carries the decision**: write the four parts into the tool's question itself — the issue, what each option does and costs, the recommended one and why, and any list it approves (a disposition table, a tree delta, the nodes a plan reopens) — so a person who sees only the question can decide; the options get short labels. **Lay the question out** (*Layout*): the issue first, in bold, put as the question; then each part under its own bold label — the options and what each does and costs as a list or a table, the approved list one item per line or a table, the recommendation last. A question run as one paragraph fails however complete it is (filled example below). The question is the one field every host shows: an option's `preview` or description may never appear, and text written just before the call may be recorded as a folded thinking block the person never sees. Nothing the decision rests on lives only in an option's field or in the text before the call. **No issue, no ask**: "shall I record this as done?" over nothing to decide is a stage approval, and a stage approval is the rubber stamp this format exists to prevent. The verdicts (the gate records) and the person's decisions (`adjudications`, Change-Log lines, `ratify`) are kept apart — one never stands in for the other.
 
 **The recommendation is the answer you would actually choose** — never the safe-looking one:
 - Never recommend leaving a decision open, or skipping a check, because deciding is hard. Recommend *later* only with the reason it can't be decided now — what is missing, and when it arrives.
@@ -282,13 +302,40 @@ Every step skill **opens and closes in the same shape**, so the person finds the
 - Never recommend removing an existing feature; ask what it is for first.
 - One decision per ask — never several under one recommendation.
 
+Filled, a question reads like this (prose in the project's language; the options are just `Build on it (recommended)` · `Change something`):
+```
+**Build milestone 1 on this tree?**
+
+**What changed since you approved the map**
+- **New:** TASK-23, the ledger writer — the one entry point that writes a balance row.
+- **Reopened:** the four nodes below.
+- **Unchanged:** TASK-2 · TASK-11 · TASK-15 · TASK-20.
+
+| node | what it does this milestone |
+|---|---|
+| TASK-1 · the app | deploy settings and a Korean error page |
+| TASK-6 · balance | the balance from real ledger rows only |
+| TASK-14 · monthly run | catches up a missed 1st of the month |
+| TASK-22 · settlement | counts a partial refund by its net amount |
+
+**Not this milestone:** the questions you put off, and 16 improvements recorded only.
+
+**Order:** TASK-1 → TASK-6 → TASK-14 → TASK-23 → TASK-22. TASK-1 is the first result you can see.
+
+**Options**
+- **Build on it** — node work starts with TASK-1.
+- **Change something** — say what; the tree is checked again before any node starts.
+
+**Recommended: build on it** — every change traces to a finding you confirmed in the plan, and nothing was added beyond them.
+```
+
 **Ask as soon as you know.** A decision you already know is the person's is asked in the step that finds it — never handed to a later step ("gap 3건은 verify에서 여쭙겠습니다"); one that first arises in a later step is asked there.
 
 **A defect only a contract change closes is asked where it is found.** Whatever step finds it — grow, verify, implement, review, fix — a must-fix (`reviewers.md` §Categories) that no change in the current step can close, because a node's Contract says the wrong thing, is asked on the spot: **fix it now, or next milestone?** It does not matter whose node it is — another one, done or not, or the very node under work. *Now*: the current step ends at its commit, and `grovespec-revise` reopens that node to `draft` with the defect as its reason — a node mid-cycle (`implemented` · `reviewed` · `fixed`) included: its open cycle is abandoned, never passed with the defect. *Next milestone*: it goes into `followups` as a `contract-gap` for the next plan, and the gate it was found at may close on the rest. Recommend *now* when it is critical — data lost or corrupted, a security hole or easy abuse, or the main path of ordinary use crashes or is blocked; otherwise *next milestone*. Never leave it as a Change-Log line or a line in a closing.
 
 Fails this format, though every word is true — a *Result* reading `R2에서 C4가 PARTIAL로 남았고 normal-use-bug 하나가 open_issues에 있습니다.` Passes — `두 번째 검토에서 한 가지가 걸렸습니다. 목표를 세운 당일의 달성 여부를 세는 규칙이 스펙과 코드에서 서로 다르게 읽혀서, 지금 상태로는 스트릭 숫자가 하루 어긋날 수 있습니다.`
 
-**Markdown headings, not label lines.** The anchor is a `##` heading and each slot a `###` heading with its prose underneath — never `Result: …` run on as a label line, which buries the slots in one block of text. Inside a slot, a list or a short table is fine where it reads better than a paragraph (the items of a decision, the nodes that changed).
+**Markdown headings, not label lines.** The anchor is a `##` heading and each slot a `###` heading — never `Result: …` run on as a label line, which buries the slots in one block of text. Inside a slot, *Layout* holds: lead with the point in a sentence or two, then the items — what was found, what changed, what waits — as a list or a table, never strung through one paragraph.
 
 **Opening** — the first message when the skill starts:
 ```
@@ -321,14 +368,21 @@ Filled, it reads like this (prose in the project's language):
 ## [grovespec review TASK-3] done — the aggregation code is written, reviewed and clean; 14 of 14 tests pass
 
 ### Result
-TASK-3 is the part that adds your records up per day and decides whether a goal was met. It is now built and all 14 of its tests pass. Reviewers who had not seen it being written read it twice over, raised nine concerns, and three of those turned out to be real: a record crossing midnight was counted on the wrong day, a goal set today reported a streak of one, and an empty day returned nothing instead of zero minutes. All three are fixed, and a fresh reading of just those fixes found nothing new.
+TASK-3 is the part that adds your records up per day and decides whether a goal was met. It is now built, and **all 14 of its tests pass**.
+
+Reviewers who had not seen it being written read it twice over and raised nine concerns. **Three were real, and all three are fixed:**
+- A record crossing midnight was counted on the wrong day.
+- A goal set today reported a streak of one.
+- An empty day returned nothing instead of zero minutes.
+
+A fresh reading of just those fixes found nothing new.
 
 ### Open
-Nothing is left open here — the three are closed and the other six were ruled out with reasons, which are kept with the review so they do not come back round after round.
+Nothing is left open here. The other six concerns were ruled out with reasons, kept with the review so they do not come back round after round.
 
 ### Your turn
-Nothing here needs a decision from you: the three problems were real and are fixed, and nothing the reviewers raised asks you to choose between behaviors or to accept a gap. So the gate is recorded as passed by the review — not as approved by you — and the build moves on.
+**Nothing here needs a decision from you.** The three problems were real and are fixed, and nothing the reviewers raised asks you to choose between behaviors or to accept a gap. So the gate is recorded as passed by the review — not as approved by you — and the build moves on.
 
 ### Next
-TASK-4 — the weekly report screen — is the next one to spec out, and the loop goes there on its own. Best started in a fresh session, so the reviewers come to it without having watched it being written.
+**TASK-4 — the weekly report screen** is the next one to spec out, and the loop goes there on its own. Best started in a fresh session, so the reviewers come to it without having watched it being written.
 ```

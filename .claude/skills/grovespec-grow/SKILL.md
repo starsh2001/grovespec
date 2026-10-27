@@ -56,6 +56,6 @@ The node is now a full `draft`. **Next is `grovespec-verify <this node>`** — t
 
 One node's `sketch` is now a full `draft` (or, for expansion, a new `draft` exists in `tree.md`). The expensive steps follow, one at a time: `grovespec-verify` → (approve → `approved`) → `grovespec-implement` → `grovespec-review` → (confirm → `done`). Only once *this* node is `done` are *its* (already-sketched) children detailed.
 
-> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — a `## … starting` heading to open; `### Result · Open · Your turn · Next` headings to close, warm full sentences). Here, *Open / Your turn* typically carry: open questions · gaps needing a ruling.
+> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — `## … starting` to open; `### Result · Open · Your turn · Next` to close; warm full sentences, laid out in lists and tables). Here, *Open / Your turn* typically carry: open questions · gaps needing a ruling.
 
 > **Recommend a new session for the next step** (`grovespec-verify` this draft). The agent that just wrote the draft shouldn't also orchestrate its cold review — start it fresh, clean bounded context (WORKFLOW §5). *(Driving with `grovespec next` in a loop? `@new` already starts that session — this recommendation is for a person going step by step, and it is never a reason to end the loop.)*

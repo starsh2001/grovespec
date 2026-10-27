@@ -53,6 +53,6 @@ After either mode: `grovespec next` drives again — plan opened the doors; it n
 
 > **Where it runs.** Main session — the tree gate it ends on spawns cold reviewers as subagents (never run a grovespec skill *as* a subagent; spawn once, message never, clear residents before a wave — `reviewers.md` §Spawning).
 
-> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — a `## … starting` heading to open; `### Result · Open · Your turn · Next` headings to close, warm full sentences). Here, the closing's substance is: the disposition table · what was dropped and why · what the next milestone will build.
+> **Open and close in the step-report shape** (`FORMATS.md` "The step report" — `## … starting` to open; `### Result · Open · Your turn · Next` to close; warm full sentences, laid out in lists and tables). Here, the closing's substance is: the disposition table · what was dropped and why · what the next milestone will build.
 
 > **Recommend a new session for the next step** (the tree verify, or the first reopened node's cycle). Clean, bounded context per step (WORKFLOW §5). *(Driving with `grovespec next` in a loop? `@new` already starts that session — this recommendation is for a person going step by step, and it is never a reason to end the loop.)*

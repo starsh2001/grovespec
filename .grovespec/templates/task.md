@@ -14,7 +14,7 @@ tdd_skip_reason: ""        # required when tdd: false
 
 > {One line: what this node is responsible for. The lede a person reads before deciding whether to read on — not a restatement of the Overview's first sentence, and not the machine fields above.}
 
-<!-- The blank line above the closing `---` is load-bearing: without it a Markdown renderer turns the whole frontmatter into this document's biggest heading. The `# TASK-N · name` title and the `>` lede replace it as the top of the page — keep both, and keep the title's id·name equal to the frontmatter's. Headers below are FIXED (the parser contract). Write the CONTENT in the project's language (config.language) — plain words, no coined terms, readable in one pass by someone new to the project. This file is read by a person and an agent alike (→ FORMATS.md "How the prose is written" · "How it reads when rendered"). -->
+<!-- The blank line above the closing `---` is load-bearing: without it a Markdown renderer turns the whole frontmatter into this document's biggest heading. The `# TASK-N · name` title and the `>` lede replace it as the top of the page — keep both, and keep the title's id·name equal to the frontmatter's. Headers below are FIXED (the parser contract). Write the CONTENT in the project's language (config.language) — plain words, no coined terms, readable in one pass by someone new to the project. This file is read by a person and an agent alike (→ FORMATS.md "How the prose is written" · "How it reads when rendered" · "Layout"). -->
 
 ## Overview
 {What this node is, and why. 2-3 sentences.}
