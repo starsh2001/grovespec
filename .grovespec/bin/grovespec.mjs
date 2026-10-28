@@ -41,7 +41,8 @@
 //              ASCII; Codex: plain UTF-8) — re-typing them is how they got corrupted
 //   hooks install|remove|status  the advisory edit-routing hook's registration in
 //              .claude/settings.json + .codex/hooks.json — the merge is runtime code,
-//              surgical + idempotent
+//              surgical + idempotent. install|remove is init's runtime step, so it also
+//              restores a missing .grovespec/.gitignore from templates/gitignore
 //   uninstall [--purge]  remove the tool (runtime + skills + hook registration); the
 //              ledger (gate records · waits · config · docs/) stays unless --purge
 //   amend TASK-N  absorb a documentation-only edit to a sealed node: Contract·AC
@@ -62,7 +63,7 @@
 // CLI black box; this runtime was graded against the bash implementation it replaced
 // on those goldens, case for case.
 // Format SoT: .grovespec/schema   Paths: .grovespec/config.yaml
-import { Project, findRoot, languageRefusal, versionRefusal } from './lib/project.mjs'
+import { Project, findRoot, languageRefusal, versionRefusal, restoreBundleIgnore, BUNDLE_IGNORE, BUNDLE_IGNORE_TEMPLATE } from './lib/project.mjs'
 import { acquire, release, lockPath } from './lib/lock.mjs'
 import { cmdValidate, cmdStatus, cmdCheck, cmdFollowups, cmdLang, cmdLocale, cmdInterview, cmdId, cmdImpact, cmdTree, cmdVersion } from './lib/cmds.mjs'
 import { cmdDiff } from './lib/cmd-diff.mjs'
@@ -196,7 +197,25 @@ if (badArg !== null) {
       case 'lang': ec = cmdLang(new Project()); break
       case 'locale': ec = cmdLocale(); break
       case 'interview': ec = cmdInterview(arg); break
-      case 'hooks': ec = cmdHooks(new Project(), arg); break
+      case 'hooks': {
+        const P = new Project()
+        ec = cmdHooks(P, arg)
+        // install|remove is init's runtime step — Q4 runs one for either answer — so it
+        // also completes a bundle that arrived without its .gitignore (lib/project.mjs),
+        // whatever the registration's own fate: a hook file it cannot parse is refused,
+        // and the bundle still gets its file. Only here: a read never writes, and the
+        // node-cycle writers (test · pin · approve · reopen …) run where a result gate's
+        // pending window holds the whole project still — a new file there makes
+        // pin/approve refuse and committing it breaks the seal (lib/git.mjs
+        // resultSubjectPath). uninstall's own hook removal calls cmdHooks directly, so
+        // it never fills a bundle it is about to delete.
+        if (arg === 'install' || arg === 'remove') {
+          const r = restoreBundleIgnore(P.root)
+          if (r === 'restored') process.stdout.write(`restored ${BUNDLE_IGNORE} from ${BUNDLE_IGNORE_TEMPLATE} — the bundle arrived without it (npm drops every .gitignore from a package); commit it with the rest of the install\n`)
+          else if (typeof r === 'object') process.stdout.write(`could not restore ${BUNDLE_IGNORE} (${r.failed}) — copy ${BUNDLE_IGNORE_TEMPLATE} there yourself, then commit it\n`)
+        }
+        break
+      }
       case 'uninstall': {
         const P = new Project()
         ec = cmdUninstall(P, rest, () => cmdHooks(P, 'remove'))

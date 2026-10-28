@@ -9,5 +9,10 @@
 # patterns in a lower-level file override higher-level ones), so `!` re-includes here.
 # A project rule that ignores .grovespec/ itself can't be undone from inside it —
 # `grovespec validate` names any GroveSpec file git still ignores.
+#
+# npm drops every .gitignore from a package, so the bundle carries these bytes twice:
+# here and as templates/gitignore. When this file is missing, init's runtime step
+# (`grovespec hooks install|remove`) recreates it from that copy — never over an
+# existing one. Edit the two together.
 !bin/
 !review/*.log

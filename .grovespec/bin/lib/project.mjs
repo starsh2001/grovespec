@@ -1,7 +1,7 @@
 // GroveSpec project model — the filesystem-bound layer: find the root, resolve config
 // paths, read tasks and the tree. All paths are kept forward-slashed from the moment
 // they are built, so every printed path is identical across platforms.
-import { existsSync, statSync, readFileSync, readdirSync, writeFileSync, renameSync, chmodSync, rmSync } from 'node:fs'
+import { existsSync, statSync, lstatSync, readFileSync, readdirSync, writeFileSync, renameSync, linkSync, chmodSync, rmSync } from 'node:fs'
 import { dirname, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { specDigest } from './source-evidence.mjs'
@@ -35,6 +35,51 @@ export function writeAtomic (path, text) {
     }
     try { rmSync(tmp, { force: true }) } catch { /* the throw below names the failure */ }
     throw e
+  }
+}
+
+// The bundle's own .gitignore (`!bin/` · `!review/*.log` — README "Using it") is shipped
+// twice: npm drops every .gitignore from a package, even one listed in `files`, so a
+// bundle unpacked from npm arrives without it, and a project rule like `bin/` then keeps
+// the runtime out of git (a fresh clone has none). templates/gitignore carries the same
+// bytes, and init's runtime step (`hooks install|remove` — grovespec.mjs) puts them back.
+export const BUNDLE_IGNORE = '.grovespec/.gitignore'
+export const BUNDLE_IGNORE_TEMPLATE = '.grovespec/templates/gitignore'
+
+// 'present' — any entry at that name, a dangling link included: an edited, emptied or
+// linked file is the project's choice and is never replaced · 'restorable' — absent, and
+// the template is a file · 'no-template' — an older bundle, or no install here ·
+// { failed } — the name could not be read, which is never folded into "absent".
+export function bundleIgnoreState (root) {
+  try { lstatSync(`${root}/${BUNDLE_IGNORE}`); return 'present' } catch (e) {
+    if (e.code !== 'ENOENT') return { failed: e.code ?? e.message }
+  }
+  try { return statSync(`${root}/${BUNDLE_IGNORE_TEMPLATE}`).isFile() ? 'restorable' : 'no-template' } catch { return 'no-template' }
+}
+
+// Put the template's bytes back — only into an absent name. Staged whole beside the
+// target, then published by hard link, which fails on an existing name (EEXIST) instead
+// of replacing it: the file appears complete or not at all — a half-written one would
+// never be repaired, since an existing file is left alone. A filesystem without hard
+// links gets an exclusive create (still never a replace). Returns 'restored', or the
+// state that stopped it.
+export function restoreBundleIgnore (root) {
+  const st = bundleIgnoreState(root)
+  if (st !== 'restorable') return st
+  const target = `${root}/${BUNDLE_IGNORE}`
+  const tmp = `${target}.tmp-${process.pid}`
+  try {
+    const bytes = readFileSync(`${root}/${BUNDLE_IGNORE_TEMPLATE}`)
+    writeFileSync(tmp, bytes)
+    try { linkSync(tmp, target) } catch (e) {
+      if (e.code === 'EEXIST') return 'present'
+      writeFileSync(target, bytes, { flag: 'wx' })
+    }
+    return 'restored'
+  } catch (e) {
+    return e.code === 'EEXIST' ? 'present' : { failed: e.code ?? e.message }
+  } finally {
+    try { rmSync(tmp, { force: true }) } catch { /* left as .tmp-<pid> scratch, which validate already skips */ }
   }
 }
 

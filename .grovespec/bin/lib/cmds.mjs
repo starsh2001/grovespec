@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createHash } from 'node:crypto'
 import { cfgValue, findWaves, itemStuck, sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, strictYamlProblems, MUST_FIX_CATEGORIES, RECORD_CATEGORIES, LEGACY_GRADE_FIELDS, completionProblems, frontmatterBoundaryProblem, readabilityFindings } from './core.mjs'
-import { Project, treeGateMsg, scriptDir, FORMAT } from './project.mjs'
+import { Project, treeGateMsg, scriptDir, FORMAT, bundleIgnoreState, BUNDLE_IGNORE, BUNDLE_IGNORE_TEMPLATE } from './project.mjs'
 import { taskEvidenceDigest, specDigest, treeDigest } from './cmd-pin.mjs'
 import { lastTest } from './cmd-approve.mjs'
 import { git, repoState, ignoredState, ignoredUnder, shallowState, showPrefix, ancestorState, canonicalOidState, dirtyResultSubject, resultSealBreach, log, touched, trackedPaths, allSubjects, allTouchedPaths, gitFailure } from './git.mjs'
@@ -957,7 +957,13 @@ export function cmdValidate (P) {
       groups.set(d, [...(groups.get(d) ?? []), f])
     }
     const shown = [...groups].map(([d, fs]) => fs.length > 1 ? `${d} (${fs.length} files)` : fs[0])
-    say(`notice: ${ignoredOwn.length} GroveSpec file(s) ignored by git — they never reach a commit, so a clone or another worktree runs without them: ${shown.join(', ')} (add '!' exceptions for them to the project's .gitignore, then commit them)`)
+    // A bundle that arrived without its own .gitignore (npm drops it — lib/project.mjs)
+    // has a fix of its own, named first: the project-root advice is for whatever the
+    // bundle's two rules leave out, and it is the edit the nested file exists to avoid.
+    const fix = bundleIgnoreState(P.root) === 'restorable'
+      ? `${BUNDLE_IGNORE} is missing — npm drops every .gitignore from a package: restore it from ${BUNDLE_IGNORE_TEMPLATE} (copy it, or re-run grovespec-init), then add '!' exceptions to the project's .gitignore for whatever is still named, and commit them`
+      : `add '!' exceptions for them to the project's .gitignore, then commit them`
+    say(`notice: ${ignoredOwn.length} GroveSpec file(s) ignored by git — they never reach a commit, so a clone or another worktree runs without them: ${shown.join(', ')} (${fix})`)
   }
   if (streakNotices.length) {
     say(`notice: ${streakNotices.length} running cycle(s) with a lower find_streak than the project's config:`)
