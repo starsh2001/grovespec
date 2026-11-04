@@ -49,7 +49,7 @@
 // one-line constant deletions cost 14 sessions, 21 commits and 0.71M tokens through
 // reopen approved. Equality the machine can prove stays bytes; this tier is a judged one.
 import { spawnSync } from 'node:child_process'
-import { git, repoState, dirtyResultSubject } from './git.mjs'
+import { git, repoState, dirtyResultSubject, porcelainPaths } from './git.mjs'
 import { testCommand } from './cmd-test.mjs'
 import { releaseOnDone, endStepMark } from './cmd-claim.mjs'
 import { writeAtomic } from './project.mjs'
@@ -170,12 +170,21 @@ export function cmdAmend (P, n, simple = null) {
     }
   }
 
-  // The code half of the simple tier: anything moved in what a result seal covers runs the
-  // project's tests before it is absorbed.
+  // The code half of the simple tier: anything moved in the product — what a result seal
+  // covers, less GroveSpec's own files (the `fresh` boundary) — runs the project's tests
+  // before it is absorbed. A plan aligning a node has its own record, other Tasks and
+  // backlogs uncommitted beside it; read as code, they refused the align or ran the whole
+  // suite and asked for a TASK- commit that owed a retro (v0.27.0 cold review).
   let tested = null
   if (simple !== null) {
-    const dirty = dirtyResultSubject(P, n)
-    if (dirty === null) { say(`${n}: cannot read the working tree (git status failed) — nothing was absorbed`); return 2 }
+    const subject = dirtyResultSubject(P, n)
+    if (subject === null) { say(`${n}: cannot read the working tree (git status failed) — nothing was absorbed`); return 2 }
+    const pr = git(P.root, ['rev-parse', '--show-prefix'])
+    if (!pr.ok) { say(`${n}: cannot read the project's place in the repository (git rev-parse failed) — nothing was absorbed`); return 2 }
+    const pfx = pr.out.trim()
+    const own = P.ownPaths()
+    const product = f => f.startsWith(pfx) && !own.some(o => f.slice(pfx.length) === o || f.slice(pfx.length).startsWith(`${o}/`))
+    const dirty = subject.filter(line => porcelainPaths(line).some(product))
     if (dirty.length) {
       const cmd = testCommand(P)
       if (cmd === '') { say(`${n}: code moved, and no test command is configured (review.test) — a code change no test guards is not a simple change: grovespec reopen ${n} approved`); return 1 }

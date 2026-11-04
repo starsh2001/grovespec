@@ -52,9 +52,9 @@ verify:
   # reviewer count per wave, scaled to the change’s reach. verify picks the level.
   scale:
     skip:     { reviewers: 0 }   # trivial spec edit (format·comment)
-    light:    { reviewers: 2 }   # small, contract unchanged
-    standard: { reviewers: 3 }   # a normal new node
-    full:     { reviewers: 5 }   # an already-used contract changes / 3+ consumers / a skeleton / security
+    light:    { reviewers: 2 }   # a small delta no consumer relies on differently
+    standard: { reviewers: 3 }   # a normal new node · a delta 1–2 consumers rely on
+    full:     { reviewers: 5 }   # a delta 3+ consumers rely on / a skeleton's structure / security
 
 # review — code cold-review on THIS NODE'S DIFF only (never the whole codebase) + tests.
 review:

@@ -51,14 +51,14 @@ Spec/tree verify files use the same category lanes (`reviewers.md` §Categories)
 `.grovespec/review/<id>.verify.yaml` for a node (`target_type: spec`), or `.grovespec/review/tree.verify.yaml` for the whole tree (`target_type: tree`). Template `review-state.yaml`. Round 1 creates it; a new tree record **must write `tree_evidence_mode: decomposition|fidelity` before the first round**, matching the question `grovespec next` selected. A reopened tree already carries that marker from `grovespec reopen tree …`; preserve it. Later rounds update the record in place so rounds accumulate. (Code review keeps a **separate** `<id>.review.yaml` and `<id>.review.round<n>.*` round files; they never collide.)
 
 ## Depth scales with reach
-verify picks the level from checkable inputs — ① does it change a contract other nodes **already use** (a new node's first contract changes nothing anyone uses) ② how many nodes consume it ③ is it a skeleton ④ does it touch security. The reviewer **count per wave** lives in `config.yaml` `verify.scale` (the SSoT — never restate a number here). A new node is `standard` unless ②–④ say otherwise.
+verify picks the level from checkable inputs — on a reopened node from **the delta, not the node**: ① does it change what a consumer **already relies on** (a new node's first contract, or a clause no consumer reads, changes nothing anyone uses) ② how many consumers that reaches (the recheck candidates it declares) ③ does it move a skeleton's structure (its children's slots) ④ does it touch security. The reviewer **count per wave** lives in `config.yaml` `verify.scale` (the SSoT — never restate a number here). A new node is `standard` unless ②–④ say otherwise; a reopened node's delta of a clause or two that ① leaves alone is `light`, however central the node.
 
 | level | when | review |
 |---|---|---|
 | `skip` | trivial spec edit (format·comment) | self-check only, no reviewers |
-| `light` | small, contract unchanged | cold reviewer waves (count from `verify.scale`) |
-| `standard` | a normal new node | cold reviewer waves |
-| `full` | an already-used contract changes / 3+ consumers / a skeleton / security-touching | cold reviewer waves |
+| `light` | a small delta no consumer relies on differently | cold reviewer waves (count from `verify.scale`) |
+| `standard` | a normal new node · a delta 1–2 consumers rely on | cold reviewer waves |
+| `full` | a delta 3+ consumers rely on / a skeleton's structure / security-touching | cold reviewer waves |
 
 `skip` collapses the cycle, it doesn't skip the record: the caller self-checks against the checklist, writes the state file itself (one `rounds[]` self entry; `found`/`strategies` may stay empty), and pin/validate/approve run as usual.
 
