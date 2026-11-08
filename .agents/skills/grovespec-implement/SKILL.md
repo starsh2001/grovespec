@@ -33,7 +33,7 @@ The node must be **`approved`** (cold-verified, its gate taken on the record) an
   2. Search the code + `tasks/` for those words.
   3. Put what you find in front of you and answer **"reuse, or write new?"** before moving on.
 
-  An isolated agent that writes the second copy, with the first not in front of it, won't know it duplicated — so "always search first here" is the rule.
+  Always search first here (why: METHODOLOGY §8).
 
 ### 2. Tests first
 From the AC, write *failing* tests — the target the implementation must hit. (Skip AC items marked `(gap)` — deliberately undefined behavior, nothing to pin — `FORMATS.md`.) Obey the Task's `tdd` field (set at grow): `tdd: true` → failing tests first; `tdd: false` → skip (its `tdd_skip_reason` says why). If the field looks wrong for this node, that's a spec fix — go back to `grovespec-revise`; don't override it silently here.
@@ -71,7 +71,7 @@ Greenfield, this node's children were already **sketched** at init. Building the
 - **Then stop building the extra behavior**: finish only this node's *own* part (a feature's core behavior, or the structural glue), park the rest as new `sketch` children (ids into `tree.md`), move the AC items they own down to them (or mark `[→ child/deferred: …]`), set `role: skeleton` if it was a feature, and record the decomposition in the Change Log — the same reconciliation, invoked early.
 
 ### 5. Hand off → implemented
-**Run it once before handing off** — start the thing, exercise this node's own behavior, and paste what it printed into the Change Log. Green tests are not evidence that it runs.
+**The tests are the hand-off evidence here.** Starting the product and exercising it end to end happens once, at the milestone's close run (`grovespec-retro`). A `tdd: false` node has no tests to stand on: run it once before handing off and paste what it printed into the Change Log.
 
 **Commit as `TASK-N: implement — <summary>`** (commits made while working this node carry the same `TASK-N:` prefix; this boundary is the diff `grovespec-review` reads — `FORMATS.md`). Stage the node's files, not a blanket `-A`; if the step wrote anything under `paths.review`, that belongs in the commit too — evidence outside git does not survive a clean-up. Set the Task `status: implemented`. **Next: `grovespec-review`** — it runs the tests and a cold code review of *this node's diff*, then `grovespec-fix` if needed, then `done`. implement does not review its own work; cold eyes do.
 

@@ -13,16 +13,20 @@
 // after the newest retro record's anchor (or since GroveSpec arrived, when no record
 // exists) — the retro's own commit is not TASK-shaped, so a closed retro never owes itself.
 //
-// TERMINATION SAFETY: a retro never reopens a node and never blocks `done` — a
+// TERMINATION SAFETY: a retro's cold lenses never reopen a node and never block `done` — a
 // capable reviewer asked again always returns something, so a closing review that
-// could veto completion is a completion that never comes. Its must-fix findings are
+// could veto completion is a completion that never comes. Their must-fix findings are
 // written into the standing backlogs (findings.md / restructuring.md), which already
 // route the terminal to plan — the milestone stays closed; the NEXT milestone gains a reason
-// to open.
+// to open. The one exception is the close run (v0.29.0, user decision 2026-11-08): the
+// milestone's whole suite and its direct run, once, before the lenses — a run fails the
+// same way every time it is asked, so a failure there reopens the node it points at and
+// a fix clears it, which no reviewer's "something" can be made to do.
 import { readdirSync } from 'node:fs'
 import { git, repoState, shallowState, showPrefix, log, TASK_COMMIT, SKILL_COMMIT, gitFailure } from './git.mjs'
-import { freshSignals } from './cmd-fresh.mjs'
+import { freshSignals, nestedCommits } from './cmd-fresh.mjs'
 import { readWaits } from './cmd-wait.mjs'
+import { closeRun, milestoneCommand } from './cmd-test.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
@@ -58,15 +62,15 @@ export function retroOwed (P) {
   // A project nested in a larger repository sees the OUTER repo's history too — an
   // unrelated outer `TASK-77:` commit read as this project's work and made a debt
   // no retro could ever clear (external review 2026-09-25, F4). Nested, the milestone
-  // is only the commits touching the project's own subtree (`-- .` relative to the
-  // project root). Stated limit, same as fresh's: an empty commit inside a nested
-  // project is invisible to a pathspec and goes uncounted.
+  // is only the commits touching the project's own subtree — by each commit's own change,
+  // a merge's against its first parent (a pathspec walk dropped `--no-ff` merges —
+  // cmd-fresh nestedCommits). Stated limit, same as fresh's: an empty commit inside a
+  // nested project touches nothing there and goes uncounted.
   const pfx = showPrefix(P.root)
   if (pfx === null) return { owed: false, n: last.n, anchor: last.anchor, broken: 'git rev-parse --show-prefix failed' }
   if (pfx !== '') {
-    const own = git(P.root, ['rev-list', 'HEAD', '--', '.'])
-    if (!own.ok) return { owed: false, n: last.n, anchor: last.anchor, broken: 'git rev-list failed' }
-    const ours = new Set(own.out.split('\n').filter(Boolean))
+    const ours = nestedCommits(P, pfx)
+    if (ours === null) return { owed: false, n: last.n, anchor: last.anchor, broken: 'git log --name-only failed (git >= 2.31 required)' }
     commits = commits.filter(c => ours.has(c.h))
   }
   let adopted = null
@@ -133,7 +137,18 @@ export function cmdRetro (P) {
   say(`  escalated cycles: ${escalated.length}${escalated.length ? ' — ' + escalated.join(' · ') : ''}`)
   say(`  live waits: ${liveWaits} · machine-approved awaiting ratify: ${unratified.length}${unratified.length ? ` (${unratified.join(', ')})` : ''}`)
   say(`  fresh debt: ${freshLine}`)
-  say(`next record: ${P.reviewDir.slice(P.root.length + 1)}/retro-${o.n + 1}.md — grovespec-retro writes it (anchor = the HEAD its commit lands on top of)`)
-  say('→ the retro never reopens a node: must-fix findings go to findings.md/restructuring.md for the next plan; the milestone stays closed.')
+  // The close run (header above) counts only on the code the milestone closes on — HEAD.
+  const cr = closeRun(P)
+  const head = git(P.root, ['rev-parse', 'HEAD'])
+  const onHead = cr !== null && head.ok && cr.commit === head.out.trim()
+  const unset = milestoneCommand(P).cmd === ''
+  const record = `${P.reviewDir.slice(P.root.length + 1)}/retro-${o.n + 1}.md`
+  if (unset) say('  close run: no suite configured (milestone.test · review.test both empty) — the direct run is all of it')
+  else if (!onHead) say(`  close run: not yet on this HEAD — grovespec test milestone${cr !== null ? ` (the last one ran on ${cr.commit === '' ? 'no commit' : cr.commit.slice(0, 7)})` : ''}`)
+  else say(`  close run: ${cr.exit === 0 ? 'passed' : `FAILED (exit ${cr.exit})`} on HEAD ${cr.commit.slice(0, 7)}`)
+  if (unset || (onHead && cr.exit === 0)) say(`next record: ${record} — grovespec-retro writes it (anchor = the HEAD its commit lands on top of)`)
+  else if (onHead) say(`next record: none while the close run fails — reopen the node it points at and commit as retro #${o.n + 1}: close run failed — … (grovespec-retro §2)`)
+  else say('next record: none yet — the close run passes on HEAD first (grovespec-retro §2)')
+  say('→ the close run comes first, and its failure reopens the node it points at; the cold lenses never reopen a node — their must-fix findings go to findings.md/restructuring.md for the next plan.')
   return 1
 }

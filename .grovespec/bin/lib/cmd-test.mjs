@@ -6,15 +6,72 @@ import { mkdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { cfgValue, splitLines } from './core.mjs'
 import { writeAtomic } from './project.mjs'
-import { git, inRepo } from './git.mjs'
+import { git, inRepo, porcelainPaths, showPrefix } from './git.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
+// Strip the quotes only when the value is actually quoted ("" or "pytest -q") —
+// a bare command ENDING in a quote (`node -e "…"`) must come through untouched.
+const unquote = v => v.length >= 2 && v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v
+
 export function testCommand (P) {
-  // Strip the quotes only when the value is actually quoted ("" or "pytest -q") —
-  // a bare command ENDING in a quote (`node -e "…"`) must come through untouched.
-  const v = cfgValue(P.configText, 'review', 'test')
-  return v.length >= 2 && v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v
+  return unquote(cfgValue(P.configText, 'review', 'test'))
+}
+
+// The close run (v0.29.0): once per milestone, at the front of the retro, the whole suite
+// runs on the code the milestone closes on — `milestone.test`, the slow integration tests
+// the per-node reviews leave out included; empty → review.test. Its record is a log with a
+// header, not a yaml: every yaml under paths.review is a gate record to validate.
+export function milestoneCommand (P) {
+  const v = unquote(cfgValue(P.configText, 'milestone', 'test'))
+  return v !== '' ? { cmd: v, key: 'milestone.test' } : { cmd: testCommand(P), key: 'review.test' }
+}
+export const closeLogPath = P => `${P.reviewDir}/milestone.test.log`
+export function closeRun (P) {
+  const text = P.read(closeLogPath(P))
+  if (text === null) return null
+  const head = {}
+  for (const l of splitLines(text)) {
+    if (l === '') break
+    const m = l.match(/^(exit|commit): (.*)$/)
+    if (m) head[m[1]] = m[2]
+  }
+  if (!/^[0-9]+$/.test(head.exit ?? '')) return null
+  return { exit: Number(head.exit), commit: head.commit ?? '' }
+}
+
+function testMilestone (P) {
+  const { cmd, key } = milestoneCommand(P)
+  if (cmd === '') { say('config milestone.test and review.test are both empty — no suite to run; the close run is the direct run alone (grovespec-retro §2)'); return 1 }
+  // The record binds the commit it ran on, so what it ran must be that commit: uncommitted
+  // product changes would pass as the milestone's code without being in it.
+  let commit = ''
+  if (inRepo(P.root)) {
+    const pfx = showPrefix(P.root)
+    const st = git(P.root, ['status', '--porcelain', '--untracked-files=all'])
+    if (pfx === null || !st.ok) { say('cannot read the working tree (git status failed) — nothing was run'); return 2 }
+    const own = P.ownPaths()
+    const product = f => f.startsWith(pfx) && !own.some(o => f.slice(pfx.length) === o || f.slice(pfx.length).startsWith(`${o}/`))
+    const dirty = st.out.split('\n').filter(Boolean).filter(l => porcelainPaths(l).some(product))
+    if (dirty.length) {
+      say('the project has uncommitted changes outside GroveSpec\'s own files — the close run binds the commit it runs on, so they are committed on their own first (FORMATS.md "Interjected work": ask about changes nobody can account for), then re-run:')
+      for (const l of dirty.slice(0, 10)) say(`  ${l}`)
+      if (dirty.length > 10) say(`  … ${dirty.length - 10} more`)
+      return 2
+    }
+    const head = git(P.root, ['rev-parse', 'HEAD'])
+    if (head.ok) commit = head.out.trim()
+  }
+  say(`$ ${cmd}${key === 'review.test' ? '   (milestone.test is empty — review.test runs)' : ''}`)
+  const r = spawnSync(cmd, { shell: true, cwd: P.root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const out = String(r.stdout ?? '') + String(r.stderr ?? '')
+  if (out !== '') process.stdout.write(out.endsWith('\n') ? out : out + '\n')
+  const exit = r.status ?? 1
+  say(`test: exit ${exit} (${exit === 0 ? 'pass' : 'FAIL'})`)
+  mkdirSync(P.reviewDir, { recursive: true })
+  writeAtomic(closeLogPath(P), [`command: ${JSON.stringify(cmd)}`, `exit: ${exit}`, `when: "${new Date().toISOString()}"`, ...(commit !== '' ? [`commit: ${commit}`] : []), '', out].join('\n'))
+  say(`recorded → ${closeLogPath(P).slice(P.root.length + 1)} (the close run — grovespec retro reads it)`)
+  return exit === 0 ? 0 : 1
 }
 
 // A configured counter, or the template default when the config is silent/garbled —
@@ -65,6 +122,7 @@ function upsertLastTest (text, cmd, exit, commit) {
 }
 
 export function cmdTest (P, tid) {
+  if (tid === 'milestone') return testMilestone(P)
   if (tid !== '' && P.read(P.taskPath(tid)) === null) { say(`no such node: ${tid}`); return 2 }
   const cmd = testCommand(P)
   if (cmd === '') {

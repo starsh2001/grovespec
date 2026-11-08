@@ -14,7 +14,7 @@ import { readWaits, waitState, waitsPath } from './cmd-wait.mjs'
 import { hooksState, HOOK_MARK } from './cmd-hooks.mjs'
 import { readCands, candsPath, recheckState } from './cmd-recheck.mjs'
 import { retroOwed } from './cmd-retro.mjs'
-import { planSaw } from './cmd-fresh.mjs'
+import { planSaw, hotfixState } from './cmd-fresh.mjs'
 import { stepMark } from './cmd-claim.mjs'
 import { sharedContext, readState, writeState, withSharedLock, STATE_REMEDY } from './shared.mjs'
 
@@ -1133,6 +1133,7 @@ function statusModel (P) {
 
 export function cmdStatus (P, json = false) {
   const m = statusModel(P)
+  const hf = hotfixState(P)
   if (json) {
     const rc = recheckState(P)
     const retro = retroOwed(P)
@@ -1145,6 +1146,7 @@ export function cmdStatus (P, json = false) {
       waits: { problems: m.ws.problems, live: m.ws.live.map(e => ({ from: e.from, to: e.to, need: e.need, declared: e.declared })) },
       recheck: { broken: rc.broken, open: rc.open.map(e => ({ ...e, armed: P.statusOf(e.from) === 'done' })) },
       retro: { owed: retro.owed, n: retro.n, anchor: retro.anchor, adopted: retro.adopted ?? null, broken: retro.broken },
+      hotfixes: { owed: hf.owed.map(c => ({ commit: c.h, subject: c.s })), broken: hf.broken },
       backlog: m.backlog,
       planDue: m.planDue
     }, null, 2))
@@ -1198,6 +1200,8 @@ export function cmdStatus (P, json = false) {
       say(`  ${e.from} → ${e.to}  declared ${e.declared} — ${e.need}${landed}`)
     }
   }
+  if (hf.broken !== null) say(`! hotfix ledger unreadable (${hf.broken})`)
+  else if (hf.owed.length) say(`hotfix owes its alignment (${hf.owed.length}): ${hf.owed.map(c => `${c.h.slice(0, 7)} "${c.s.slice('hotfix: '.length)}"`).join(' · ')} — next routes it ahead of node work (grovespec-revise §D)`)
   if (m.gate) { say(`next: grovespec-verify the tree (the ${P.treeGateKind() === 'fidelity' ? 'survey fidelity' : 'decomposition'} gate)`); return 0 }
   const nexts = m.nodes.filter(n => n.next !== null).map(n => ` ${n.id}`).join('')
   if (nexts !== '') say(`next:${nexts}`)

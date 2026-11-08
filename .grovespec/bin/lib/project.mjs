@@ -295,7 +295,7 @@ export class Project {
     for (const key of duplicateTopKeys(this.configText)) {
       out.push(`${this.configPath}  top-level field '${key}' appears more than once — config routing would be ambiguous`)
     }
-    for (const parent of ['paths', 'review']) {
+    for (const parent of ['paths', 'review', 'milestone']) {
       for (const key of duplicateNestedKeys(this.configText, parent)) {
         out.push(`${this.configPath}  ${parent} field '${key}' appears more than once — config routing would be ambiguous`)
       }

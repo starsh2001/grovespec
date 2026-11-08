@@ -6,7 +6,7 @@
 // A REPORT, not a gate: a human may hot-fix deliberately; the answer is grovespec-revise
 // (reconcile spec ↔ code), so validate stays green and this command surfaces the list.
 // Exit 1 when signals exist (CI can watch it); the skills surface it, never block on it.
-import { git, porcelainPaths, repoState, shallowState, log, mergeHashes, TASK_COMMIT, SKILL_COMMIT, gitFailure } from './git.mjs'
+import { git, porcelainPaths, repoState, shallowState, showPrefix, log, mergeHashes, TASK_COMMIT, SKILL_COMMIT, HOTFIX_COMMIT, alignedBy, gitFailure } from './git.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 const PLAN_COMMIT = /^plan #[0-9]+: /
@@ -24,9 +24,12 @@ const PLAN_COMMIT = /^plan #[0-9]+: /
 // (v0.24.0). fresh asked git once per commit (and once per file for its owner), which
 // was tolerable over src/tests; the watched scope now covers resources too, and on a
 // real project with art commits that cost minutes, each git start nearly a second.
-// null when git log fails.
+// null when git log fails. A rename lists both of its paths (--no-renames, the rule
+// git.mjs touched() states): a move OUT of a watched area or a nested project's subtree
+// changed it, and git's rename view shows only where the file went (Codex re-review
+// 2026-11-09, R1 · R3).
 function historyFiles (P) {
-  const r = git(P.root, ['log', '--reverse', '--format=%x01%H%x02%s', '--name-only', '-z', '--diff-merges=first-parent', 'HEAD'])
+  const r = git(P.root, ['log', '--reverse', '--format=%x01%H%x02%s', '--name-only', '-z', '--diff-merges=first-parent', '--no-renames', 'HEAD'])
   if (!r.ok) return null
   const out = []
   for (const chunk of r.out.split('\x01')) {
@@ -41,6 +44,18 @@ function historyFiles (P) {
     })
   }
   return out
+}
+
+// The commits of a project nested in a larger repository: those whose change — a merge's
+// against its first parent, what it brought into this line — touches the project's subtree.
+// Not `git rev-list HEAD -- .`: history simplification drops a merge that matches one of
+// its parents there, which is exactly an ordinary `--no-ff` merge of a branch (Codex review
+// 2026-11-09, F1) — and both sides of a rename count (R1). An empty commit touches nothing,
+// so it is never the project's — the limit the nested filters always stated. null when git
+// log fails.
+export function nestedCommits (P, pfx) {
+  const hist = historyFiles(P)
+  return hist === null ? null : new Set(hist.filter(c => c.files.some(f => f.startsWith(pfx))).map(c => c.h))
 }
 
 // Owner = the most recent `TASK-N:` cycle commit touching the file — now, or (for a
@@ -172,14 +187,53 @@ export function freshSignals (P) {
     const filesOf = new Map(hist.map(c => [c.h, c.files]))
     // Attribution is by the documented commit grammar, both shapes: the `TASK-N:`
     // cycle anchor AND the skills' step/gate/decision shapes (SKILL_COMMIT) — a
-    // `review TASK-N:` commit is the skills' own writing, not a hand edit.
+    // `review TASK-N:` commit is the skills' own writing, not a hand edit. A `hotfix:`
+    // commit stays a signal until an `align` commit names it (hotfixState below).
+    const aligned = alignedBy(all)
     for (const c of all) {
-      if (!after.has(c.h) || merges.has(c.h) || TASK_COMMIT.test(c.s) || SKILL_COMMIT.test(c.s)) continue
+      if (!after.has(c.h) || merges.has(c.h) || TASK_COMMIT.test(c.s) || SKILL_COMMIT.test(c.s) || (HOTFIX_COMMIT.test(c.s) && aligned(c.h))) continue
       if ((filesOf.get(c.h) ?? []).some(inAreas)) offband.push({ ...c, files: filesOf.get(c.h) })
     }
     return { dirty, offband, adoption, anchor, planned: plan !== null, repo: true, areas, nested, outsideOwn, hist, broken: null }
   }
   return { dirty, offband, adoption, anchor: null, planned: false, repo: true, areas, nested, outsideOwn, hist: [], broken: null }
+}
+
+// The hotfix lane's ledger (v0.29.0): `hotfix: …` commits that no `align <sha>: …` commit
+// names yet, oldest first. Counted in the window fresh counts in — after GroveSpec arrived
+// and after the newest plan, which reconciled what came before it (a hotfix made under an
+// older runtime included). One git call when history holds no hotfix subject; a broken git
+// is said, never folded into "nothing owed" (cmd-next stops on it).
+export function hotfixState (P) {
+  const rs = repoState(P.root)
+  if (rs !== 'repo') return { owed: [], broken: rs === 'broken' ? `git did not answer (${gitFailure()})` : null }
+  let all = log(P.root)
+  if (all === null) return { owed: [], broken: 'git log failed' }
+  if (!all.some(c => HOTFIX_COMMIT.test(c.s))) return { owed: [], broken: null }
+  const list = args => { const r = git(P.root, args); return r.ok ? new Set(r.out.split('\n').filter(Boolean)) : null }
+  // Nested in a larger repository, this project's history is the commits touching its own
+  // subtree — the hotfix, the align naming it and the plan reconciling it alike: a
+  // neighbour project's plan or align must not close this one's debt (cold review 2026-11-08).
+  const pfx = showPrefix(P.root)
+  if (pfx === null) return { owed: [], broken: 'git rev-parse --show-prefix failed' }
+  if (pfx !== '') {
+    const ours = nestedCommits(P, pfx)
+    if (ours === null) return { owed: [], broken: 'git log --name-only failed (git >= 2.31 required)' }
+    all = all.filter(c => ours.has(c.h))
+  }
+  const aligned = alignedBy(all)
+  const hot = all.filter(c => HOTFIX_COMMIT.test(c.s) && !aligned(c.h))
+  if (!hot.length) return { owed: [], broken: null }
+  const gs = git(P.root, ['rev-list', '--reverse', 'HEAD', '--', '.grovespec'])
+  if (!gs.ok) return { owed: [], broken: 'git rev-list failed' }
+  const tasks = all.filter(c => TASK_COMMIT.test(c.s))
+  const adoption = gs.out.split('\n').find(Boolean) ?? (tasks.length ? tasks[tasks.length - 1].h : null)
+  if (adoption === null) return { owed: [], broken: null }
+  let window = list(['rev-list', `${adoption}..HEAD`])
+  const plan = window === null ? null : all.find(c => window.has(c.h) && PLAN_COMMIT.test(c.s)) ?? null
+  if (plan !== null) window = list(['rev-list', `${plan.h}..HEAD`])
+  if (window === null) return { owed: [], broken: 'git rev-list failed' }
+  return { owed: hot.filter(c => window.has(c.h)).reverse(), broken: null }
 }
 
 // Parked work the newest planning pass already ruled on (v0.25.0). A plan dispositions the

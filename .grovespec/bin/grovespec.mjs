@@ -18,7 +18,9 @@
 //              bare `wait` lists what is live and whose turn the newest declaration gives
 //   diff ID    the node's cycle diff, mechanically (TASK-N: commits + working tree)
 //   files ID   which code belongs to the node, across every cycle (derived, never stored)
-//   test [ID]  run config review.test; with ID, record exit+log as the node's evidence
+//   test [ID|milestone]  run config review.test; with ID, record exit+log as the node's
+//              evidence; `milestone` runs milestone.test (else review.test) as the close run
+//              and records it for retro, bound to HEAD (v0.29.0)
 //   fresh      out-of-band signals: src/tests changes that skipped the skills (report)
 //   followups  every parked non-blocking finding across all gate records + the brownfield
 //              backlogs — the aggregate surface grovespec-plan structures into the next milestone
@@ -91,7 +93,7 @@ const rest = process.argv.slice(3)
 
 // The one spelling of the command surface (tests/doccheck.sh pins it against the
 // dispatch table, the header comment and README — edit them together).
-const USAGE = 'grovespec — validate | status [--json] | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N | files TASK-N | test [TASK-N] | fresh | followups [TASK-N] | source TASK-N [file.md@4…|--check|--refresh] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|end|release <TASK-N|tree>] | lang | locale | interview [claude|codex] | hooks install|remove|status | uninstall [--purge] | amend TASK-N [--simple <verdict>] | recheck [declare|close|open …] | retro | migrate changelog | impact TASK-N | tree | version\n'
+const USAGE = 'grovespec — validate | status [--json] | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N | files TASK-N | test [TASK-N|milestone] | fresh | followups [TASK-N] | source TASK-N [file.md@4…|--check|--refresh] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|end|release <TASK-N|tree>] | lang | locale | interview [claude|codex] | hooks install|remove|status | uninstall [--purge] | amend TASK-N [--simple <verdict>] | recheck [declare|close|open …] | retro | migrate changelog | impact TASK-N | tree | version\n'
 
 // The argv gate: an unknown flag or a surplus argument is a typo'd INTENTION and exits 2 —
 // `approve TASK-1 --humman` used to be silently accepted and recorded a MACHINE decision
@@ -115,7 +117,7 @@ if (AV[cmd] !== undefined) {
 }
 
 // The single-writer gate — only the commands that WRITE project state take the lock
-// (test only when it records, i.e. with an id); reads never queue behind anything.
+// (test only when it records, i.e. with an id or `milestone`); reads never queue behind anything.
 // A refusal is exit 2 with the path: no wait, no automatic reclaim (lib/lock.mjs).
 // (id and claim write only the repository-shared state, under that state's own short
 // lock — lib/shared.mjs — so they are not in this table: run.lock is one checkout's.)

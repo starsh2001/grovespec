@@ -48,8 +48,8 @@ Ten units — one per step of a node's life, plus the passes between milestones 
 
 ### retro — the milestone's closing look (before plan #N)
 - **When**: every node is `done` and TASK- work landed since the last retro record — `grovespec next` names it before it routes anything to plan (`grovespec retro` is the deterministic floor: owed-state + the milestone measured).
-- **What**: the milestone's numbers with honest prose, then **one cross-node cold wave** (journey · seam · composition lenses reading tree + Contracts *across* node boundaries — the defect class no node-scoped gate can see), ledger-first (a finding the gap/adjudication ledger already measured is cited, never re-raised). Findings classify by the fixed categories; **it never reopens a node** — must-fix items land in `findings.md`/`restructuring.md` for the next plan, so the milestone stays closed and completion cannot be vetoed by one more review.
-- **Output**: `<paths.review>/retro-N.md` (frontmatter `anchor:` = the commit the milestone closed on) + backlog items, committed `retro #N: …`.
+- **What**: the milestone's numbers with honest prose, then **the close run** — the whole suite (`milestone.test`, slow integration tests included) and a direct run of the product, once, on the code the milestone closes on; a failure reopens the node it points at and the milestone stays open until a run passes. Then **one cross-node cold wave** (journey · seam · composition lenses reading tree + Contracts *across* node boundaries — the defect class no node-scoped gate can see), ledger-first (a finding the gap/adjudication ledger already measured is cited, never re-raised). Findings classify by the fixed categories; **the lenses never reopen a node** — must-fix items land in `findings.md`/`restructuring.md` for the next plan, so completion cannot be vetoed by one more review.
+- **Output**: `<paths.review>/retro-N.md` (frontmatter `anchor:` = the commit the milestone closed on) + the close run's log + backlog items, committed `retro #N: …`.
 
 ### grow — detail a sketch into a draft (or add a new node)
 - **When**: the next `sketch` node whose parent is `done` (`grovespec check` lists it) — the initial-build detailing step; or a brand-new node beyond the spec (expansion).
@@ -76,8 +76,8 @@ Ten units — one per step of a node's life, plus the passes between milestones 
 - **What**: apply them to *this node's* code only → `fixed` → re-run review. The `reviewed ⇄ fixed` loop until clean.
 
 ### revise — change an already-done node
-- **When**: deliberately changing a `done` node later, changing tree structure, or promoting a leaf to a skeleton.
-- **What**: reopen to the earliest status the change touches; **if the contract changed**, propagate to the consumer set (grep + tree + `grovespec impact`) by reopening and re-verifying·re-reviewing them. Default to *keeping the outer contract* — that's what keeps the partial tree small.
+- **When**: deliberately changing a `done` node later, changing tree structure, promoting a leaf to a skeleton — or aligning the spec after a hotfix.
+- **What**: reopen to the earliest status the change touches; **if the contract changed**, propagate to the consumer set (grep + tree + `grovespec impact`) by reopening and re-verifying·re-reviewing them. Default to *keeping the outer contract* — that's what keeps the partial tree small. **A hotfix flips the order**: a fix that cannot wait is built and committed first as `hotfix: …`, proven by its result; `grovespec next` then routes its alignment ahead of node work, and one `align <sha7>: …` commit brings the owners' specs to what the code now does.
 
 > **Where does fixing live?** For the *spec*, `verify` fixes the draft inline (a small doc — no token cost). For *code*, `fix` is a **separate, explicit** step — the expensive, risky part, kept controllable and in a fresh context.
 
@@ -105,7 +105,7 @@ Shared rules:
 - **Non-expert**: fails it on any jargon/fluff a layperson can't confirm (the lever that keeps a spec human-confirmable).
 
 **review — is the *code* good?** (run the tests first, then cold code lenses: correctness · security · the-6-month-maintainer · breaker · test-quality)
-- **Tests are the spine**: every AC item should have a passing test; a failing/missing one is an issue. (A `tdd:false` node has no tests → the cold lenses are the only gate.) Running the project's *whole* suite each review doubles as the **regression net** for earlier nodes — including an edit made outside the skills (partial: only where tests cover the broken contract).
+- **Tests are the spine**: every AC item should have a passing test; a failing/missing one is an issue. (A `tdd:false` node has no tests → the cold lenses are the only gate.) Running the project's per-unit suite (`review.test`) each review doubles as the **regression net** for earlier nodes — including an edit made outside the skills (partial: only where tests cover the broken contract). The slow integration tests and the product's direct run wait for the milestone's close run — once, not once per node.
 - **Diff only**: reviewers read *this node's changed files* + its AC·Contract + the test results — never the wider codebase. This is what keeps review's cost **flat** as the project grows.
 - **test-quality** lens stops "tests pass" from being a rubber stamp (catches hollow/tautological tests).
 - review never re-asks spec questions — verify settled those, cold, before any code.

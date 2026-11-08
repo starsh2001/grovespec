@@ -1,10 +1,11 @@
 // cycle diff — the ONE derivation of "what review reads", mechanical.
 // FORMATS: a node's cycle diff is everything since the parent of the cycle's first
-// `TASK-N:` commit, plus uncommitted changes, limited to the node's files. A cycle
-// starts when the node leaves approved; once a review is pinned (reviewed_commit,
-// written at done), the next cycle's commits are the ones after that pin.
+// `TASK-N:` commit — or of an earlier hotfix an `align` commit tied to the node — plus
+// uncommitted changes, limited to the node's files. A cycle starts when the node leaves
+// approved; once a review is pinned (reviewed_commit, written at done), the next cycle's
+// commits are the ones after that pin.
 import { topValue } from './core.mjs'
-import { git, porcelainPaths, repoState, shallowState, ancestorState, canonicalOidState, emptyTree, log, touched, showPrefix, gitFailure } from './git.mjs'
+import { git, porcelainPaths, repoState, shallowState, ancestorState, canonicalOidState, emptyTree, log, touched, showPrefix, gitFailure, alignedHotfixes } from './git.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
@@ -29,6 +30,7 @@ export function cmdDiff (P, n) {
 
   // A pinned review closes the previous cycle: only commits after it belong to this one.
   const rc = topValue(P.read(P.reviewYamlPath(n)) ?? '', 'reviewed_commit')
+  let win = null
   if (rc !== '') {
     // A seal must name immutable bytes: 'HEAD' resolved to an empty rev-list window
     // and hid the whole live cycle. Canonical-full-OID first, then ancestry.
@@ -50,6 +52,7 @@ export function cmdDiff (P, n) {
     }
     const after = new Set(r.out.split('\n').filter(Boolean))
     commits = commits.filter(c => after.has(c.h))
+    win = after
   }
 
   // The gate records are never the cycle's SUBJECT. A fix commit legitimately carries the
@@ -66,6 +69,19 @@ export function cmdDiff (P, n) {
   // "gate record(s)" is the whole review dir, not only this node's records and not only
   // the yaml — round briefs and test logs live there too, and all of them are held.
   const heldNote = k => `  (${k} file(s) under ${P.reviewDir.slice(P.root.length + 1)}/ held out — gate records are not this cycle's subject)`
+
+  // The hotfixes an alignment tied to this node (v0.29.0). An `align <sha>:` commit in this
+  // cycle's window that wrote the node's Task or Change Log — a reopen, a spec edit, its log
+  // line — names `hotfix:` commits whose code this node's gate reads too. They landed before
+  // the cycle's first TASK commit, so without them the base starts after the hotfix and its
+  // files fall outside the set (Codex review 2026-11-09, F2).
+  // One rule with the result seal (git.mjs alignedHotfixes), here bounded to the cycle window.
+  const hot = alignedHotfixes(P, n, history, c => win === null || win.has(c.h))
+  if (hot === null) { say('cannot read the files of the align commits — git failed (git >= 2.31 is required for merge-aware diffs); no diff was produced'); return 2 }
+  if (hot.length) {
+    const ids = new Set([...commits, ...hot].map(c => c.h))
+    commits = history.filter(c => ids.has(c.h))
+  }
 
   if (commits.length === 0) {
     say(`cycle diff of ${n} (${P.statusOf(n)}) — no '${n}:' commits${rc !== '' ? ` after reviewed_commit ${rc.slice(0, 7)}` : ''}; nothing committed this cycle`)

@@ -207,8 +207,8 @@ async function main () {
       advice.unshift({
         rel: '',
         msg: ko
-          ? `GroveSpec: 이 체크아웃에서 돌고 있는 GroveSpec 단계가 없고 마일스톤이 진행 중입니다(${open}). 단계 밖의 이 편집은 끼어든 작업입니다 — 사람에게 '지금'인지 '다음 마일스톤'인지 물으세요. 지금이면 따로 커밋합니다(fresh 가 기록하고 다음 plan 이 정리합니다. 결과 봉인을 기다리는 노드가 있으면 그 승인부터). 다음 마일스톤이면 이 편집을 되돌리고 요청을 ${requests} 에 적습니다. (FORMATS.md "Interjected work")`
-          : `GroveSpec: no GroveSpec step is running in this checkout and the milestone is open (${open}). An edit outside a step is interjected work — ask the person: now or next milestone. Now: commit it on its own (fresh records it and the next plan reconciles it; if a node's result seal is pending, it is approved first). Next milestone: undo this edit and write the request into ${requests}. (FORMATS.md "Interjected work")`
+          ? `GroveSpec: 이 체크아웃에서 돌고 있는 GroveSpec 단계가 없고 마일스톤이 진행 중입니다(${open}). 단계 밖의 이 편집은 끼어든 작업입니다 — 사람에게 '지금'인지 '다음 마일스톤'인지 물으세요. 지금이면 따로 커밋합니다 — 기다릴 수 없는 수정이면 \`hotfix: …\` 로(next 가 스펙 맞추기부터 내놓습니다), 그 밖에는 fresh 가 기록하고 다음 plan 이 정리합니다(결과 봉인을 기다리는 노드가 있으면 그 승인부터). 다음 마일스톤이면 이 편집을 되돌리고 요청을 ${requests} 에 적습니다. (FORMATS.md "Interjected work")`
+          : `GroveSpec: no GroveSpec step is running in this checkout and the milestone is open (${open}). An edit outside a step is interjected work — ask the person: now or next milestone. Now: commit it on its own — as \`hotfix: …\` when it is a fix that cannot wait (next then routes its spec alignment first); otherwise fresh records it and the next plan reconciles it (if a node's result seal is pending, it is approved first). Next milestone: undo this edit and write the request into ${requests}. (FORMATS.md "Interjected work")`
       })
     }
   }

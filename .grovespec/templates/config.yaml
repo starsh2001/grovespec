@@ -60,6 +60,7 @@ verify:
 review:
   test: ""           # command to run this project's tests (e.g. "pytest -q", "npm test"). NOT asked at init — auto-detected:
                      #   brownfield: filled from the project at init · greenfield: empty until the first review derives it from the stack (asked only if undeterminable).
+                     #   Every node's review runs it: keep it to the fast per-unit tests — the slow integration ones go to milestone.test.
   find_streak: 2     # N — same rule as verify: consecutive no-new-must-fix waves that end find.
   plan_streak: 2     # M — a fix PLAN is applied only after M consecutive clean cold reviews of
                      # that plan (editing the plan resets its counter — grovespec-fix).
@@ -78,6 +79,11 @@ review:
     light:    { reviewers: 2 }   # small diff, no new behavior
     standard: { reviewers: 3 }   # a normal node's implementation
     full:     { reviewers: 5 }   # security-touching / large / changes an already-used contract
+
+# milestone — the close run: once per milestone, at the front of grovespec-retro, on the code
+# the milestone closes on. A failure reopens the node it points at; the milestone closes only on a pass.
+milestone:
+  test: ""           # the whole suite, slow integration tests included (grovespec test milestone). Empty → review.test runs.
 
 # Edit-routing hook — advisory context injected on src/tests edits (see `grovespec
 # hooks install|remove|status`; the registration itself lives in .claude/settings.json

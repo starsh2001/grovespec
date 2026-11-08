@@ -1,6 +1,6 @@
 ---
 name: grovespec-revise
-description: Changes a node that already passed a gate in GroveSpec (done, or an approved spec) — change its behavior under a new requirement (reopen), change the tree structure (split·merge·move), or promote a leaf to a skeleton (it grew to need children). The machine decides the lane (grovespec amend): documentation-only edits re-seal in place, an AC change runs the node's own gates, and only a Contract change reaches further — its dependents become recheck candidates judged in one step, never mass reopens. Use when the user wants to "change·fix this (already-done) thing / the requirement changed / scale this up / split·merge·move this node / grovespec revise". For not-yet-built nodes use grovespec-grow·verify·implement.
+description: Changes a node that already passed a gate in GroveSpec (done, or an approved spec) — change its behavior under a new requirement (reopen), change the tree structure (split·merge·move), promote a leaf to a skeleton (it grew to need children), or build a hotfix first and align the spec after. The machine decides the lane (grovespec amend): documentation-only edits re-seal in place, an AC change runs the node's own gates, and only a Contract change reaches further — its dependents become recheck candidates judged in one step, never mass reopens. Use when the user wants to "change·fix this (already-done) thing / the requirement changed / scale this up / split·merge·move this node / hotfix this now / 급하게 고쳐 / grovespec revise", or when `grovespec next` names align. For not-yet-built nodes use grovespec-grow·verify·implement.
 ---
 
 # grovespec-revise
@@ -11,7 +11,7 @@ Changing a node that already **passed a gate** — a `done` node, or an `approve
 
 > **Decisions: recommend + leave a way out.** When you ask the user to decide (split·merge·move, how to change…): **mark your recommended option `(추천)`** with a one-line why, and **always allow a free-form answer** (ask through the host's question tool — its *Other* is that answer; `FORMATS.md` "A decision, not a stage"). Don't force a closed pick.
 
-**Claim the node first:** `node .grovespec/bin/grovespec.mjs claim TASK-N revise` — non-zero = **stop** and report what it printed.
+**Claim the node first:** `node .grovespec/bin/grovespec.mjs claim TASK-N revise` (a hotfix alignment claims the tree — §D) — non-zero = **stop** and report what it printed.
 
 ## The lane decides everything — and the machine decides the lane
 For a spec edit, **run `node .grovespec/bin/grovespec.mjs amend TASK-N` first** — it compares Contract and AC **byte-for-byte** against HEAD and either finishes or names the lane (why the split exists and its measured cost: METHODOLOGY §6):
@@ -65,6 +65,13 @@ A `done` `feature` turns out to need sub-nodes ("scale this up / more behavior a
 - **Outer Contract unchanged** (it just gains internal structure) → consumers untouched; re-`implement` its own structural code if needed → `review` → `done`, then `grovespec-grow` each child one at a time.
 - **Outer Contract changed** → declare the consumers as candidates, as in A.3.
 The role promotion *is* the change; the children themselves are grown afterward, normally.
+
+### D. Hotfix — build first, align after
+When a fix cannot wait for the cycle and the person says so (something broke in use, a demo in an hour), the order flips: the code first, the spec after.
+1. **Build it directly** — no spec edit, no cold review. Prove it by its result: a test that reproduces the break and now passes, or a direct run whose output you keep. It lands between steps, like any interjected work (`FORMATS.md` "Interjected work").
+2. **Commit it on its own as `hotfix: <what broke, in a line>`** — the code and its test. Until it is aligned, `fresh` lists it and `next` routes its alignment ahead of node work (`next: align …`).
+3. **Align** — claim the tree (`grovespec claim tree align`); `grovespec fresh` names the nodes whose code the hotfix touched. For each, write the hotfix into its Change Log and bring its spec to what the code now does through the lanes above — none when the fix only restores what the Contract says; otherwise `grovespec amend TASK-N` names the lane (most often the simple tier's catch-up).
+4. **Commit as `align <sha7>: <summary>`** — every owner's edits in one commit (`align <sha7> <sha7>: …` for several hotfixes), instead of the `amend` or `revise` subject those lanes print. That commit closes the hotfix; a cycle it opened runs on under its own commits, its diff taking the hotfix in. Then release the tree: `grovespec claim release tree`.
 
 ## Where the batches come from — grovespec-plan
 The parked work (review-file `followups` · the brownfield backlogs `findings.md`/`restructuring.md` · `fresh` hand-edits) is **structured into milestones by `grovespec-plan`**, which clusters it, gets the human's disposition, and translates each kept item into exactly the changes above — a behavior change (A) arrives here as a reopen, a structural one as (B). A **single small item needs no plan**: come straight here. Check a backlog item off (or delete it) once its node is `done` again.

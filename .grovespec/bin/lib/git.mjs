@@ -228,13 +228,17 @@ function resultSubjectPath (P, target) {
   // A node may intentionally touch a shared monorepo sibling. `grovespec diff`
   // includes that path, so the hand-off seal must include it too.  The all-cycle
   // footprint is a safe superset of the current cycle and, unlike a stored path
-  // roster, cannot be truncated or miss a new post-pin TASK commit.
+  // roster, cannot be truncated or miss a new post-pin TASK commit. The hotfixes an
+  // alignment tied to the node join it — diff reads them too (alignedHotfixes).
   if (shallowState(P.root) !== 'full') return null
   const history = log(P.root)
   if (history === null) return null
   const footprint = new Set()
+  const hot = alignedHotfixes(P, target, history)
+  if (hot === null) return null
+  const hotIds = new Set(hot.map(c => c.h))
   for (const c of history) {
-    if (!c.s.startsWith(`${target}: `)) continue
+    if (!c.s.startsWith(`${target}: `) && !hotIds.has(c.h)) continue
     const paths = touched(P.root, c.h)
     if (paths === null) return null
     for (const path of paths) footprint.add(path)
@@ -397,9 +401,13 @@ export function allTouchedPaths (root) {
 // could be reissued, and a merge-shaped cycle commit read as touching nothing.
 // First-parent is the mainline's view: what this commit brought to the line.
 // (Both options only change merge output — non-merge commits print the same bytes.)
+// `--no-renames`: a rename touched BOTH paths. git's rename view names only where the file
+// went, so the path it left — deleted there — fell out of the cycle diff and the result
+// seal, and a file reappearing at the old place passed the seal (Codex re-review
+// 2026-11-09, R3). Every reader here already handles a path that no longer exists.
 // null on failure, as above — [] must mean "genuinely touched nothing".
 export function touched (root, hash) {
-  const r = git(root, ['show', '--format=', '--name-only', '-z', '--diff-merges=first-parent', hash])
+  const r = git(root, ['show', '--format=', '--name-only', '-z', '--diff-merges=first-parent', '--no-renames', hash])
   return r.ok ? r.out.split('\0').filter(Boolean) : null
 }
 
@@ -423,4 +431,37 @@ export const TASK_COMMIT = /^TASK-[0-9]+: /
 // `review TASK-N:` commits three planning passes running (proof-run measurement).
 // Deliberately exact, not `/TASK-/ anywhere`: a hand commit merely *mentioning* a task
 // ("fix thing, see TASK-3") must stay out-of-band.
-export const SKILL_COMMIT = /^(?:(?:grow|verify|review|revise) TASK-[0-9]+: |verify tree: |approve (?:TASK-[0-9]+|tree): |ratify TASK-[0-9]+( TASK-[0-9]+)*: |plan #[0-9]+: |retro #[0-9]+: |recheck #[0-9]+: |amend TASK-[0-9]+: |init: )/
+export const SKILL_COMMIT = /^(?:(?:grow|verify|review|revise) TASK-[0-9]+: |verify tree: |approve (?:TASK-[0-9]+|tree): |ratify TASK-[0-9]+( TASK-[0-9]+)*: |plan #[0-9]+: |retro #[0-9]+: |recheck #[0-9]+: |amend TASK-[0-9]+: |align [0-9a-f]{7,40}( [0-9a-f]{7,40})*: |init: )/
+
+// The hotfix lane (v0.29.0): a fix that cannot wait is built first and committed as
+// `hotfix: …`; the spec catches up after, in one `align <sha7>…: …` commit naming it.
+// Until then the hotfix stays what it is — out-of-band (fresh lists it) — and `next`
+// routes its alignment ahead of node work. The shas an align names, by prefix.
+export const HOTFIX_COMMIT = /^hotfix: /
+const ALIGN_SHAS = /^align ([0-9a-f]{7,40}(?: [0-9a-f]{7,40})*): /
+export const alignNames = subject => ALIGN_SHAS.exec(subject)?.[1].split(' ') ?? []
+export function alignedBy (commits) {
+  const named = commits.flatMap(c => alignNames(c.s))
+  return h => named.some(p => h.startsWith(p))
+}
+
+// The hotfixes an alignment tied to a node: `hotfix:` commits named by an `align` commit that
+// wrote the node's Task or Change Log. ONE rule for what the node's gate reads (cmd-diff, the
+// cycle window) and what its result seal protects (resultSubjectPath, all history — a
+// superset, so a pin moving reviewed_commit never drops a file it just reviewed): the diff
+// once read a shared file the seal did not guard (Codex re-review 2026-11-09, R2). `within`
+// bounds both the align and the hotfix. null when git fails.
+export function alignedHotfixes (P, target, history, within = () => true) {
+  const prefix = showPrefix(P.root)
+  if (prefix === null) return null
+  const own = new Set([P.taskPath(target), P.changelogPath(target)].map(p => `${prefix}${p.slice(P.root.length + 1)}`))
+  const named = []
+  for (const c of history) {
+    const names = within(c) ? alignNames(c.s) : []
+    if (!names.length) continue
+    const tf = touched(P.root, c.h)
+    if (tf === null) return null
+    if (tf.some(f => own.has(f))) named.push(...names)
+  }
+  return named.length ? history.filter(c => within(c) && HOTFIX_COMMIT.test(c.s) && named.some(p => c.h.startsWith(p))) : []
+}

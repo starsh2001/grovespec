@@ -20,7 +20,7 @@
 // the SKILL's final line for it, and a runtime that echoed it would stop the loop early.
 import { listItemCount, RECORD_CATEGORIES } from './core.mjs'
 import { treeGateMsg } from './project.mjs'
-import { freshSignals, planSaw } from './cmd-fresh.mjs'
+import { freshSignals, planSaw, hotfixState } from './cmd-fresh.mjs'
 import { retroOwed } from './cmd-retro.mjs'
 import { waitState } from './cmd-wait.mjs'
 import { recheckState } from './cmd-recheck.mjs'
@@ -122,6 +122,21 @@ export function cmdNext (P, auto) {
     if (stop !== null) return stop
     const froms = [...new Set(rc.armed.map(e => e.from))].join(' · ')
     say(`next: recheck — ${rc.armed.length} candidate(s) from ${froms} are armed (origin done); one step judges whether the change reaches each, and only judged-touched nodes reopen (grovespec-recheck)`)
+    return 0
+  }
+
+  // A hotfix outranks new node work too (v0.29.0): it changed the product ahead of the
+  // spec, so every node built on until it is aligned reads a spec that no longer says what
+  // the code does. Same fail-loud rule: an unreadable history is a stop.
+  const hf = hotfixState(P)
+  if (hf.broken !== null) {
+    say(`nothing decidable — whether a hotfix still owes its alignment cannot be read (${hf.broken}); fix git, then re-run`)
+    return 1
+  }
+  if (hf.owed.length) {
+    const stop = treeHeld('a hotfix alignment (grovespec-revise §D)')
+    if (stop !== null) return stop
+    say(`next: align — ${hf.owed.length} hotfix commit(s) changed the product ahead of its spec: ${hf.owed.map(c => `${c.h.slice(0, 7)} "${c.s.slice('hotfix: '.length)}"`).join(' · ')}; bring the owners' specs to what the code now does, then commit as align <sha7>: … (grovespec-revise §D — grovespec fresh names and grades the owners)`)
     return 0
   }
 
