@@ -35,5 +35,5 @@ tdd_skip_reason: ""        # required when tdd: false
 - [ ] {implementation step}
 
 ## Change Log
-<!-- ONE line per entry, ≤200 characters, in plain words a newcomer can follow: what changed and why. This is the most-read part of the file and the easiest to ruin — the round numbers, check codes (C4, D2), finding ids and PASS/FAIL tables stay in the gate record under paths.review, which is where anyone auditing the cycle looks. Dropped-as-nitpick / accepted-gap adjudications do NOT go here either — they stay in the node's review record, which reopen preserves. For a skeleton, record the decomposition here too: which children it needs + which Contract clause each child owns. Code diffs live in git. -->
-- {YYYY-MM-DD} — {what changed and why, in one plain sentence}
+<!-- The entries live in their own file, changelog/TASK-0.md beside this one (template: .grovespec/templates/changelog.md) — every step and every cold reviewer reads this file whole, so the history stays out of it. This section keeps only the link below; set its id to this node's. -->
+- [changelog/TASK-0.md](changelog/TASK-0.md)

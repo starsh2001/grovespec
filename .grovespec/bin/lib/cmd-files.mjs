@@ -40,6 +40,7 @@ export function cmdFiles (P, n) {
 
   const rel = p => p.startsWith(`${P.root}/`) ? p.slice(P.root.length + 1) : null
   const ownTask = rel(P.taskPath(n))            // the node's own Task file — known by definition
+  const ownLog = rel(P.changelogPath(n))        // and its Change Log, which is not code either
 
   const seen = new Set()
   for (const c of commits) {
@@ -51,6 +52,7 @@ export function cmdFiles (P, n) {
     for (const f of tf) seen.add(f.startsWith(pfx) ? f.slice(pfx.length) : `:/${f}`)
   }
   if (ownTask !== null) seen.delete(ownTask)
+  if (ownLog !== null) seen.delete(ownLog)
 
   const all = [...seen].sort()
   // Both coordinates answer to the same index — "outside the project" never means

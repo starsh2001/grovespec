@@ -241,13 +241,17 @@ function resultSubjectPath (P, target) {
   }
   const rel = p => p.startsWith(`${P.root}/`) ? p.slice(P.root.length + 1) : null
   const task = rel(P.taskPath(target))
+  const changelog = rel(P.changelogPath(target))
   const review = rel(P.reviewDir)
-  if (task === null || review === null) return null
+  if (task === null || changelog === null || review === null) return null
   const taskPath = `${prefix}${task}`
+  const logPath = `${prefix}${changelog}`
   const reviewPath = `${prefix}${review}`
   const runLockPath = `${prefix}.grovespec/run.lock`
   return file => {
-    if (file === taskPath) return false
+    // The node's own Change Log is its Task's running record (in its own file since
+    // v0.28.0) — the entry approve and review write must not break the seal they record.
+    if (file === taskPath || file === logPath) return false
     if (file === reviewPath || file.startsWith(`${reviewPath}/`)) return false
     // The dispatcher creates this owner file before invoking every mutating command
     // and removes it afterward; it is runtime coordination, never reviewer input.

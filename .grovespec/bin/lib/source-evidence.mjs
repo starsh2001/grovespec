@@ -878,16 +878,86 @@ export function parseSourcePacket (briefText, at = 'round brief') {
   return packet
 }
 
-function sectionLogicalLines (taskText, name, at) {
-  const lines = visibleMarkdownLines(taskText, at)
+// The visible lines of a Task section: [start, end) indexes into `lines`, or null.
+function sectionRange (lines, name) {
   const start = lines.findIndex(entry => entry.headingEligible &&
     new RegExp(`^##[ \\t]+${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[ \\t]*$`).test(entry.line))
-  if (start === -1) return []
+  if (start === -1) return null
   let end = lines.length
   for (let i = start + 1; i < lines.length; i++) {
     if (lines[i].headingEligible && /^##[ \t]+/.test(lines[i].line)) { end = i; break }
   }
-  return logicalBlocks(lines.slice(start + 1, end)).map(block => block.text)
+  return { start: start + 1, end }
+}
+
+function sectionBlocks (taskText, name, at) {
+  const lines = visibleMarkdownLines(taskText, at)
+  const range = sectionRange(lines, name)
+  return range === null ? [] : logicalBlocks(lines.slice(range.start, range.end))
+}
+
+function sectionLogicalLines (taskText, name, at) {
+  return sectionBlocks(taskText, name, at).map(block => block.text)
+}
+
+// The link line a moved section keeps, decided on the RAW line, before anything is
+// flattened or stripped: exactly `- [<text>](changelog/TASK-N.md)` from the line's first
+// column (trailing spaces allowed, nothing else), outside fences and indented code, on a
+// line no comment touches, standing alone — what follows it is a blank line, another
+// item, a heading, a fence or the section's end, never a line that continues it. Anything
+// else showing the same text is history: a quote, an indented or nested line (the block
+// reader strips their markers — external review r2, P0), a link with a comment after it
+// (the scanner blanks comments — r3, P0), a fenced example (r1, P0).
+export const LINK_LINE = /^- \[[^\]]*\]\(changelog\/(TASK-[0-9]+)\.md\)[ \t]*$/
+function linkLines (lines, raw, range) {
+  const out = []
+  for (let i = range.start; i < range.end; i++) {
+    const entry = lines[i]
+    if (entry.fenced || entry.indentedCode || entry.line !== raw[i]) continue
+    const m = raw[i].match(LINK_LINE)
+    if (!m) continue
+    const next = i + 1 < range.end ? lines[i + 1] : null
+    const alone = next === null || next.fenced || next.line.trim() === '' ||
+      (!next.indentedCode && /^(?:[-+*]|[0-9]+[.)])[ \t]|^#{1,6}[ \t]/.test(next.line))
+    if (alone) out.push({ i, id: m[1] })
+  }
+  return out
+}
+
+// A node's Change Log, read ONE way (v0.28.0) — by the resolver below, by validate and by
+// `migrate changelog`, so what a step is told, what validate passes and what a move keeps
+// are the same blocks the anchors name. It is a file of its own beside the Task, and the
+// Task's section keeps a link line to it. A section that links its file has moved: the
+// file alone is the record, and an entry left beside the link is read by nobody. A
+// section with no link has not moved yet: its entries come first and the file's follow —
+// so an anchor sealed against the section keeps its number when a step starts the file
+// before the move, and migrate joins the two in that order. `body` is the section's raw
+// line span (0-based, end exclusive) and `linkAt` the link lines' indexes in it, for the
+// move to take out exactly those and keep every other line.
+export function changeLogOf (taskText, taskPath, logText, logPath) {
+  const lines = visibleMarkdownLines(taskText, taskPath)
+  const raw = splitLines(taskText).map(nfc)              // the same lines, nothing blanked
+  const range = sectionRange(lines, 'Change Log')
+  const links = range === null ? [] : linkLines(lines, raw, range)
+  const linkAt = new Set(links.map(link => link.i))
+  const entries = range === null ? [] : logicalBlocks(lines.slice(range.start, range.end)
+    .map((entry, k) => linkAt.has(range.start + k) ? { ...entry, line: '' } : entry)).map(block => block.text)
+  const filed = logText === null ? [] : logicalBlocks(visibleMarkdownLines(logText, logPath)).map(block => block.text)
+  return {
+    links: links.map(link => link.id),
+    linkAt: [...linkAt],
+    body: range,
+    entries,
+    filed,
+    linked: links.length > 0,
+    resolved: links.length ? filed : entries.concat(filed)
+  }
+}
+
+export function changeLogBlocks (P, target, taskText = null) {
+  const taskPath = P.taskPath(target)
+  const logPath = P.changelogPath(target)
+  return changeLogOf(taskText ?? P.read(taskPath) ?? '', taskPath, P.read(logPath), logPath)
 }
 
 function basisAnchor (basis, taskSections, verifyText, clause, at) {
@@ -999,7 +1069,11 @@ export function resolvePacketBases (P, target, packet, verifyText) {
   const taskPath = P.taskPath(target)
   const taskText = P.read(taskPath)
   if (taskText === null) fail(`Task missing: ${taskPath}`)
-  const taskSections = Object.fromEntries(['Contract', 'AC', 'Change Log'].map(k => [k, sectionLogicalLines(taskText, k, taskPath)]))
+  const taskSections = {
+    Contract: sectionLogicalLines(taskText, 'Contract', taskPath),
+    AC: sectionLogicalLines(taskText, 'AC', taskPath),
+    'Change Log': changeLogBlocks(P, target, taskText).resolved
+  }
   const resolvedBases = []
   for (const clause of packet.clauses) {
     const c1Anchor = basisAnchor(clause.c1_basis, taskSections, verifyText, clause, `${clause.id}.c1_basis`)

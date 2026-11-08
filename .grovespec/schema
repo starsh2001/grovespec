@@ -62,3 +62,14 @@ read.lede.max: 120
 # followed by digits (C4, R11); everything else is a literal word, matched whole,
 # outside code spans and fences.
 read.jargon: PASS|FAIL|PARTIAL|UNSET|C<n>|D<n>|F<n>|R<n>|open_issues|followups|approved_by|no_new_streak|plan_clear_streak|max_rounds
+
+# --- Node size: past this a node is split, not grown ---
+# Counted as top-level claims — items and paragraphs at no indent in the Contract and in
+# the AC (a nested item is the fixture or number under one). Measured across 11 projects
+# (265 nodes, 2026-11-08): typical nodes stay under 40 of each, and the 15 past these
+# limits sat in the two projects reopened most — one leaf's Contract had reached 91
+# claims and 51 AC through thirteen milestones of a few lines each, with no step ever
+# looking at the whole. validate tells (a notice, never blocking); the step that next
+# changes such a node proposes its split, and the person decides at the tree gate.
+node.contract.max: 60
+node.ac.max: 40

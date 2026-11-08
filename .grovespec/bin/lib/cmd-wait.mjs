@@ -230,7 +230,7 @@ function declareWait (P, args) {
   entries.push({ from, to, declared: ts, step: '', need, resolved: '', answer: '' })
   writeWaits(P, entries)
   say(`wait: ${from} → ${to} declared ${ts}`)
-  say(`${from} is asleep until ${to} answers or goes done — record the same fact in ${from}'s Change Log (one plain sentence)`)
+  say(`${from} is asleep until ${to} answers or goes done — record the same fact in ${from}'s Change Log, ${P.changelogRel(from)} (one plain sentence)`)
   return 0
 }
 
@@ -249,6 +249,6 @@ function resolveWait (P, args) {
   e.answer = answer
   writeWaits(P, entries)
   say(`resolved: ${from} → ${to} (declared ${e.declared}) — ${answer}`)
-  say(`record what answered it in ${from}'s Change Log, then continue the step that froze`)
+  say(`record what answered it in ${from}'s Change Log (${P.changelogRel(from)}), then continue the step that froze`)
   return 0
 }

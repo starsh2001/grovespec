@@ -47,6 +47,7 @@ Fill the Task out fully: keep the `id`, **preserve `refs` exactly**, and set `st
 - **`blocked_by`** = the shared/cross-tree nodes this one consumes (often `[]`); *not* the parent (that's in tree.md). (Already set on the sketch — confirm it.)
 - **Measurable NFR targets** (latency·throughput·error-rate) go in the AC as checkable items.
 - **AC items are plain list items, no checkbox** — even where the sketch or a sibling node still shows `- [ ]` (an older layout); the spec seal covers AC.
+- **Past the split limit, stop adding** (`FORMATS.md` "Node size"): a draft that would pass it, or a reopened one `validate` lists, is split — ask the person now with the children and the clauses each takes; yes = `grovespec-revise`'s split.
 
 ### 4. Done → verify next
 The node is now a full `draft`. **Next is `grovespec-verify <this node>`** — the cold multi-persona check of the draft, then its gate (`draft` → `approved`). grow does **no** review and sets **no** approval; that is verify's job, kept separate so the reviewers stay cold.

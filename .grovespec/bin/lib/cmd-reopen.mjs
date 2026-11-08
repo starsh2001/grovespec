@@ -192,7 +192,7 @@ export function cmdReopen (P, n, target, { hint = true } = {}) {
   P.forget()
 
   say(`reopened: ${n} ${st} → ${target}${resets.length ? ` — ${resets.join(' · ')}` : ''}`)
-  if (MID_CYCLE.includes(st)) say(`  abandoned: the open ${st} cycle${abandoned.length ? ` and its open issue(s) ${abandoned.join(' · ')}` : ''} — git history keeps ${abandoned.length ? 'them' : 'it'}; write ${abandoned.length ? 'each' : 'why'} into the Change Log. The next cycle's diff still holds this cycle's code.`)
-  if (hint) say(`  a fresh cycle starts here; record why in the Change Log (grovespec-revise owns the prose)${target === 'draft' ? ' — next routes it to grow until a grow has run' : ''}`)
+  if (MID_CYCLE.includes(st)) say(`  abandoned: the open ${st} cycle${abandoned.length ? ` and its open issue(s) ${abandoned.join(' · ')}` : ''} — git history keeps ${abandoned.length ? 'them' : 'it'}; write ${abandoned.length ? 'each' : 'why'} into its Change Log (${P.changelogRel(n)}). The next cycle's diff still holds this cycle's code.`)
+  if (hint) say(`  a fresh cycle starts here; record why in its Change Log, ${P.changelogRel(n)} (grovespec-revise owns the prose)${target === 'draft' ? ' — next routes it to grow until a grow has run' : ''}`)
   return 0
 }

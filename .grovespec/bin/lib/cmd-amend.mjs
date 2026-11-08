@@ -220,15 +220,15 @@ export function cmdAmend (P, n, simple = null) {
     say(`amended (simple): ${n} — ${moved} moved, AC byte-identical${tested !== null ? '; the tests pass on the moved code' : ''}; the cold verdict: ${simple.trim()}`)
     say(`re-sealed spec_digest ${spec.slice(0, 12)}… + task_evidence_digest ${task.slice(0, 12)}…${packetSeal !== null ? ' + the source packet, re-bound to its anchors\' new wording' : ''} → ${touched.join(' · ')}`)
     say(tested !== null
-      ? `status stays ${st}; the meaning did not move, so no dependent becomes a candidate. Record the verdict in the Change Log and commit the code with the Task as \`${n}: simple — <summary>\` — the node's next review reads it with its diff.`
-      : `status stays ${st}; the meaning did not move, so no dependent becomes a candidate. Record the verdict in the Change Log, commit as \`amend ${n}: simple — <summary>\` with the re-sealed records.`)
+      ? `status stays ${st}; the meaning did not move, so no dependent becomes a candidate. Record the verdict in its Change Log (${P.changelogRel(n)}) and commit the code with the Task as \`${n}: simple — <summary>\` — the node's next review reads it with its diff.`
+      : `status stays ${st}; the meaning did not move, so no dependent becomes a candidate. Record the verdict in its Change Log (${P.changelogRel(n)}), commit as \`amend ${n}: simple — <summary>\` with the re-sealed records.`)
     if (st === 'done') for (const line of releaseOnDone(P, n)) say(line)
     endStepMark(P.root, n)
     return 0
   }
   say(`amended: ${n} — Contract·AC byte-identical against HEAD; re-sealed spec_digest ${spec.slice(0, 12)}… + task_evidence_digest ${task.slice(0, 12)}… → ${touched.join(' · ')}`)
   if (retired !== null) say(`refs moved: the source packet sealed in round ${retired} described the old assignment and retires (the brief stays as history) — the tree gate carries the new one: grovespec reopen tree decomposition, then verify the tree`)
-  say(`status stays ${st}; dependents untouched. Record why in the Change Log, commit as \`amend ${n}: <summary>\` — the record files ride the same commit.`)
+  say(`status stays ${st}; dependents untouched. Record why in its Change Log (${P.changelogRel(n)}), commit as \`amend ${n}: <summary>\` — the record files ride the same commit.`)
   // A revise that ends here leaves the node done: the claim its revise step took becomes a
   // done mark (or ends), exactly as at approve.
   if (st === 'done') for (const line of releaseOnDone(P, n)) say(line)

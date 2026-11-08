@@ -114,7 +114,7 @@ Shared rules:
 
 ## 4. Task file format (concept only)
 
-A Task holds *concept* only — **it does not record what the code looks like** (that's read from the code). It's YAML frontmatter + fixed sections (`Overview · Requirements · Contract · AC · Subtasks · Change Log`); the exact format is fixed in `.grovespec/templates/FORMATS.md` (the parser contract), with a fill-in template at `.grovespec/templates/task.md` — not reprinted here.
+A Task holds *concept* only — **it does not record what the code looks like** (that's read from the code). It's YAML frontmatter + fixed sections (`Overview · Requirements · Contract · AC · Subtasks · Change Log` — the Change Log's entries in a file of their own, `tasks/changelog/TASK-N.md`, the section a link to it); the exact format is fixed in `.grovespec/templates/FORMATS.md` (the parser contract), with a fill-in template at `.grovespec/templates/task.md` — not reprinted here.
 
 - Position (who the parent is) is held by tree.md — a Task doesn't record its parent. **tree.md holds every node**, including the not-yet-detailed `sketch` nodes (greenfield, the whole tree is laid out at init).
 - Source ownership is held by frontmatter `refs`: a canonical list of current coordinates under `paths.ref` — numbered headings or line ranges — or explicit `[]`. It is assigned at the tree level and consumed mechanically by spec verify; a caller-written summary cannot silently replace it.

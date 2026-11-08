@@ -217,7 +217,7 @@ export function cmdRecheck (P, rest) {
       ? `it is already ${st}, so its own open cycle reads the change — verdict recorded`
       : st === 'done' ? `reopened to ${reopened}` : 'widened to draft (an earlier verdict reopened it to approved; this reach needs the spec)'
     say(sub === 'open'
-      ? `${node}: judged TOUCHED by ${entry.from}'s change — ${opened}. Write the origin and the reached use into its Change Log now: its next step reads them there. If ITS contract changes, its dependents become candidates the same way.${staying}`
+      ? `${node}: judged TOUCHED by ${entry.from}'s change — ${opened}. Write the origin and the reached use into its Change Log (${P.changelogRel(node)}) now: its next step reads them there. If ITS contract changes, its dependents become candidates the same way.${staying}`
       : `${node}: closed untouched against ${entry.from}'s change — its done and its seals were never disturbed; the verdict is the record.${staying}`)
     return 0
   }

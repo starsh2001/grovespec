@@ -252,6 +252,18 @@ export class Project {
   }
   tidOf (file) { return file.slice(file.lastIndexOf('/') + 1).replace(/\.md$/, '') }
   taskPath (tid) { return `${this.tasksDir}/${tid}.md` }
+  // A node's Change Log lives in a file of its own beside the Task (v0.28.0): every step
+  // and every cold reviewer reads the Task whole, and the history had grown to 35-60% of
+  // it. The Task's `## Change Log` section keeps one link line to this file.
+  changelogDir () { return `${this.tasksDir}/changelog` }
+  changelogPath (tid) { return `${this.tasksDir}/changelog/${tid}.md` }
+  changelogRel (tid) { return this.changelogPath(tid).slice(this.root.length + 1) }   // as a message names it
+  changelogFiles () {
+    let names
+    try { names = readdirSync(this.changelogDir()) } catch { return [] }
+    return names.filter(n => n.startsWith('TASK-') && n.endsWith('.md')).sort()
+      .map(n => `${this.changelogDir()}/${n}`)
+  }
   fm (file, key) {
     const t = this.read(file)
     return t === null ? '' : fmValue(t, key)

@@ -3,12 +3,12 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createHash } from 'node:crypto'
-import { cfgValue, findWaves, itemStuck, sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, strictYamlProblems, MUST_FIX_CATEGORIES, RECORD_CATEGORIES, LEGACY_GRADE_FIELDS, completionProblems, frontmatterBoundaryProblem, readabilityFindings } from './core.mjs'
+import { cfgValue, findWaves, itemStuck, sectionsOf, badTreeLines, treeStrictProblems, pipes, langValue, topValue, listItemCount, listItems, itemValue, splitLines, flowListKeys, strictYamlProblems, MUST_FIX_CATEGORIES, RECORD_CATEGORIES, LEGACY_GRADE_FIELDS, completionProblems, frontmatterBoundaryProblem, readabilityFindings, changeLogReadability, nodeSize } from './core.mjs'
 import { Project, treeGateMsg, scriptDir, FORMAT, bundleIgnoreState, BUNDLE_IGNORE, BUNDLE_IGNORE_TEMPLATE } from './project.mjs'
 import { taskEvidenceDigest, specDigest, treeDigest } from './cmd-pin.mjs'
 import { lastTest } from './cmd-approve.mjs'
 import { git, repoState, ignoredState, ignoredUnder, shallowState, showPrefix, ancestorState, canonicalOidState, dirtyResultSubject, resultSealBreach, log, touched, trackedPaths, allSubjects, allTouchedPaths, gitFailure } from './git.mjs'
-import { SourceEvidenceError, assertFindRound, parseSourcePacket, skippedIndexRows, sourceScopeDigest, taskRefAssignment, validateCompletedPacket, validateTaskRefsSyntax } from './source-evidence.mjs'
+import { SourceEvidenceError, assertFindRound, changeLogBlocks, parseSourcePacket, skippedIndexRows, sourceScopeDigest, taskRefAssignment, validateCompletedPacket, validateTaskRefsSyntax } from './source-evidence.mjs'
 import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
 import { readWaits, waitState, waitsPath } from './cmd-wait.mjs'
 import { hooksState, HOOK_MARK } from './cmd-hooks.mjs'
@@ -37,7 +37,8 @@ export const SCHEMA_KEYS = [
   'finding.fm.required',
   'finding.enum.kind', 'finding.enum.category',
   'brief.fm.required', 'brief.sections', 'conventions.sections',
-  'read.item.max', 'read.paragraph.max', 'read.lede.max', 'read.jargon'
+  'read.item.max', 'read.paragraph.max', 'read.lede.max', 'read.jargon',
+  'node.contract.max', 'node.ac.max'
 ]
 
 // A number the schema does not carry is a limit nobody agreed to — refuse to invent
@@ -60,6 +61,8 @@ export function cmdValidate (P) {
   const ignoredOwn = []              // GroveSpec files git ignores — same
   const refNotices = []              // a sketch/draft node its next spec gate will refuse — same
   const streakNotices = []           // a running cycle with a lower find_streak than config — same
+  const sizeNotices = []             // a node grown past the split limit (node.*.max) — same
+  const unmovedLogs = []             // Tasks whose Change Log has not moved to its own file — ONE notice line
 
   // A schema key that resolves to nothing turns its checks OFF, not green — the
   // `for` loop it feeds runs zero times and the run stays clean. A renamed or lost
@@ -144,6 +147,43 @@ export function cmdValidate (P) {
         else readNotices.push(line)
       }
     }
+    // The Change Log is a file of its own (v0.28.0); the Task's section keeps its link.
+    // Read the one way the anchors read it (source-evidence changeLogOf). A section with
+    // no link has not moved yet — its entries are read first, the file's after, so it is
+    // a notice even once a step has started the file; a section that links its file has
+    // moved, and an entry left beside the link is read by nobody.
+    const logFile = P.changelogPath(tid)
+    const logText = P.read(logFile)
+    let cl = null
+    try { cl = changeLogBlocks(P, tid, taskText) } catch (e) {
+      if (!(e instanceof SourceEvidenceError)) throw e
+      prob(`${f}  its Change Log cannot be read: ${e.message}`)
+    }
+    const wrongLink = cl?.links.find(id => id !== tid) ?? null
+    if (wrongLink !== null) prob(`${f}  the Change Log link names ${wrongLink}, not ${tid} — write '- [changelog/${tid}.md](changelog/${tid}.md)'`)
+    if (cl?.linked && cl.entries.length) prob(`${f}  ${cl.entries.length} Change Log block(s) beside the link — the section links its file, so nothing reads them: move them to the end of ${logFile} (grovespec migrate changelog does it between steps)`)
+    else if (cl && !cl.linked && (cl.entries.length || logText !== null)) unmovedLogs.push(tid)
+    if (logText !== null) {
+      if (itemMax && paraMax) {
+        const found = changeLogReadability(logText, { itemMax, paraMax, jargon: schList('read.jargon') })
+        if (found.length) {
+          const line = `${logFile}  hard to read rendered: ${found.join(' · ')}`
+          const st = P.fm(f, 'status')
+          if (st === 'sketch' || st === 'draft') prob(line)
+          else readNotices.push(line)
+        }
+      }
+    }
+    // How big the node has grown (v0.28.0) — told, never blocking: a node past the
+    // limit is split the next time a step changes it, and that is the person's call.
+    const contractMax = readLimit(P.sch('node.contract.max'))
+    const acMax = readLimit(P.sch('node.ac.max'))
+    if (contractMax && acMax) {
+      const size = nodeSize(taskText)
+      if (size.contract > contractMax || size.ac > acMax) {
+        sizeNotices.push(`${tid} (${P.fm(f, 'role') || '?'}, ${P.fm(f, 'status') || '?'}): Contract ${size.contract}/${contractMax} · AC ${size.ac}/${acMax}`)
+      }
+    }
     v = P.fm(f, 'blocked_by')
     if (v !== '') {
       // The lenient parser quietly drops a malformed dependency — a dropped dependency
@@ -178,6 +218,8 @@ export function cmdValidate (P) {
       }
     }
   }
+  // A Change Log file whose node is gone is the history of nothing — told, never blocking.
+  const orphanLogs = P.changelogFiles().filter(f => P.read(P.taskPath(P.tidOf(f))) === null)
 
   // --- tree.md line format + strict structure ---
   for (const bad of badTreeLines(P.treeText())) prob(`${P.treePath}:${bad}  not a '- TASK-N' line`)
@@ -982,6 +1024,16 @@ export function cmdValidate (P) {
   if (readNotices.length) {
     say(`notice: ${readNotices.length} sealed or done node(s) not yet in the reading rules — a person opening these meets a wall of text. Not blocking (the spec is sealed, or its gates are decided); tidy each the next time it opens at draft:`)
     for (const m of readNotices) say(`  ${m}`)
+  }
+  if (unmovedLogs.length) {
+    say(`notice: ${unmovedLogs.length} Task file(s) still hold their Change Log inside the Task — since v0.28.0 it is a file of its own, out of the Task every step and reviewer reads whole; 'grovespec migrate changelog' moves them once, between steps (then commit what it moved)`)
+  }
+  if (sizeNotices.length) {
+    say(`notice: ${sizeNotices.length} node(s) grown past the split limit — not blocking; the next step that changes one splits it into children instead of adding to it, the person deciding at the tree gate:`)
+    for (const m of sizeNotices) say(`  ${m}`)
+  }
+  if (orphanLogs.length) {
+    say(`notice: ${orphanLogs.length} Change Log file(s) whose node has no Task file — the history of nothing; delete each, or restore its Task: ${orphanLogs.join(', ')}`)
   }
   if (yamlNotices.length) {
     say(`notice: ${yamlNotices.length} spot(s) in gate records that strict YAML cannot read, or that grovespec's own line readers cannot see — an outside YAML consumer (a dashboard, js-yaml) fails or drops the block, and a broken list shape hides its items from every per-item check here, so a settled finding can re-fire. Each line says its own repair:`)

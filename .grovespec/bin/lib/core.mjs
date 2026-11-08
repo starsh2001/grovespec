@@ -362,6 +362,13 @@ export function readabilityFindings (text, limits) {
     else if ([...lede.text].length > ledeMax) out.push(`lede is ${[...lede.text].length} chars (max ${ledeMax})`)
   }
 
+  return out.concat(bodyFindings(body, { itemMax, paraMax, jargon }))
+}
+
+// The per-block limits and the machine-lane words — what every page a person opens is
+// measured by, whatever its own top looks like.
+function bodyFindings (body, { itemMax, paraMax, jargon = [] }) {
+  const out = []
   for (const [kind, max, label] of [['item', itemMax, 'list item'], ['para', paraMax, 'paragraph']]) {
     const bad = body.filter(b => b.kind === kind && [...b.text].length > max)
     if (!bad.length) continue
@@ -373,6 +380,20 @@ export function readabilityFindings (text, limits) {
   const hits = jargonHits(words, jargon)
   if (hits.length) out.push(`machine-lane vocabulary a reader cannot act on: ${hits.slice(0, 6).join(', ')}${hits.length > 6 ? ` (+${hits.length - 6})` : ''} — that belongs in the gate record`)
   return out
+}
+
+// A node's Change Log file (v0.28.0) is measured like the section it came from.
+export function changeLogReadability (text, limits) {
+  return bodyFindings(logicalBlocks(text).filter(b => b.kind !== 'heading'), limits)
+}
+
+
+// How big a node has grown (v0.28.0): the top-level claims of its Contract and its AC —
+// items and paragraphs at no indent, a nested item being the fixture or number under one.
+export function nodeSize (text) {
+  const blocks = logicalBlocks(text)
+  const count = name => blocks.filter(b => b.section === name && (b.kind === 'item' || b.kind === 'para') && b.indent === 0).length
+  return { contract: count('Contract'), ac: count('AC') }
 }
 
 // tree.md → rows {tid, parent, depth}. Comment lines (#) skipped; an item is
