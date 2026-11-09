@@ -1,6 +1,7 @@
 // Thin git access — the diff/fresh commands' one door to history. Still zero npm deps
 // (node:child_process is a builtin); git itself is already a GroveSpec requirement.
 import { execFileSync } from 'node:child_process'
+import { packageState } from './packages.mjs'
 import { existsSync } from 'node:fs'
 
 // GROVESPEC_GIT overrides the binary: an unusual install can name its git, and the
@@ -252,10 +253,15 @@ function resultSubjectPath (P, target) {
   const logPath = `${prefix}${changelog}`
   const reviewPath = `${prefix}${review}`
   const runLockPath = `${prefix}.grovespec/run.lock`
+  // An open work package's Tasks and Change Logs are the package's gate state (v0.30.0): its
+  // nodes are sealed at one commit and approved one after another, and each approval writes
+  // its own Task — which is project input to every other member's seal.
+  const pkg = packageState(P).openOf(target)
+  const gateState = new Set(pkg === null ? [] : pkg.nodes.flatMap(t => [P.taskPath(t), P.changelogPath(t)].map(f => rel(f)).filter(f => f !== null).map(f => `${prefix}${f}`)))
   return file => {
     // The node's own Change Log is its Task's running record (in its own file since
     // v0.28.0) — the entry approve and review write must not break the seal they record.
-    if (file === taskPath || file === logPath) return false
+    if (file === taskPath || file === logPath || gateState.has(file)) return false
     if (file === reviewPath || file.startsWith(`${reviewPath}/`)) return false
     // The dispatcher creates this owner file before invoking every mutating command
     // and removes it afterward; it is runtime coordination, never reviewer input.
@@ -352,7 +358,7 @@ export function log (root) {
 // so each reopen adds it afresh), and a grow is a `grow TASK-N: ` commit after it — the
 // commit grammar fresh attributes by. A mark not yet in HEAD is a reopen still in the
 // working tree: nothing has grown since it.
-export function grownSince (root, recordPath, tid, mark) {
+export function grownSince (root, recordPath, tid, mark, packageIds = []) {
   if (repoState(root) !== 'repo') return null
   const rel = recordPath.startsWith(`${root}/`) ? recordPath.slice(root.length + 1) : recordPath
   const head = git(root, ['show', `HEAD:./${rel}`])
@@ -367,7 +373,8 @@ export function grownSince (root, recordPath, tid, mark) {
   if (at.out.trim() === '') return false
   const after = git(root, ['log', '--format=%s', `${at.out.trim()}..HEAD`])
   if (!after.ok) return null
-  return after.out.split('\n').some(s => s.startsWith(`grow ${tid}: `))
+  // A work package grows its nodes in one commit, `grow WP-N: …` (v0.30.0).
+  return after.out.split('\n').some(s => [tid, ...packageIds].some(id => s.startsWith(`grow ${id}: `)))
 }
 
 // Every trace an id can leave in history, across ALL reachable refs — not just the
@@ -431,7 +438,7 @@ export const TASK_COMMIT = /^TASK-[0-9]+: /
 // `review TASK-N:` commits three planning passes running (proof-run measurement).
 // Deliberately exact, not `/TASK-/ anywhere`: a hand commit merely *mentioning* a task
 // ("fix thing, see TASK-3") must stay out-of-band.
-export const SKILL_COMMIT = /^(?:(?:grow|verify|review|revise) TASK-[0-9]+: |verify tree: |approve (?:TASK-[0-9]+|tree): |ratify TASK-[0-9]+( TASK-[0-9]+)*: |plan #[0-9]+: |retro #[0-9]+: |recheck #[0-9]+: |amend TASK-[0-9]+: |align [0-9a-f]{7,40}( [0-9a-f]{7,40})*: |init: )/
+export const SKILL_COMMIT = /^(?:(?:grow|verify|review|revise) TASK-[0-9]+: |(?:grow|verify|review|approve) WP-[0-9]+: |verify tree: |approve (?:TASK-[0-9]+|tree): |ratify TASK-[0-9]+( TASK-[0-9]+)*: |plan #[0-9]+: |retro #[0-9]+: |recheck #[0-9]+: |amend TASK-[0-9]+: |align [0-9a-f]{7,40}( [0-9a-f]{7,40})*: |init: )/
 
 // The hotfix lane (v0.29.0): a fix that cannot wait is built first and committed as
 // `hotfix: …`; the spec catches up after, in one `align <sha7>…: …` commit naming it.

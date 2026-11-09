@@ -27,9 +27,9 @@ init (once: config · scaffolding; brownfield: survey the code → all-done tree
 
 ---
 
-## 2. The ten skills
+## 2. The eleven skills
 
-Ten units — one per step of a node's life, plus the passes between milestones (retro · plan) and the reach check a contract change arms (recheck).
+Eleven units — one per step of a node's life, plus the passes between milestones (retro · plan), the reach check a contract change arms (recheck), and the work package that runs several nodes' steps in one session (package).
 
 ### init — set up the project (and reconfigure)
 - **When**: at the start; **re-invoke anytime to *reconfigure*** (re-asks the setup interview, updates config, doesn't recreate the project).
@@ -45,6 +45,11 @@ Ten units — one per step of a node's life, plus the passes between milestones 
 - **When**: a contract-changing revise declared its dependents as candidates (`grovespec recheck declare`), and the origin is back at `done` — `grovespec next` names it ahead of new node work (`grovespec recheck` is the deterministic floor: the armed set + a machine reach line per candidate).
 - **What**: ONE step judges every armed candidate on one question — does the change reach this node's use? Differently-armed waves judge each under `find_streak`; the machine's grep line (the origin's contract names against the candidate's footprint) is material for those waves, never a verdict — absence of today's names proves nothing about renamed names or file-mediated coupling. Untouched candidates close in place — their `done` and seals were never disturbed; **only judged-touched nodes reopen** — the touched verdict reopens them itself (`recheck open … draft|approved`), their own dependents becoming candidates the same way, one layer at a time. Alongside it, `grovespec amend` absorbs documentation-only edits to sealed nodes without any cycle (Contract·AC proven byte-identical vs HEAD; a sealed evidence packet rides along consistently re-sealed), and an AC-only change runs the node's own gates with dependents untouched.
 - **Output**: `<paths.review>/recheck-N.md` + the settled ledger (`.grovespec/candidates.yaml`), committed `recheck #N: …`.
+
+### package — several nodes, one session (when config `packages:` names a model)
+- **When**: `grovespec next` names an open work package (`WP-N`) — plan bundled its nodes and gave it an implementer model within that model's budget (`grovespec package add`).
+- **What**: one session runs every member through every gate — specs (grow's work), one light cold spec check over all of them, TDD node by node, one test run (`grovespec test WP-N`), one cold code review of the joined diff (`grovespec diff WP-N`), then each member sealed and approved. Each step's rules stay in its skill; the members keep their own records and seals.
+- **Output**: every member `done`, gate commits `<step> WP-N: …`, code commits `TASK-N: …` per member.
 
 ### retro — the milestone's closing look (before plan #N)
 - **When**: every node is `done` and TASK- work landed since the last retro record — `grovespec next` names it before it routes anything to plan (`grovespec retro` is the deterministic floor: owed-state + the milestone measured).

@@ -21,6 +21,7 @@
 import { listItemCount, RECORD_CATEGORIES } from './core.mjs'
 import { treeGateMsg } from './project.mjs'
 import { freshSignals, planSaw, hotfixState } from './cmd-fresh.mjs'
+import { packageState } from './packages.mjs'
 import { retroOwed } from './cmd-retro.mjs'
 import { waitState } from './cmd-wait.mjs'
 import { recheckState } from './cmd-recheck.mjs'
@@ -140,6 +141,16 @@ export function cmdNext (P, auto) {
     return 0
   }
 
+  // Work packages (v0.30.0): a runnable node of an open package is picked as its package —
+  // one session builds every node of it through every gate (grovespec-package), with the
+  // model the plan gave it. Same fail-loud rule: a ledger problem is a stop.
+  const pk = packageState(P)
+  if (pk.problems.length) {
+    for (const m of pk.problems) say(m)
+    say('nothing decidable — fix the package ledger problem above, then re-run')
+    return 1
+  }
+
   const ids = P.treeIds()
   // A node another worktree holds is skipped — its progress lives on that worktree's
   // branch, while this ledger still shows the status it had when the branches split. So
@@ -163,16 +174,19 @@ export function cmdNext (P, auto) {
   let pick = null
   let pickStep = null
   let pickPrio = ''
+  let pickPkg = null
   // The turn follows the newest declaration: among runnable nodes, one that a live
   // wait points AT outranks tree order (the chain's frozen work is what the turn
   // serves), newest declaration first. '' = nobody waits on it.
   const take = (t, step) => {
     const prio = ws.wakePriority(t)
-    if (pick === null || prio > pickPrio) { pick = t; pickStep = step; pickPrio = prio }
+    if (pick === null || prio > pickPrio) { pick = t; pickStep = step; pickPrio = prio; pickPkg = pk.openOf(t) }
   }
+  // An in-package parent or blocker counts as ready only while it can itself go on here.
+  const stuck = b => ws.asleepOn(b) !== null || claims().held(b) !== null
   for (const t of ids) {
     if (P.statusOf(t) === 'done') continue
-    const ub = P.unblocked(t)
+    const ub = P.unblocked(t, stuck)
     if (ub !== 'yes') { blocked.push(`${t} (${ub.slice(3)})`); depBlocked++; continue }
     const asleep = ws.asleepOn(t)
     if (asleep !== null) { blocked.push(`${t} (waiting on ${asleep.to} — declared ${asleep.declared})`); depBlocked++; continue }
@@ -204,8 +218,9 @@ export function cmdNext (P, auto) {
 
   if (pick !== null) {
     const step = pickStep
-    if (step === null) { say(`nothing runnable — ${pick} has an unknown status '${P.statusOf(pick)}' (run grovespec validate)`); return 1 }
-    say(`next: ${pick} (${P.nameOf(pick)}) ${P.statusOf(pick)} → ${step}`)
+    if (pickPkg !== null) say(`next: ${pickPkg.id} (${pickPkg.nodes.join(' · ')}) → grovespec-package (model: ${pickPkg.model})`)
+    else if (step === null) { say(`nothing runnable — ${pick} has an unknown status '${P.statusOf(pick)}' (run grovespec validate)`); return 1 }
+    else say(`next: ${pick} (${P.nameOf(pick)}) ${P.statusOf(pick)} → ${step}`)
     sayHeld()
     if (waiting.length) {
       say('also waiting on you (not runnable):')

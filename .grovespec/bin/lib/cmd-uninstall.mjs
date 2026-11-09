@@ -23,7 +23,7 @@ const say = s => process.stdout.write(s + '\n')
 // literals on purpose: a delete list must never be computed from config a user
 // can point somewhere else.
 const RUNTIME = ['.grovespec/schema', '.grovespec/templates', '.grovespec/LICENSE', '.grovespec/NOTICE', '.grovespec/TRADEMARK.md', '.grovespec/VERSION', '.grovespec/bin']
-const LEDGER = ['.grovespec/review', '.grovespec/config.yaml', '.grovespec/waits.yaml']
+const LEDGER = ['.grovespec/review', '.grovespec/config.yaml', '.grovespec/waits.yaml', '.grovespec/packages.yaml']
 
 export function cmdUninstall (P, flags, removeHooks) {
   const purge = flags.includes('--purge')

@@ -14,7 +14,7 @@ The one look that crosses node boundaries — for the defect class no node-scope
 ## Steps
 
 ### 1. Measure — the machine speaks first
-Run **`node .grovespec/bin/grovespec.mjs retro`**: is a retro owed, and the milestone's numbers (nodes × cycle commits, gate/step commits, escalations, live waits, ratify backlog, fresh debt). Not owed → report that and stop. Owed → **claim the tree:** `node .grovespec/bin/grovespec.mjs claim tree retro` — non-zero = **stop** and report what it printed. Then carry the numbers into the record verbatim, then add the honest prose: what the milestone set out to do (the plan/intent record that opened it), what it cost, where it dragged — name the heaviest node and why (escalations · repeated waves · waits).
+Run **`node .grovespec/bin/grovespec.mjs retro`**: is a retro owed, and the milestone's numbers (nodes × cycle commits, gate/step commits, escalations, live waits, ratify backlog, fresh debt). Not owed → report that and stop. Owed → **claim the tree:** `node .grovespec/bin/grovespec.mjs claim tree retro` — non-zero = **stop** and report what it printed. Then carry the numbers into the record verbatim, then add the honest prose: what the milestone set out to do (the plan/intent record that opened it), what it cost, where it dragged — name the heaviest node and why (escalations · repeated waves · waits). To each work package the measure lists, add what the host measured where it can (sessions, tokens); for one far over or under its budget, propose the next budget in the record — the person sets it (`config packages:`).
 
 ### 2. The close run — the suite and the product, once
 The node reviews ran only `review.test`; the slow suite and the product itself run here, once, on the code the milestone closes on:

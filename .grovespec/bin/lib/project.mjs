@@ -6,6 +6,7 @@ import { dirname, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { specDigest } from './source-evidence.mjs'
 import { grownSince } from './git.mjs'
+import { packageState } from './packages.mjs'
 import {
   fmValue, treeRows, blockedIds, schValue, cfgValue, topValue, listItemCount,
   listItems, itemValue, splitLines, duplicateFrontmatterKeys, duplicateTopKeys,
@@ -295,7 +296,7 @@ export class Project {
     for (const key of duplicateTopKeys(this.configText)) {
       out.push(`${this.configPath}  top-level field '${key}' appears more than once — config routing would be ambiguous`)
     }
-    for (const parent of ['paths', 'review', 'milestone']) {
+    for (const parent of ['paths', 'review', 'milestone', 'packages']) {
       for (const key of duplicateNestedKeys(this.configText, parent)) {
         out.push(`${this.configPath}  ${parent} field '${key}' appears more than once — config routing would be ambiguous`)
       }
@@ -537,13 +538,35 @@ export class Project {
   }
 
   // ---- readiness ----
-  unblocked (tid) {                                      // 'yes' | 'no:<reason>'
-    const p = this.parentOf(tid)
-    if (p !== '' && this.statusOf(p) !== 'done') return `no:parent ${p} not done`
-    for (const b of this.blockedIdsOf(this.taskPath(tid))) {
-      if (this.statusOf(b) !== 'done') return `no:blocked by ${b}`
+  unblocked (tid, stuck = () => false) {                 // 'yes' | 'no:<reason>'
+    // Inside an open work package a parent or blocker that is a member is built earlier in
+    // the same session (grovespec-package) — an order, not a wait (v0.30.0). Every step
+    // skill's readiness rule reads this answer, so the package's own order does not stop it.
+    // A member counts only while it can itself go on: ready by this same rule, no escalation
+    // waiting on the person, and not `stuck` by what the caller reads (a wait, another
+    // worktree's claim) — else the package is the pick while nothing in it can move (Codex
+    // 2026-11-09 F1). A cycle reads as not ready.
+    const pkg = packageState(this).openOf(tid)
+    const goes = new Map()
+    const deps = t => {
+      const p = this.parentOf(t)
+      if (p !== '' && !ready(p)) return `no:parent ${p} not done`
+      for (const b of this.blockedIdsOf(this.taskPath(t))) {
+        if (!ready(b)) return `no:blocked by ${b}`
+      }
+      return 'yes'
     }
-    return 'yes'
+    const ready = b => {
+      if (this.statusOf(b) === 'done') return true
+      if (pkg === null || !pkg.nodes.includes(b)) return false
+      if (!goes.has(b)) {
+        goes.set(b, false)
+        const escalated = [this.verifyYamlPath(b), this.reviewYamlPath(b)].some(r => this.reviewStatus(r) === 'escalated')
+        goes.set(b, deps(b) === 'yes' && !escalated && !stuck(b))
+      }
+      return goes.get(b)
+    }
+    return deps(tid)
   }
   // A draft reopened to change what it does goes to grow until grow has run since that
   // reopen — a `grow TASK-N:` commit after it (v0.25.0). v0.24.0 read it off the spec
@@ -557,7 +580,7 @@ export class Project {
     const vp = this.verifyYamlPath(tid)
     const marked = topValue(this.read(vp) ?? '', 'reopened_spec_digest')
     if (marked === '') return false
-    const grown = grownSince(this.root, vp, tid, marked)
+    const grown = grownSince(this.root, vp, tid, marked, packageState(this).packages.filter(p => p.nodes.includes(tid)).map(p => p.id))
     if (grown !== null) return !grown
     const task = this.read(this.taskPath(tid))
     return task !== null && specDigest(task) === marked

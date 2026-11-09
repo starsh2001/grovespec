@@ -6,12 +6,66 @@
 // commits are the ones after that pin.
 import { topValue } from './core.mjs'
 import { git, porcelainPaths, repoState, shallowState, ancestorState, canonicalOidState, emptyTree, log, touched, showPrefix, gitFailure, alignedHotfixes } from './git.mjs'
+import { packageState, PACKAGE_ID } from './packages.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
+// One node's cycle: its `TASK-N:` commits after its pinned review, plus the hotfixes an
+// alignment tied to it. { commits, rc } — or { err }, what to say instead of a diff.
+function cycleOf (P, n, history) {
+  let commits = history.filter(c => c.s.startsWith(`${n}: `))
+
+  // A pinned review closes the previous cycle: only commits after it belong to this one.
+  const rc = topValue(P.read(P.reviewYamlPath(n)) ?? '', 'reviewed_commit')
+  let win = null
+  if (rc !== '') {
+    // A seal must name immutable bytes: 'HEAD' resolved to an empty rev-list window
+    // and hid the whole live cycle. Canonical-full-OID first, then ancestry.
+    const oid = canonicalOidState(P.root, rc)
+    if (oid === 'broken') return { err: `reviewed_commit ${rc.slice(0, 7)} cannot be resolved (unknown commit, or git failed) — the cycle boundary cannot be established; no diff was produced` }
+    if (oid === 'no') return { err: `reviewed_commit '${rc}' is not a canonical full commit id — a seal names immutable bytes, never a moving name (HEAD · branch · short sha); re-run the gate so pin seals a real commit` }
+    // Existing is not enough: a commit on a sibling branch or a pre-rewrite line
+    // EXISTS, and rev-list rc..HEAD "succeeds" around it with a wrong window. The
+    // boundary must be an ancestor of the history it bounds.
+    const anc = ancestorState(P.root, rc)
+    if (anc === 'broken') return { err: `git merge-base failed for reviewed_commit ${rc.slice(0, 7)} — the cycle boundary cannot be established; no diff was produced` }
+    if (anc === 'no') return { err: `reviewed_commit ${rc.slice(0, 7)} is not an ancestor of HEAD — a stale seal from another line of history cannot bound this cycle; re-run the gate (grovespec-review) so it seals this history` }
+    const r = git(P.root, ['rev-list', `${rc}..HEAD`])
+    // An unknown/unreachable reviewed_commit used to become an EMPTY after-set —
+    // real cycle commits then read as "nothing committed", exit 0.
+    if (!r.ok) return { err: `git rev-list failed for reviewed_commit ${rc.slice(0, 7)} — the cycle boundary cannot be established (unknown or unreachable commit); no diff was produced` }
+    const after = new Set(r.out.split('\n').filter(Boolean))
+    commits = commits.filter(c => after.has(c.h))
+    win = after
+  }
+
+  // The hotfixes an alignment tied to this node (v0.29.0). An `align <sha>:` commit in this
+  // cycle's window that wrote the node's Task or Change Log — a reopen, a spec edit, its log
+  // line — names `hotfix:` commits whose code this node's gate reads too. They landed before
+  // the cycle's first TASK commit, so without them the base starts after the hotfix and its
+  // files fall outside the set (Codex review 2026-11-09, F2).
+  // One rule with the result seal (git.mjs alignedHotfixes), here bounded to the cycle window.
+  const hot = alignedHotfixes(P, n, history, c => win === null || win.has(c.h))
+  if (hot === null) return { err: 'cannot read the files of the align commits — git failed (git >= 2.31 is required for merge-aware diffs); no diff was produced' }
+  if (hot.length) {
+    const ids = new Set([...commits, ...hot].map(c => c.h))
+    commits = history.filter(c => ids.has(c.h))
+  }
+  return { commits, rc }
+}
+
+// `diff WP-N` (v0.30.0): a work package's review reads its nodes' cycles as one diff — the
+// union of their commits, from the oldest one's parent, so a file two nodes share shows once.
 export function cmdDiff (P, n) {
-  if (n === '') { say('usage: grovespec diff TASK-N'); return 2 }
-  if (P.read(P.taskPath(n)) === null) { say(`no such node: ${n}`); return 2 }
+  if (n === '') { say('usage: grovespec diff TASK-N|WP-N'); return 2 }
+  let pkg = null
+  if (PACKAGE_ID.test(n)) {
+    const st = packageState(P)
+    for (const m of st.problems) say(m)
+    if (st.problems.length) { say('the package ledger has the problem above — no diff was produced'); return 2 }
+    pkg = st.packages.find(p => p.id === n) ?? null
+    if (pkg === null) { say(`no such package: ${n}`); return 2 }
+  } else if (P.read(P.taskPath(n)) === null) { say(`no such node: ${n}`); return 2 }
   const rs = repoState(P.root)
   if (rs === 'broken') { say(`git did not answer (${gitFailure()}) — the cycle cannot be read; no diff was produced`); return 2 }
   if (rs === 'none') { say('not a git repository — diff reads the cycle from TASK- commits'); return 2 }
@@ -23,37 +77,8 @@ export function cmdDiff (P, n) {
   if (sh === 'broken') { say('git rev-parse --is-shallow-repository failed — the cycle cannot be established; no diff was produced'); return 2 }
   if (sh === 'shallow') { say('this is a shallow clone — history is cut, so neither the cycle nor its base can be established; unshallow it (git fetch --unshallow), then re-run'); return 2 }
 
-  const prefix = `${n}: `
   const history = log(P.root)
   if (history === null) { say('git log failed — the cycle cannot be read; no diff was produced'); return 2 }
-  let commits = history.filter(c => c.s.startsWith(prefix))
-
-  // A pinned review closes the previous cycle: only commits after it belong to this one.
-  const rc = topValue(P.read(P.reviewYamlPath(n)) ?? '', 'reviewed_commit')
-  let win = null
-  if (rc !== '') {
-    // A seal must name immutable bytes: 'HEAD' resolved to an empty rev-list window
-    // and hid the whole live cycle. Canonical-full-OID first, then ancestry.
-    const oid = canonicalOidState(P.root, rc)
-    if (oid === 'broken') { say(`reviewed_commit ${rc.slice(0, 7)} cannot be resolved (unknown commit, or git failed) — the cycle boundary cannot be established; no diff was produced`); return 2 }
-    if (oid === 'no') { say(`reviewed_commit '${rc}' is not a canonical full commit id — a seal names immutable bytes, never a moving name (HEAD · branch · short sha); re-run the gate so pin seals a real commit`); return 2 }
-    // Existing is not enough: a commit on a sibling branch or a pre-rewrite line
-    // EXISTS, and rev-list rc..HEAD "succeeds" around it with a wrong window. The
-    // boundary must be an ancestor of the history it bounds.
-    const anc = ancestorState(P.root, rc)
-    if (anc === 'broken') { say(`git merge-base failed for reviewed_commit ${rc.slice(0, 7)} — the cycle boundary cannot be established; no diff was produced`); return 2 }
-    if (anc === 'no') { say(`reviewed_commit ${rc.slice(0, 7)} is not an ancestor of HEAD — a stale seal from another line of history cannot bound this cycle; re-run the gate (grovespec-review) so it seals this history`); return 2 }
-    const r = git(P.root, ['rev-list', `${rc}..HEAD`])
-    if (!r.ok) {
-      // An unknown/unreachable reviewed_commit used to become an EMPTY after-set —
-      // real cycle commits then read as "nothing committed", exit 0.
-      say(`git rev-list failed for reviewed_commit ${rc.slice(0, 7)} — the cycle boundary cannot be established (unknown or unreachable commit); no diff was produced`)
-      return 2
-    }
-    const after = new Set(r.out.split('\n').filter(Boolean))
-    commits = commits.filter(c => after.has(c.h))
-    win = after
-  }
 
   // The gate records are never the cycle's SUBJECT. A fix commit legitimately carries the
   // round record it just updated, and folding that into the diff hands the next COLD round
@@ -70,21 +95,21 @@ export function cmdDiff (P, n) {
   // the yaml — round briefs and test logs live there too, and all of them are held.
   const heldNote = k => `  (${k} file(s) under ${P.reviewDir.slice(P.root.length + 1)}/ held out — gate records are not this cycle's subject)`
 
-  // The hotfixes an alignment tied to this node (v0.29.0). An `align <sha>:` commit in this
-  // cycle's window that wrote the node's Task or Change Log — a reopen, a spec edit, its log
-  // line — names `hotfix:` commits whose code this node's gate reads too. They landed before
-  // the cycle's first TASK commit, so without them the base starts after the hotfix and its
-  // files fall outside the set (Codex review 2026-11-09, F2).
-  // One rule with the result seal (git.mjs alignedHotfixes), here bounded to the cycle window.
-  const hot = alignedHotfixes(P, n, history, c => win === null || win.has(c.h))
-  if (hot === null) { say('cannot read the files of the align commits — git failed (git >= 2.31 is required for merge-aware diffs); no diff was produced'); return 2 }
-  if (hot.length) {
-    const ids = new Set([...commits, ...hot].map(c => c.h))
-    commits = history.filter(c => ids.has(c.h))
+  const ids = new Set()
+  let rc = ''
+  for (const m of pkg === null ? [n] : pkg.nodes) {
+    const c = cycleOf(P, m, history)
+    if (c.err) { say(c.err); return 2 }
+    for (const x of c.commits) ids.add(x.h)
+    if (pkg === null) rc = c.rc
   }
+  const commits = history.filter(c => ids.has(c.h))
+  const label = pkg === null ? `${n} (${P.statusOf(n)})` : `${n} (${pkg.nodes.join(' · ')})`
 
   if (commits.length === 0) {
-    say(`cycle diff of ${n} (${P.statusOf(n)}) — no '${n}:' commits${rc !== '' ? ` after reviewed_commit ${rc.slice(0, 7)}` : ''}; nothing committed this cycle`)
+    say(pkg === null
+      ? `cycle diff of ${label} — no '${n}:' commits${rc !== '' ? ` after reviewed_commit ${rc.slice(0, 7)}` : ''}; nothing committed this cycle`
+      : `cycle diff of ${label} — none of its nodes has a cycle commit; nothing committed this cycle`)
     const st = git(P.root, ['status', '--porcelain'])
     if (!st.ok) { say('cannot read the working tree (git status failed) — uncommitted state unknown'); return 2 }
     const dirty = st.out.split('\n').filter(Boolean)
@@ -123,7 +148,7 @@ export function cmdDiff (P, n) {
   }
   files.sort()
 
-  say(`cycle diff of ${n} (${P.statusOf(n)}) — ${commits.length} commit(s), base = parent of ${oldest.slice(0, 7)}`)
+  say(`cycle diff of ${label} — ${commits.length} commit(s), base = parent of ${oldest.slice(0, 7)}`)
   for (const c of commits) say(`  ${c.h.slice(0, 7)} ${c.s}`)
   say('files:')
   for (const f of files) say(`  ${f}`)

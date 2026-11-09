@@ -33,9 +33,9 @@ init (once: setup; brownfield also maps code)
 - **Propagation on change.** Changing a done node asks whether its Contract changed: if not, fix just that spot; if so, find the nodes that used it and re-review them. Source ownership is tracked separately — changing Task `refs` reopens the spec and the tree's source-assignment gate even when the Contract wording has not moved.
 - **Milestones, not a dead end.** Gates block only on must-fix problems in their own target; everything else real is *recorded* (followups, the brownfield backlogs) — and when the tree is all done, `plan` structures the parked work into the next milestone: cluster, human disposition (reopen · restructure · consciously drop), reopens the driver picks up again. Known work never ends a run silently — but the record list is not a queue: improvements become work only on your pick, and an auto run with nothing else left **ends** rather than opening a cleanup session.
 
-## The ten skills
+## The eleven skills
 
-One per step of a node's life — `sketch → draft → approved → implemented → reviewed ⇄ fixed → done` — plus the passes between milestones (plan · retro) and the reach check a contract change arms (recheck).
+One per step of a node's life — `sketch → draft → approved → implemented → reviewed ⇄ fixed → done` — plus the passes between milestones (plan · retro), the reach check a contract change arms (recheck), and the work package that runs several nodes' steps in one session (package).
 
 | Skill | What it does |
 |---|---|
@@ -46,6 +46,7 @@ One per step of a node's life — `sketch → draft → approved → implemented
 | `grovespec-implement` | Turn an approved spec into code: pre-check → tests first → code (the root: a walking skeleton — one real path through the main components) → confirm the node's decomposition (`approved → implemented`). |
 | `grovespec-review` | Run the **tests** + cold-review **only this node's diff** (not the codebase) → confirmed issue list (`implemented → reviewed`). |
 | `grovespec-fix` | Apply the review's issues to this node's code → re-review (`reviewed ⇄ fixed`), until clean → `done`. |
+| `grovespec-package` | One work package — the nodes a plan bundled for one session and one implementer model — through every gate in that session: specs, one light cold spec check, TDD node by node, one test run, one cold review of the joined diff, the seals. The rules stay the step skills'. |
 | `grovespec-revise` | Change a node that already passed a gate (`done`, or an `approved` spec) — behavior (reopen + propagate), structure (split·merge·move), promote a leaf to a skeleton, or align the specs after a hotfix. |
 | `grovespec-recheck` | The reach check: when a contract change lands, one step judges every dependent candidate on one question — does the change reach its use? Untouched ones close in place; a touched verdict reopens the node. |
 | `grovespec-retro` | The milestone's closing look: once every node is done, the close run — the whole suite and the product, once — then one cross-node review reads across contract seams for defects no node gate can see, and parks them for the next plan. Only a failed close run reopens a node. |
@@ -68,7 +69,7 @@ docs/
   config.yaml         paths · review settings · language
   schema              the format contract (machine SoT; FORMATS.md mirrors it)
   templates/          fill-in templates + FORMATS.md (the parser contract)
-  bin/grovespec.mjs   deterministic checks — validate · status · check · next · approve · reopen · ratify · wait · diff · files · test · fresh · followups · source · pin · id · claim · lang · locale · interview · hooks · uninstall · amend · recheck · retro · migrate · impact · tree · version
+  bin/grovespec.mjs   deterministic checks — validate · status · check · next · approve · reopen · ratify · wait · diff · files · test · fresh · followups · source · pin · id · claim · lang · locale · interview · hooks · uninstall · amend · recheck · retro · migrate · package · impact · tree · version
   VERSION             the runtime bundle version — compare an install against this repo
 ```
 
@@ -143,6 +144,8 @@ Ownership is deliberate, so the docs can't drift apart: the flow and steps are d
 GroveSpec stands on earlier spec-driven work, with thanks. Its *explore* stance is influenced by [OpenSpec](https://github.com/Fission-AI/OpenSpec)'s explore mode. The cold, multi-reviewer gate and the one-node-ahead tree are GroveSpec's own response to the rubber-stamp reviews and spec↔code drift that every spec workflow meets at scale — territory charted by [BMAD-METHOD](https://github.com/bmadcode/bmad-method) and [Spec-Kit](https://github.com/github/spec-kit). Different bets, shared lineage.
 
 ## Status
+
+**v0.30.0 — a work package: several nodes, one session.** Node by node, every step was its own session — on one pipeline project a milestone took 46 sessions, 207 subagents and about 40 hours, and even a five-minute session spent millions of tokens re-reading the skills, the Tasks and the conventions. Now the plan bundles a milestone's nodes into work packages (`WP-N`, `grovespec package add`), each handed to one implementer model within its budget (config `packages:` — the AC items one session of that model covers). `grovespec next` names the package and its model, and one session runs it through every gate with the new `grovespec-package` skill: specs, one light cold spec check, TDD node by node, one test run (`grovespec test WP-N`), one cold review of the joined diff (`grovespec diff WP-N`), the seals. Every node keeps its own spec, records and seals, so the rest of the tree reads it as before. **Migration:** nothing to run — without `packages:` in config there are no packages and nodes run one by one; to use them, name your models with their budgets there.
 
 **v0.29.0 — the milestone closes on a run; a hotfix builds first and aligns after.** Every node's review ran the whole suite and every implement ran the product: on one pipeline project the full suite — about 1,400 tests, some 20 minutes a run — ran more than ten times in one milestone. Now `review.test` is the fast per-unit set, and the slow integration tests (the new `milestone.test`) and the product's direct run happen once, at the front of the retro, on the code the milestone closes on (`grovespec test milestone`). A failure there reopens the node it points at, and the milestone stays open until a run passes. A fix that cannot wait is built first and committed as `hotfix: …`; `grovespec next` then routes `align` ahead of node work until one `align <sha7>: …` commit brings the owners' specs to what the code now does. **Migration:** nothing to run — without `milestone.test` the close run uses `review.test`; to split them, move the slow tests from `review.test` to `milestone.test`. A `hotfix:` commit made since your last plan now asks for its alignment first.
 

@@ -27,6 +27,8 @@ import { git, repoState, shallowState, showPrefix, log, TASK_COMMIT, SKILL_COMMI
 import { freshSignals, nestedCommits } from './cmd-fresh.mjs'
 import { readWaits } from './cmd-wait.mjs'
 import { closeRun, milestoneCommand } from './cmd-test.mjs'
+import { packageState } from './packages.mjs'
+import { packageModels, acOf } from './cmd-package.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
@@ -133,6 +135,17 @@ export function cmdRetro (P) {
   say(`retro: owed — TASK- work landed since ${o.anchor !== null ? `retro-${o.n} (anchor ${o.anchor.slice(0, 7)})` : o.adopted !== null ? `GroveSpec arrived (${o.adopted.slice(0, 7)} — no retro yet)` : 'the beginning (no retro yet)'}`)
   say(`the milestone, measured:`)
   say(`  nodes worked: ${perNode.size} — ${[...perNode.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}(${v})`).join(' · ')}`)
+  // The work packages this milestone built (v0.30.0): what each held against its model's
+  // budget — the retro's own material for proposing the next budgets (grovespec-retro §1).
+  const pst = packageState(P)
+  if (pst.problems.length) say(`  packages: unreadable — ${pst.problems[0]}`)
+  else {
+    const models = packageModels(P)
+    for (const p of pst.packages.filter(x => x.nodes.some(t => perNode.has(t)))) {
+      const commits = p.nodes.reduce((n, t) => n + (perNode.get(t) ?? 0), 0)
+      say(`  ${p.id} (${p.model}): ${p.nodes.join(' · ')} — ${acOf(P, p.nodes)} AC items of ${models.get(p.model) ?? '?'} · ${commits} TASK commit(s)${p.dropped !== '' ? ' · dropped' : ''}`)
+    }
+  }
   say(`  commits: ${o.work.length} TASK cycle · ${steps} gate/step — ${o.work.length + steps} of ${o.inMilestone.length} total in the milestone`)
   say(`  escalated cycles: ${escalated.length}${escalated.length ? ' — ' + escalated.join(' · ') : ''}`)
   say(`  live waits: ${liveWaits} · machine-approved awaiting ratify: ${unratified.length}${unratified.length ? ` (${unratified.join(', ')})` : ''}`)

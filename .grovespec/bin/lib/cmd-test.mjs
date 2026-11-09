@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 import { cfgValue, splitLines } from './core.mjs'
 import { writeAtomic } from './project.mjs'
 import { git, inRepo, porcelainPaths, showPrefix } from './git.mjs'
+import { packageState, PACKAGE_ID } from './packages.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 
@@ -123,7 +124,24 @@ function upsertLastTest (text, cmd, exit, commit) {
 
 export function cmdTest (P, tid) {
   if (tid === 'milestone') return testMilestone(P)
-  if (tid !== '' && P.read(P.taskPath(tid)) === null) { say(`no such node: ${tid}`); return 2 }
+  // `test WP-N` (v0.30.0): an open work package runs the suite once and records it into each
+  // of its nodes not yet done — a done node's closed record is left as its gate sealed it. A
+  // run for one member records into them all as well: the suite is the project's, and a
+  // member whose run predates a sibling's fix would fail its approve (Codex 2026-11-09 F3).
+  // A package no longer open runs nothing — its nodes go one by one (F2).
+  let members = tid === '' ? [] : [tid]
+  let via = null
+  if (tid !== '') {
+    const byId = PACKAGE_ID.test(tid)
+    if (!byId && P.read(P.taskPath(tid)) === null) { say(`no such node: ${tid}`); return 2 }
+    const st = packageState(P)
+    for (const m of st.problems) say(m)
+    if (st.problems.length) { say('the package ledger has the problem above — nothing was run'); return 2 }
+    const p = byId ? st.packages.find(x => x.id === tid) ?? null : st.openOf(tid)
+    if (byId && p === null) { say(`no such package: ${tid}`); return 2 }
+    if (byId && !p.open) { say(`${tid} is ${p.dropped !== '' ? 'dropped' : p.closed !== '' ? 'closed' : 'done'} — no run is recorded into it; its nodes run one by one (grovespec test TASK-N)`); return 2 }
+    if (p !== null) { members = p.nodes.filter(t => t === tid || P.statusOf(t) !== 'done'); via = byId ? null : p.id }
+  }
   const cmd = testCommand(P)
   if (cmd === '') {
     say('config review.test is empty — the first grovespec-review derives it from the stack and writes it back (grovespec-review §1)')
@@ -136,19 +154,24 @@ export function cmdTest (P, tid) {
   const exit = r.status ?? 1
   say(`test: exit ${exit} (${exit === 0 ? 'pass' : 'FAIL'})`)
 
-  if (tid !== '') {
+  if (members.length) {
     let commit = ''
     if (inRepo(P.root)) {
       const head = git(P.root, ['rev-parse', 'HEAD'])
       if (head.ok) commit = head.out.trim()
     }
     mkdirSync(P.reviewDir, { recursive: true })
-    const yamlPath = P.reviewYamlPath(tid)
-    const existing = P.read(yamlPath)
-    writeAtomic(yamlPath, upsertLastTest(existing ?? skeleton(P, tid), cmd, exit, commit))
-    writeAtomic(`${P.reviewDir}/${tid}.test.log`, out)
-    say(`recorded → ${yamlPath} (last_test) + ${tid}.test.log`)
-    if (existing === null) {
+    let born = false
+    for (const m of members) {
+      const yamlPath = P.reviewYamlPath(m)
+      const existing = P.read(yamlPath)
+      writeAtomic(yamlPath, upsertLastTest(existing ?? skeleton(P, m), cmd, exit, commit))
+      writeAtomic(`${P.reviewDir}/${m}.test.log`, out)
+      if (members.length === 1) say(`recorded → ${yamlPath} (last_test) + ${m}.test.log`)
+      born ||= existing === null
+    }
+    if (members.length > 1) say(`recorded → last_test + <id>.test.log for ${members.join(' · ')}${via === null ? '' : ` (${tid} is in ${via} — one run counts for its open nodes)`}`)
+    if (born) {
       const c = reviewSkeletonCounters(P)
       say(`new record: find_streak ${c.find} · plan_streak ${c.plan} · max_rounds ${c.max} (config review:)`)
     }

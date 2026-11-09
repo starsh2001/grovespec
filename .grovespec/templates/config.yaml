@@ -85,6 +85,14 @@ review:
 milestone:
   test: ""           # the whole suite, slow integration tests included (grovespec test milestone). Empty → review.test runs.
 
+# Work packages — the implementer models a plan may hand a package to (several nodes, one session),
+# each with its budget: how many AC items one session of that model covers. grovespec-plan sizes
+# each package to its model; `next` names the model and the driver opens the session with it; the
+# retro proposes new budgets from what the packages cost. Empty: no packages — nodes run one by one.
+packages:
+  # opus: 120
+  # sonnet: 50
+
 # Edit-routing hook — advisory context injected on src/tests edits (see `grovespec
 # hooks install|remove|status`; the registration itself lives in .claude/settings.json
 # and .codex/hooks.json and is managed by that command, never by hand). 'off' silences

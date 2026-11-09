@@ -16,11 +16,13 @@
 //   wait [resolve] TASK-A TASK-B <text…>  the sideways-dependency ledger: A freezes until
 //              B answers (declare), A closes its wait saying what answered it (resolve);
 //              bare `wait` lists what is live and whose turn the newest declaration gives
-//   diff ID    the node's cycle diff, mechanically (TASK-N: commits + working tree)
+//   diff ID    the node's cycle diff, mechanically (TASK-N: commits + working tree);
+//              WP-N joins its nodes' cycles into one (v0.30.0)
 //   files ID   which code belongs to the node, across every cycle (derived, never stored)
-//   test [ID|milestone]  run config review.test; with ID, record exit+log as the node's
-//              evidence; `milestone` runs milestone.test (else review.test) as the close run
-//              and records it for retro, bound to HEAD (v0.29.0)
+//   test [ID|WP-N|milestone]  run config review.test; with ID, record exit+log as the
+//              node's evidence (WP-N: once, into each of its open nodes); `milestone`
+//              runs milestone.test (else review.test) as the close run and records it
+//              for retro, bound to HEAD (v0.29.0)
 //   fresh      out-of-band signals: src/tests changes that skipped the skills (report)
 //   followups  every parked non-blocking finding across all gate records + the brownfield
 //              backlogs — the aggregate surface grovespec-plan structures into the next milestone
@@ -49,6 +51,9 @@
 //              ledger (gate records · waits · config · docs/) stays unless --purge
 //   amend TASK-N  absorb a documentation-only edit to a sealed node: Contract·AC
 //              byte-identical (proven vs HEAD) → re-seal in place, no reopen
+//   package [add <model> TASK-…|drop WP-N]  the work-package ledger (v0.30.0): which nodes
+//              one session of which implementer model builds — grovespec-plan writes it,
+//              next names an open package as one step (grovespec-package)
 //   recheck [declare|close|open]  the candidate ledger: a contract change makes
 //              dependents candidates, ONE armed step judges reach for them all, and
 //              `open` reopens a judged-touched one in the same command
@@ -87,13 +92,14 @@ import { cmdAmend } from './lib/cmd-amend.mjs'
 import { cmdRecheck } from './lib/cmd-recheck.mjs'
 import { cmdClaim } from './lib/cmd-claim.mjs'
 import { cmdMigrate } from './lib/cmd-migrate.mjs'
+import { cmdPackage } from './lib/cmd-package.mjs'
 
 const [cmd = '', arg = ''] = process.argv.slice(2)
 const rest = process.argv.slice(3)
 
 // The one spelling of the command surface (tests/doccheck.sh pins it against the
 // dispatch table, the header comment and README — edit them together).
-const USAGE = 'grovespec — validate | status [--json] | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N | files TASK-N | test [TASK-N|milestone] | fresh | followups [TASK-N] | source TASK-N [file.md@4…|--check|--refresh] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|end|release <TASK-N|tree>] | lang | locale | interview [claude|codex] | hooks install|remove|status | uninstall [--purge] | amend TASK-N [--simple <verdict>] | recheck [declare|close|open …] | retro | migrate changelog | impact TASK-N | tree | version\n'
+const USAGE = 'grovespec — validate | status [--json] | check [TASK-N] | next [--auto] | approve <TASK-N|tree> [--human] | reopen TASK-N draft|approved | reopen tree decomposition|fidelity | ratify TASK-N… | wait [resolve] TASK-A TASK-B <text…> | diff TASK-N|WP-N | files TASK-N | test [TASK-N|WP-N|milestone] | fresh | followups [TASK-N] | source TASK-N [file.md@4…|--check|--refresh] | pin <TASK-N|tree> | id | claim [list|<TASK-N|tree> [step]|end|release <TASK-N|tree>] | lang | locale | interview [claude|codex] | hooks install|remove|status | uninstall [--purge] | amend TASK-N [--simple <verdict>] | recheck [declare|close|open …] | retro | migrate changelog | package [add <model> TASK-…|drop WP-N] | impact TASK-N | tree | version\n'
 
 // The argv gate: an unknown flag or a surplus argument is a typo'd INTENTION and exits 2 —
 // `approve TASK-1 --humman` used to be silently accepted and recorded a MACHINE decision
@@ -103,7 +109,7 @@ const AV = {
   validate: [0], status: [0, ['--json']], check: [1], next: [0, ['--auto', 'auto']],
   approve: [1, ['--human']], reopen: [2], ratify: [Infinity], wait: [Infinity], diff: [1], files: [1],
   test: [1], fresh: [0], followups: [1], source: [Infinity, ['--check', '--refresh']], pin: [1], id: [0], claim: [2], lang: [0], locale: [0],
-  interview: [1], hooks: [1], uninstall: [0, ['--purge']], retro: [0], amend: [Infinity, ['--simple']], recheck: [Infinity], migrate: [1], impact: [1], tree: [0], version: [0]
+  interview: [1], hooks: [1], uninstall: [0, ['--purge']], retro: [0], amend: [Infinity, ['--simple']], recheck: [Infinity], migrate: [1], package: [Infinity], impact: [1], tree: [0], version: [0]
 }
 // No command takes two flags, and none takes the same one twice — `next --auto --auto`
 // and `next --auto auto` (aliases of one flag) are both a surplus token, not emphasis.
@@ -121,7 +127,7 @@ if (AV[cmd] !== undefined) {
 // A refusal is exit 2 with the path: no wait, no automatic reclaim (lib/lock.mjs).
 // (id and claim write only the repository-shared state, under that state's own short
 // lock — lib/shared.mjs — so they are not in this table: run.lock is one checkout's.)
-const MUTATES = { approve: () => true, ratify: () => true, reopen: () => true, pin: () => true, test: () => arg !== '', wait: () => arg !== '', hooks: () => arg !== 'status', uninstall: () => true, amend: () => true, recheck: () => arg !== '', source: () => rest.includes('--refresh'), migrate: () => true }
+const MUTATES = { approve: () => true, ratify: () => true, reopen: () => true, pin: () => true, test: () => arg !== '', wait: () => arg !== '', hooks: () => arg !== 'status', uninstall: () => true, amend: () => true, recheck: () => arg !== '', source: () => rest.includes('--refresh'), migrate: () => true, package: () => arg === 'add' || arg === 'drop' }
 
 // Commands that answer ABOUT the runtime or the environment, never about the project's
 // content — the four that stay reachable across a format boundary (a skewed project
@@ -228,6 +234,7 @@ if (badArg !== null) {
       }
       case 'retro': ec = cmdRetro(new Project()); break
       case 'migrate': ec = cmdMigrate(new Project(), arg); break
+      case 'package': ec = cmdPackage(new Project(), rest); break
       case 'amend': ec = cmdAmend(new Project(), arg, rest.includes('--simple') ? rest.slice(1).filter(a => a !== '--simple').join(' ') : (rest.length > 1 ? '' : null)); break
       case 'recheck': ec = cmdRecheck(new Project(), rest); break
       case 'id': ec = cmdId(new Project()); break

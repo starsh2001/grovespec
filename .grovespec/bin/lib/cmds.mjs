@@ -15,6 +15,8 @@ import { hooksState, HOOK_MARK } from './cmd-hooks.mjs'
 import { readCands, candsPath, recheckState } from './cmd-recheck.mjs'
 import { retroOwed } from './cmd-retro.mjs'
 import { planSaw, hotfixState } from './cmd-fresh.mjs'
+import { packageState } from './packages.mjs'
+import { packageModels, packageEntries } from './cmd-package.mjs'
 import { stepMark } from './cmd-claim.mjs'
 import { sharedContext, readState, writeState, withSharedLock, STATE_REMEDY } from './shared.mjs'
 
@@ -979,6 +981,20 @@ export function cmdValidate (P) {
     }
   }
 
+  // --- the work-package ledger (packages.yaml, v0.30.0) ---
+  const packageNotices = []
+  {
+    const pst = packageState(P)
+    for (const m of pst.problems) prob(m)
+    const models = packageModels(P)
+    for (const { key, value } of packageEntries(P.configText)) {
+      if (value === null || !/^[0-9]+$/.test(value)) packageNotices.push(`config packages: '${key}' is not \`<model>: <whole number of AC items>\` — that model is ignored until it is`)
+    }
+    if (pst.problems.length === 0) {
+      for (const p of pst.packages.filter(x => x.open && !models.has(x.model))) packageNotices.push(`${p.id} names the model '${p.model}', which config packages: does not list — next still names it`)
+    }
+  }
+
   // What this run actually looked at — so "I did not look" (a wrong path, an empty
   // tasks dir) can never read as "I looked and found nothing".
   say(`examined: tasks ${P.taskFiles().length} · tree nodes ${ids.length} · review files ${P.reviewFiles().length}`)
@@ -1043,6 +1059,10 @@ export function cmdValidate (P) {
     say(`notice: ${waitNotices.length} live wait(s) whose target is already done — the value landed; the waiter resumes there (read the entry, use the value, grovespec wait resolve):`)
     for (const m of waitNotices) say(`  ${m}`)
   }
+  if (packageNotices.length) {
+    say(`notice: ${packageNotices.length} work-package line(s) to look at (never blocks):`)
+    for (const m of packageNotices) say(`  ${m}`)
+  }
   if (markerNotices.length) {
     say(`notice: ${markerNotices.length} sideways deferral marker(s) on sealed nodes — the text is bound by a seal, so this does not block; nothing re-reads a sideways note, so convert each (a wait, or a revise) when its node next opens at draft:`)
     for (const m of markerNotices) say(`  ${m}`)
@@ -1083,8 +1103,10 @@ function statusModel (P) {
   // runnable and must not read as one. Unreadable ledger = say so and keep going —
   // status informs, validate owns the verdict.
   const ws = waitState(P)
+  // The work packages (v0.30.0) — same rule: an unreadable ledger is said, not folded away.
+  const pk = packageState(P)
   const nodes = P.treeIds().map(t => {
-    const st = P.statusOf(t); const ub = P.unblocked(t)
+    const st = P.statusOf(t); const ub = P.unblocked(t, b => ws.problems.length === 0 && ws.asleepOn(b) !== null)
     const asleep = ws.problems.length ? null : ws.asleepOn(t)
     const waits = P.humanWaits(t)
     let state; let next = null
@@ -1108,7 +1130,8 @@ function statusModel (P) {
       asleepOn: asleep === null ? null : { to: asleep.to, declared: asleep.declared, need: asleep.need },
       escalations: waits.filter(w => w.kind === 'escalated').map(w => w.text),
       unratified: P.unratified(t),
-      followups: P.followupCounts(t)
+      followups: P.followupCounts(t),
+      package: pk.openOf(t)?.id ?? null
     }
   })
   const b = P.backlogCounts()
@@ -1119,6 +1142,7 @@ function statusModel (P) {
   return {
     gate,
     ws,
+    pk,
     // The step running in this checkout (the step mark — cmd-claim): interjected work waits
     // for it, and only between steps may it land (FORMATS.md "Interjected work").
     step: stepMark(P.root),
@@ -1147,6 +1171,7 @@ export function cmdStatus (P, json = false) {
       recheck: { broken: rc.broken, open: rc.open.map(e => ({ ...e, armed: P.statusOf(e.from) === 'done' })) },
       retro: { owed: retro.owed, n: retro.n, anchor: retro.anchor, adopted: retro.adopted ?? null, broken: retro.broken },
       hotfixes: { owed: hf.owed.map(c => ({ commit: c.h, subject: c.s })), broken: hf.broken },
+      packages: { problems: m.pk.problems, list: m.pk.packages.map(p => ({ id: p.id, model: p.model, nodes: p.nodes, declared: p.declared, dropped: p.dropped || null, closed: p.closed || null, open: p.open })) },
       backlog: m.backlog,
       planDue: m.planDue
     }, null, 2))
@@ -1166,7 +1191,11 @@ export function cmdStatus (P, json = false) {
     else if (n.state === 'asleep') say(`${pad(t, 8)} ${pad(n.status, 12)} (waiting on ${n.asleepOn.to} — declared ${n.asleepOn.declared})`)
     else if (n.state === 'waiting-on-human') say(`${pad(t, 8)} ${pad(n.status, 12)} (waiting on you — below)`)
     else if (n.state === 'approve') say(`${pad(t, 8)} ${pad(n.status, 12)} → approve (sealed clean gate, nothing to decide — grovespec approve ${t})`)
-    else say(`${pad(t, 8)} ${pad(n.status, 12)} → ${n.next}`)
+    else say(`${pad(t, 8)} ${pad(n.status, 12)} → ${n.next}${n.package !== null ? ` (in ${n.package})` : ''}`)
+  }
+  for (const msg of m.pk.problems) say(`! ${msg}`)
+  for (const p of m.pk.packages.filter(x => x.open)) {
+    say(`${p.id} (${p.model}): ${p.nodes.join(' · ')} — ${p.nodes.filter(t => P.statusOf(t) === 'done').length} of ${p.nodes.length} done; one session runs it (grovespec-package)`)
   }
   // Rulings parked on the human, split out — so "nothing ready" can never hide an
   // escalation that is actually waiting on the user.
@@ -1292,6 +1321,7 @@ export function cmdCheck (P, n) {
     say('✗ readiness cannot be answered — the wait ledger is unreadable; fix it, then re-run')
     return 2
   }
+  const stuck = b => ws.asleepOn(b) !== null
   if (n === '') {
     say('ready to work now (top-down):')
     let any = false; let doneskel = false
@@ -1300,21 +1330,22 @@ export function cmdCheck (P, n) {
         if (P.roleOf(t) === 'skeleton') doneskel = true
         continue
       }
-      if (P.unblocked(t) === 'yes' && ws.asleepOn(t) === null) { say(`  ${pad(t, 8)} ${pad(P.statusOf(t), 12)} → ${P.nextAction(t)}`); any = true }
+      if (P.unblocked(t, stuck) === 'yes' && ws.asleepOn(t) === null) { say(`  ${pad(t, 8)} ${pad(P.statusOf(t), 12)} → ${P.nextAction(t)}`); any = true }
     }
     if (!any) say('  (none — every non-done node is blocked)')
     if (doneskel) say("  + done skeletons: their children are already sketched (work them above); 'grow' only adds children beyond the spec")
     return 0
   }
   if (P.read(P.taskPath(n)) === null) { say(`✗ ${n}: no task file`); return 2 }
-  const ub = P.unblocked(n)
+  const ub = P.unblocked(n, stuck)
   if (ub === 'yes') {
     const asleep = ws.asleepOn(n)
     if (asleep !== null) {
       say(`✗ ${n} is NOT ready — waiting on ${asleep.to} (declared ${asleep.declared}): ${asleep.need}. The turn returns when ${asleep.to} answers or goes done.`)
       return 1
     }
-    say(`✓ ${n} is ready (${P.statusOf(n)}) — parent done, blocked_by done → next: ${P.nextAction(n)}`)
+    const pkg = packageState(P).openOf(n)
+    say(`✓ ${n} is ready (${P.statusOf(n)}) — parent done, blocked_by done${pkg !== null ? ` or in ${pkg.id} (built earlier in its session)` : ''} → next: ${P.nextAction(n)}`)
     return 0
   }
   say(`✗ ${n} is NOT ready — ${ub.slice(3)}. Do NOT work it (that's bottom-up). Work a node 'grovespec check' lists as ready.`)

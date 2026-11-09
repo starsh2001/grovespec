@@ -24,6 +24,7 @@ import { SourceEvidenceError, assertFindRound, parseSourcePacket, sourceScopeDig
 import { TreeEvidenceError, TREE_EVIDENCE_MODES, treeEvidenceDigest } from './tree-evidence.mjs'
 import { waitState } from './cmd-wait.mjs'
 import { releaseOnDone, releaseTree, endStepMark } from './cmd-claim.mjs'
+import { closeFinished } from './cmd-package.mjs'
 
 const say = s => process.stdout.write(s + '\n')
 const hasTop = (text, key) => splitLines(text).some(line => new RegExp(`^${key}[ \\t]*:`).test(line))
@@ -293,6 +294,8 @@ export function cmdApprove (P, n, human) {
   // Done HERE (v0.19.0): this worktree's claim becomes a done mark for the worktrees that
   // have not got this commit yet, or simply ends. Said, never allowed to undo the decision.
   if (target === 'done') for (const line of releaseOnDone(P, n)) say(line)
+  // A work package whose last node this was is closed for good (v0.30.0 — packages.mjs).
+  if (target === 'done') for (const id of closeFinished(P)) say(`${id} is closed — every node of it is done`)
   // The gate decision closes the step that sealed it (the step mark — cmd-claim).
   endStepMark(P.root, n)
   return 0

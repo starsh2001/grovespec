@@ -10,7 +10,7 @@ Runs **one** step — the one that's due — and stops. You don't have to know w
 > **Language: read it first.** Read `language:` from `.grovespec/config.yaml` (or `node .grovespec/bin/grovespec.mjs lang`) and write **every** reply in that language. These files are English; your output is not.
 
 ## What it is
-A driver over the nine step skills, and nothing more: **it carries no rules of its own** — each step's rules live in that step's skill, and duplicating them here is exactly the drift GroveSpec exists to stop. Repetition isn't its job either (§ *Looping it*) — one step per invocation is what keeps each session bounded (WORKFLOW §5).
+A driver over the ten step skills, and nothing more: **it carries no rules of its own** — each step's rules live in that step's skill, and duplicating them here is exactly the drift GroveSpec exists to stop. Repetition isn't its job either (§ *Looping it*) — one step per invocation is what keeps each session bounded (WORKFLOW §5).
 
 ## What stops the loop: a decision, never a stage
 The rule and the shape of the ask are one paragraph in `FORMATS.md` "The step report" (*A decision, not a stage*): the person is stopped only where a decision is genuinely theirs — an ambiguous requirement, a product behavior or scope choice, accepting an unmet or unverifiable requirement — and the ask carries **the issue · the options · each option's impact · the recommended one**. A gate that came out clean within the agreed requirements is **not** a decision: its verdict is recorded and the build goes on. No issue, no ask.
@@ -38,6 +38,7 @@ Say the mode in the invocation when you call a step skill: **ask** — put every
 ## 2. Ask what's due
 `node .grovespec/bin/grovespec.mjs next` (auto mode: `next --auto`) — it answers one of:
 - `next: TASK-N (name) <status> → <skill>` — run it (§3). It may also list what's waiting on the human, and nodes another worktree holds or finished on a branch not merged here (skipped here); carry those into your report. The step may be `grovespec approve` — a sealed clean gate, taken on the record in either mode.
+- `next: WP-N (…) → grovespec-package (model: <model>)` — an open work package: run `grovespec-package` (§3). The model is the session's — a driver that can choose one opens the session with it.
 - `next: tree → grovespec-verify (…)` — a tree gate is armed (decomposition, or the brownfield survey's fidelity) — run `grovespec-verify` on the tree (§3).
 - `next: recheck — …` — a contract change landed and its candidates are armed — run `grovespec-recheck` (§3): one step judges reach for them all; only judged-touched nodes reopen. Same in both modes.
 - `next: align — …` — a `hotfix:` commit still owes its spec — run `grovespec-revise` §D on the commits it names (§3). Same in both modes.
@@ -64,7 +65,7 @@ Then the last line — **read it off the `grovespec next` you just ran, don't de
 | that run answered | your last line |
 |---|---|
 | `nothing runnable — …` | exactly `NOTHING_TO_WORK — <the reason it gave>` |
-| anything else (`next: TASK-N …` · `next: tree …` · `next: recheck …` · `next: align …` · `next: retro …` · `next: plan …`) | **no final line at all** — end with that `next: …` so the loop keeps going |
+| anything else (`next: TASK-N …` · `next: WP-N …` · `next: tree …` · `next: recheck …` · `next: align …` · `next: retro …` · `next: plan …`) | **no final line at all** — end with that `next: …` so the loop keeps going |
 
 One exception, and only this one: **a decision you put to the user is still unanswered when your turn ends** — asked in your closing because the host has no question tool (a step skill's four-part ask in ask mode, or in auto mode a question with no recommended option). Then close with `NOTHING_TO_WORK — waiting on you: <the issue>` even though `next` still names a step. **A question asked through the host's question tool never ends on the token** — a blocking tool already returned its answer, and an async one's answer comes back as your next message; keep going from it.
 
